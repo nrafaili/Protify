@@ -1,0 +1,142 @@
+import torch
+from torch import nn
+from transformers import PreTrainedModel, PretrainedConfig
+from transformers.modeling_outputs import SequenceClassifierOutput, TokenClassifierOutput
+from typing import List
+from .mlp import swiglu_correction_fn
+from .losses import get_loss_fct
+from .transformer import Transformer
+from ..embedder import Pooler
+
+
+class TransformerProbeConfig(PretrainedConfig):
+    model_type = "probe"
+    def __init__(
+            self,
+            input_dim: int = 768,
+            hidden_dim: int = 512,
+            ff_dim: int = 4096,
+            transformer_dropout: float = 0.1,
+            classifier_dropout: float = 0.2,
+            num_labels: int = 2,
+            n_layers: int = 1,
+            n_heads: int = 4,
+            task_type: str = 'binary',
+            rotary: bool = True,
+            pooling_types: List[str] = ['mean', 'cls'],
+    ):
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.ff_dim = ff_dim
+        self.transformer_dropout = transformer_dropout
+        self.classifier_dropout = classifier_dropout
+        self.task_type = task_type
+        self.num_labels = num_labels
+        self.n_heads = n_heads
+        self.n_layers = n_layers
+        self.rotary = rotary
+        self.pooling_types = pooling_types
+
+
+class TransformerForSequenceClassification(PreTrainedModel):
+    config_class = TransformerProbeConfig
+    def __init__(self, config: TransformerProbeConfig):
+        super().__init__(config)
+        self.config = config
+        self.task_type = config.task_type
+        self.loss_fct = get_loss_fct(config.task_type)
+        self.num_labels = config.num_labels
+        self.input_dim = config.input_dim
+        self.input_layer = nn.Linear(config.input_dim, config.hidden_dim)
+        self.transformer = Transformer(
+            d_model=config.hidden_dim,
+            n_heads=config.n_heads,
+            n_layers=config.n_layers,
+            expansion_ratio=8 / 3,
+            dropout=config.transformer_dropout,
+            rotary=config.rotary,
+        )
+
+        proj_dim = swiglu_correction_fn(expansion_ratio=2, d_model=config.num_labels)
+        self.classifier = nn.Sequential(
+            nn.LayerNorm(config.hidden_dim),
+            nn.Linear(config.hidden_dim, config.ff_dim),
+            nn.ReLU(),
+            nn.Dropout(config.transformer_dropout),
+            nn.Linear(config.ff_dim, proj_dim),
+            nn.ReLU(),
+            nn.Dropout(config.classifier_dropout),
+            nn.Linear(proj_dim, proj_dim),
+            nn.ReLU(),
+            nn.Linear(proj_dim, config.num_labels)
+        )
+        self.pooler = Pooler(config.pooling_types)
+
+    def forward(self, embeddings, attention_mask=None, labels=None):
+        x = self.input_layer(embeddings)
+        x = self.transformer(x, attention_mask)
+        x = self.pooler(x, attention_mask)
+        logits = self.classifier(x)
+        loss = None
+        if labels is not None:
+            if self.task_type == 'regression':
+                loss = self.loss_fct(logits.flatten(), labels.view(-1).float())
+            elif self.task_type == 'multilabel':
+                loss = self.loss_fct(logits, labels.float())
+            else:
+                loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1).long())
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=None,
+            attentions=None
+        )
+    
+
+class TransformerForTokenClassification(PreTrainedModel):
+    config_class = TransformerProbeConfig
+    def __init__(self, config: TransformerProbeConfig):
+        super().__init__(config)
+        self.config = config
+        self.task_type = config.task_type
+        self.loss_fct = get_loss_fct(config.task_type)
+        self.num_labels = config.num_labels
+        self.input_dim = config.input_dim
+        self.input_layer = nn.Linear(config.input_dim, config.hidden_dim)
+        self.transformer = Transformer(
+            d_model=config.hidden_dim,
+            n_heads=config.n_heads,
+            n_layers=config.n_layers,
+            expansion_ratio=8 / 3,
+            dropout=config.dropout,
+            rotary=True,
+            diff_attn=config.diff_attn
+        )
+
+        proj_dim = swiglu_correction_fn(expansion_ratio=2, d_model=config.num_labels)
+        self.classifier = nn.Sequential(
+            nn.LayerNorm(config.hidden_dim),
+            nn.Linear(config.hidden_dim, config.ff_dim),
+            nn.ReLU(),
+            nn.Dropout(config.transformer_dropout),
+            nn.Linear(config.ff_dim, proj_dim),
+            nn.ReLU(),
+            nn.Dropout(config.classifier_dropout),
+            nn.Linear(proj_dim, proj_dim),
+            nn.SiLU(),
+            nn.Linear(proj_dim, config.num_labels)
+        )
+
+    def forward(self, embeddings, attention_mask=None, labels=None):
+        x = self.input_layer(embeddings)
+        x = self.transformer(x, attention_mask)
+        logits = self.classifier(x)
+        loss = None
+        if labels is not None:
+            loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=None,
+            attentions=None
+        )
