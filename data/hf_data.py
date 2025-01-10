@@ -29,7 +29,8 @@ def get_hf_data(args: HFDataArguments):
     datasets = []
     for data_path in args.data_paths:
         data_name = data_path.split('/')[-1]
+        ppi = 'ppi' in data_name.lower()
         dataset = load_dataset(data_path)
         train_set, valid_set, test_set = dataset['train'], dataset['valid'], dataset['test']
-        datasets.append((train_set, valid_set, test_set))
-    return process_datasets(datasets=datasets, data_name=data_name, max_len=args.max_len, trim=args.trim)
+        datasets.append((train_set, valid_set, test_set, ppi))
+    return process_datasets(hf_datasets=datasets, data_name=data_name, max_len=args.max_len, trim=args.trim)

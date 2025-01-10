@@ -4,7 +4,7 @@ supported_datasets = {
     'GO-CC': 'GleghornLab/CC_reg',
     'GO-BP': 'GleghornLab/BP_reg',
     'GO-MF': 'GleghornLab/MF_reg',
-    'GO-MB': 'GleghornLab/MB_reg',
+    'MB': 'GleghornLab/MB_reg',
     'DeepLoc2': 'GleghornLab/DL2_reg',
     'DeepLoc10': 'GleghornLab/DL10_reg',
     'enzyme-kcat': 'GleghornLab/enzyme_kcat',
@@ -31,7 +31,7 @@ possible_with_vector_reps = [
     'GO-CC',
     'GO-BP',
     'GO-MF',
-    'GO-MB',
+    'MB',
     'DeepLoc2',
     'DeepLoc10',
     'enzyme-kcat',
@@ -47,6 +47,15 @@ possible_with_vector_reps = [
     'cloning-clf',
     'stability-prediction',
     'human-ppi',
+]
+
+
+testing = [
+    'EC', # multilabel
+    'DeepLoc2', # binary
+    'DeepLoc10', # multiclass
+    'enzyme-kcat', # regression
+    'human-ppi', # ppi
 ]
 
 

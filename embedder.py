@@ -3,22 +3,18 @@ import torch
 import warnings
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Callable
 
 
 @dataclass
 class EmbeddingArguments:
-    """
-    """
-    datasets: list[str]
     all_seqs: list[str]
     batch_size: int = 4
     num_workers: int = 0
     download_embeddings: bool = False
-    max_length: int = 2048
     matrix_embed: bool = False
-    pooling_types: list[str] = ['mean']
+    pooling_types: list[str] = field(default_factory=lambda: ['mean'])
     save_embeddings: bool = False
     embed_dtype: torch.dtype = torch.float32
     sql: bool = False
@@ -98,7 +94,7 @@ class Pooler:
             return (emb * attention_mask).var(dim=1)
 
     def cls_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        return emb[0, :]
+        return emb[:, 0, :]
 
     def __call__(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # [mean, max]
         final_emb = []
@@ -130,14 +126,14 @@ def build_collator(tokenizer) -> Callable[[list[str]], tuple[torch.Tensor, torch
 class Embedder:
     def __init__(self, args: EmbeddingArguments):
         self.args = args
-        self.datasets = args.datasets
+        self.all_seqs = args.all_seqs
         self.batch_size = args.batch_size
         self.num_workers = args.num_workers
-        self.max_length = args.max_length
         self.matrix_embed = args.matrix_embed
         self.pooling_types = args.pooling_types
+        self.download_embeddings = args.download_embeddings
         self.save_embeddings = args.save_embeddings
-        self.save_dtype = args.save_dtype
+        self.embed_dtype = args.embed_dtype
         self.sql = args.sql
         self.save_dir = args.save_dir
 
@@ -162,7 +158,12 @@ class Embedder:
         return set(sequences)
 
     def _embed_sequences(self, model_name: str, embedding_model: any, tokenizer: any) -> Optional[dict[str, torch.Tensor]]:
+        os.makedirs(self.save_dir, exist_ok=True)
         model = embedding_model.to(self.device).eval()
+        """
+        TODO
+        torch compile?
+        """
         dataset = ProteinDataset(self.all_seqs)
         collate_fn = build_collator(tokenizer)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=collate_fn)
@@ -220,19 +221,21 @@ class Embedder:
         else:
             print(f"No embeddings found in {save_path}")
             to_embed = self.all_seqs
+
+        if len(to_embed) > 0:
             with torch.no_grad():
                 for i, batch in tqdm(enumerate(dataloader), total=len(dataloader), desc='Embedding batches'):
                     seqs = to_embed[i * self.batch_size:(i + 1) * self.batch_size]
-                input_ids, attention_mask = batch['input_ids'].to(device), batch['attention_mask'].to(device)
-                residue_embeddings = model(input_ids, attention_mask)
-                residue_embeddings = residue_embeddings.to(self.embed_dtype)
-                embeddings = _get_embeddings(residue_embeddings, attention_mask).cpu()
-                for seq, emb in zip(seqs, embeddings):
-                    embeddings_dict[seq] = emb
+                    input_ids, attention_mask = batch['input_ids'].to(device), batch['attention_mask'].to(device)
+                    residue_embeddings = model(input_ids, attention_mask)
+                    residue_embeddings = residue_embeddings.to(self.embed_dtype)
+                    embeddings = _get_embeddings(residue_embeddings, attention_mask).cpu()
+                    for seq, emb in zip(seqs, embeddings):
+                        embeddings_dict[seq] = emb
         
-        if self.save_embeddings:
-            print(f"Saving embeddings to {save_path}")
-            save_file(embeddings_dict, save_path)
+            if self.save_embeddings:
+                print(f"Saving embeddings to {save_path}")
+                save_file(embeddings_dict, save_path)
         return embeddings_dict
 
     def __call__(self, model_name: str, embedding_model: Optional[any] = None, tokenizer: Optional[any] = None):
@@ -248,8 +251,66 @@ class Embedder:
 
 
 if __name__ == '__main__':
-    """
-    TODO
-    Embed all supported datasets with all supported models
-    """
-    pass
+    ### Embed all supported datasets with all supported models
+    import argparse
+    from huggingface_hub import upload_file, login
+    from data.supported_datasets import supported_datasets, possible_with_vector_reps, testing
+    from data.hf_data import HFDataArguments, get_hf_data
+    from base_models.get_base_models import BaseModelArguments, get_base_model
+    os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1' # prevent cache warning on Windows machines
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--token', default=None, help='Huggingface token')
+    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--num_workers', type=int, default=0)
+    parser.add_argument('--pooling_types', nargs='+', default=['mean'])
+    parser.add_argument('--save_embeddings', action='store_true')
+    parser.add_argument('--embed_dtype', type=str, default='float16')
+    parser.add_argument('--save_dir', type=str, default='embeddings')
+    args = parser.parse_args()
+
+    if args.token is not None:
+        login(args.token)
+
+    if args.embed_dtype == 'float16':
+        dtype = torch.float16
+    elif args.embed_dtype == 'bfloat16':
+        dtype = torch.bfloat16
+    elif args.embed_dtype == 'float32':
+        dtype = torch.float32
+    else:
+        raise ValueError(f"Invalid embedding dtype: {args.embed_dtype}")
+
+    # Get data
+    data_paths = [supported_datasets[dataset] for dataset in testing]
+    data_args = HFDataArguments(data_paths=data_paths, max_len=2048, trim=False)
+    all_seqs = get_hf_data(data_args)[1]
+
+    # Set up embedder
+    embedder_args = EmbeddingArguments(
+        all_seqs=all_seqs,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        download_embeddings=False,
+        matrix_embed=False,
+        pooling_types=args.pooling_types,
+        save_embeddings=args.save_embeddings,
+        embed_dtype=dtype,
+        sql=False,
+        save_dir='embeddings'
+    )
+    embedder = Embedder(embedder_args)
+    
+    # Embed for each model
+    model_args = BaseModelArguments()
+    for model_name in model_args.model_names:
+        model, tokenizer = get_base_model(model_name)
+        _ = embedder(model_name, model, tokenizer)
+        save_path = os.path.join(embedder_args.save_dir, f'{model_name}.safetensors')
+        upload_file(
+            path_or_fileobj=save_path,
+            path_in_repo='embeddings',
+            repo_id='Synthyra/plm_embeddings',
+            repo_type='dataset')
+
+    print('Done')

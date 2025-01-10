@@ -32,10 +32,10 @@ def _label_type_checker(labels):
     return label_type
 
 
-def process_datasets(hf_datasets: List[Dataset], data_name: str, max_len: int, trim: bool = False, ppi: bool = False):
+def process_datasets(hf_datasets: List[Dataset], data_name: str, max_len: int, trim: bool = False):
     datasets, all_seqs = {}, set()
     for dataset in hf_datasets:
-        train_set, valid_set, test_set = dataset
+        train_set, valid_set, test_set, ppi = dataset
         if trim: # trim by length if necessary
             original_train_size, original_valid_size, original_test_size = len(train_set), len(valid_set), len(test_set)
             if ppi:
@@ -76,7 +76,7 @@ def process_datasets(hf_datasets: List[Dataset], data_name: str, max_len: int, t
             all_seqs.update(train_set['seqs'])
             all_seqs.update(valid_set['seqs'])
             all_seqs.update(test_set['seqs'])
-
+            
         # confirm the type of labels
         check_labels = valid_set['labels']
         label_type = _label_type_checker(check_labels)
@@ -115,5 +115,7 @@ def process_datasets(hf_datasets: List[Dataset], data_name: str, max_len: int, t
                     full_list = np.arange(0, max_label+1)
                     num_labels = len(full_list)
 
+    all_seqs = list(all_seqs)
+    all_seqs = sorted(all_seqs, key=len, reverse=True) # longest first
     datasets[data_name] = (train_set, valid_set, test_set, num_labels, label_type)
     return datasets, all_seqs
