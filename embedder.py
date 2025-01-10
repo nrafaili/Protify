@@ -162,10 +162,6 @@ class Embedder:
         return set(sequences)
 
     def _embed_sequences(self, model_name: str, embedding_model: any, tokenizer: any) -> Optional[dict[str, torch.Tensor]]:
-        """
-        TODO
-        probably switch to sequence inputs to embedding_model, not tokenized
-        """
         model = embedding_model.to(self.device).eval()
         dataset = ProteinDataset(self.all_seqs)
         collate_fn = build_collator(tokenizer)
