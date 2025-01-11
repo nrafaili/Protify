@@ -628,8 +628,8 @@ class EsmSequenceTokenizer(PreTrainedTokenizerFast):
 
 
 presets = {
-    'esmc_300': 'Synthyra/ESMplusplus_small',
-    'esmc_600': 'Synthyra/ESMplusplus_large',
+    'ESMC-300': 'Synthyra/ESMplusplus_small',
+    'ESMC-600': 'Synthyra/ESMplusplus_large',
 }
 
 
@@ -640,6 +640,6 @@ def build_esmc_model(preset: str):
 
 
 if __name__ == '__main__':
-    model, tokenizer = build_esmc_model('esmc_300')
+    model, tokenizer = build_esmc_model('ESMC-300')
     print(model)
     print(tokenizer)

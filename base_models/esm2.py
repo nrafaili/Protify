@@ -580,11 +580,11 @@ class FastEsmForEmbedding(FastEsmPreTrainedModel):
 
 
 presets = {
-    'esm2_8': 'facebook/esm2_t6_8M_UR50D',
-    'esm2_35': 'facebook/esm2_t12_35M_UR50D',
-    'esm2_150': 'facebook/esm2_t30_150M_UR50D',
-    'esm2_650': 'facebook/esm2_t33_650M_UR50D',
-    'esm2_3B': 'facebook/esm2_t36_3B_UR50D',
+    'ESM2-8': 'facebook/esm2_t6_8M_UR50D',
+    'ESM2-35': 'facebook/esm2_t12_35M_UR50D',
+    'ESM2-150': 'facebook/esm2_t30_150M_UR50D',
+    'ESM2-650': 'facebook/esm2_t33_650M_UR50D',
+    'ESM2-3B': 'facebook/esm2_t36_3B_UR50D',
 }
 
 
@@ -595,6 +595,6 @@ def build_esm2_model(preset: str):
 
 
 if __name__ == '__main__':
-    model, tokenizer = build_esm2_model('esm2_8')
+    model, tokenizer = build_esm2_model('ESM2-8')
     print(model)
     print(tokenizer)

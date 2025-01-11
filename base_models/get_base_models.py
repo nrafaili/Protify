@@ -2,32 +2,32 @@ from dataclasses import dataclass, field
 
 
 currently_supported_models = [
-    'esm2_8',
-    'esm2_35',
-    'esm2_150',
-    'esm2_650',
-    'esm2_3B',
-    'random',
-    'random_esm2_8',
-    'random_esm2_35', # same as random_weights
-    'random_esm2_150',
-    'random_esm2_650',
-    'random_esm2_3B',
-    'esmc_300',
-    'esmc_600'
+    'ESM2-8',
+    'ESM2-35',
+    'ESM2-150',
+    'ESM2-650',
+    'ESM2-3B',
+    'Random',
+    'Random-ESM2-8',
+    'Random-ESM2-35', # same as random_weights
+    'Random-ESM2-150',
+    'Random-ESM2-650',
+    'Random-ESM2-3B',
+    'ESMC-300',
+    'ESMC-600'
 ]
 
 
 standard_benchmark = [
-    'esm2_8',
-    'esm2_35',
-    'esm2_150',
-    'esm2_650',
-    'esm2_3B',
-    'esmc_300',
-    'esmc_600',
-    'random',
-    'random_weights'
+    'ESM2-8',
+    'ESM2-35',
+    'ESM2-150',
+    'ESM2-650',
+    'ESM2-3B',
+    'ESMC-300',
+    'ESMC-600',
+    'Random',
+    'Random-Transformer',
 ]
 
 
@@ -37,13 +37,13 @@ class BaseModelArguments:
 
 
 def get_base_model(model_name: str):
-    if 'random' in model_name:
+    if 'random' in model_name.lower():
         from .random import build_random_model
         return build_random_model(model_name)
-    elif 'esm2' in model_name:
+    elif 'esm2' in model_name.lower():
         from .esm2 import build_esm2_model
         return build_esm2_model(model_name)
-    elif 'esmc' in model_name:
+    elif 'esmc' in model_name.lower():
         from .esmc import build_esmc_model
         return build_esmc_model(model_name)
     else:

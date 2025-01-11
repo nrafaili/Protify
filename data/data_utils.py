@@ -35,6 +35,7 @@ def _label_type_checker(labels):
 def process_datasets(hf_datasets: List[Dataset], data_name: str, max_len: int, trim: bool = False):
     datasets, all_seqs = {}, set()
     for dataset in hf_datasets:
+        print(f'Processing {data_name}')
         train_set, valid_set, test_set, ppi = dataset
         if trim: # trim by length if necessary
             original_train_size, original_valid_size, original_test_size = len(train_set), len(valid_set), len(test_set)

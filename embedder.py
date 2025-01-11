@@ -233,9 +233,14 @@ class Embedder:
                     for seq, emb in zip(seqs, embeddings):
                         embeddings_dict[seq] = emb
         
-            if self.save_embeddings:
-                print(f"Saving embeddings to {save_path}")
-                save_file(embeddings_dict, save_path)
+        if self.save_embeddings:
+            """
+            TODO
+            probably need to remove before saving again
+            """
+            # os.remove(save_path) # this does not have permission
+            print(f"Saving embeddings to {save_path}")
+            save_file(embeddings_dict, save_path)
         return embeddings_dict
 
     def __call__(self, model_name: str, embedding_model: Optional[any] = None, tokenizer: Optional[any] = None):
@@ -309,7 +314,7 @@ if __name__ == '__main__':
         save_path = os.path.join(embedder_args.save_dir, f'{model_name}.safetensors')
         upload_file(
             path_or_fileobj=save_path,
-            path_in_repo='embeddings',
+            path_in_repo=f'embeddings/{model_name}.safetensors',
             repo_id='Synthyra/plm_embeddings',
             repo_type='dataset')
 

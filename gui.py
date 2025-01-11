@@ -1,193 +1,236 @@
+import torch
 import tkinter as tk
 from tkinter import ttk
 
+from base_models.get_base_models import BaseModelArguments, standard_benchmark
+from data.hf_data import HFDataArguments, get_hf_data
+from data.supported_datasets import supported_datasets, possible_with_vector_reps
+from embedder import EmbeddingArguments
 
-class SettingsGUI:
+from main import MainProcess
+
+
+class GUI(MainProcess):
     def __init__(self, master):
+        super().__init__()
         self.master = master
-        self.master.title("Game Settings")
-        self.master.geometry("500x350")
+        self.master.title("Settings GUI")
+        self.master.geometry("600x800")
 
-        # Dictionary to store all settings
-        self.settings = {}
+        icon = tk.PhotoImage(file="synthyra_logo.png")  
+        # Set the window icon
+        self.master.iconphoto(True, icon)
 
-        # Create a Notebook widget that holds multiple tabs
+        # Dictionary to store Tkinter variables for settings
+        self.settings_vars = {}
+
+        # Create the Notebook widget
         self.notebook = ttk.Notebook(master)
         self.notebook.pack(fill='both', expand=True)
 
         # Create frames for each settings tab
-        self.general_tab = ttk.Frame(self.notebook)
-        self.graphics_tab = ttk.Frame(self.notebook)
-        self.audio_tab = ttk.Frame(self.notebook)
-        
+        self.data_tab = ttk.Frame(self.notebook)
+        self.embed_tab = ttk.Frame(self.notebook)
+        self.model_tab = ttk.Frame(self.notebook)
+
         # Add tabs to the notebook
-        self.notebook.add(self.general_tab, text="General")
-        self.notebook.add(self.graphics_tab, text="Graphics")
-        self.notebook.add(self.audio_tab, text="Audio")
+        self.notebook.add(self.model_tab, text="Model")
+        self.notebook.add(self.data_tab, text="Data")
+        self.notebook.add(self.embed_tab, text="Embedding")
 
         # Build each tab
-        self.build_general_tab()
-        self.build_graphics_tab()
-        self.build_audio_tab()
+        self._build_model_tab()
+        self._build_data_tab()
+        self._build_embed_tab()
 
-        # Add a "Save All" button below the notebook
-        apply_button = ttk.Button(master, text="Save All", command=self.save_settings)
-        apply_button.pack(side="bottom", pady=10)
+        #apply_button = ttk.Button(master, text="Stop code", command=self._clear_console)
+        #apply_button.pack(side="bottom", pady=10)
 
-    def build_general_tab(self):
-        """Initialize all widgets for the General settings tab."""
-        # Example: Username
-        ttk.Label(self.general_tab, text="Username:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.settings["username"] = tk.StringVar(value="Player1")
-        username_entry = ttk.Entry(self.general_tab, textvariable=self.settings["username"])
-        username_entry.grid(row=0, column=1, padx=10, pady=5)
+    def _build_data_tab(self):
+        # Label + Listbox for dataset names
+        ttk.Label(self.data_tab, text="Dataset Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
+        self.data_listbox = tk.Listbox(self.data_tab, selectmode="extended", height=25, width=25)
+        for dataset_name in supported_datasets:
+            self.data_listbox.insert(tk.END, dataset_name)
+        self.data_listbox.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
 
-        # Example: Difficulty (dropdown)
-        ttk.Label(self.general_tab, text="Difficulty:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        self.settings["difficulty"] = tk.StringVar(value="Normal")
-        difficulty_combo = ttk.Combobox(
-            self.general_tab, 
-            textvariable=self.settings["difficulty"], 
-            values=["Easy", "Normal", "Hard", "Nightmare"]
+        # Max length (Spinbox)
+        ttk.Label(self.data_tab, text="Max Sequence Length:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["max_len"] = tk.IntVar(value=1024)
+        spin_max_len = ttk.Spinbox(
+            self.data_tab,
+            from_=1,
+            to=8192,
+            textvariable=self.settings_vars["max_len"]
         )
-        difficulty_combo.grid(row=1, column=1, padx=10, pady=5)
+        spin_max_len.grid(row=1, column=1, padx=10, pady=5, sticky="w")
 
-        # Example: Enable tutorials (checkbox)
-        ttk.Label(self.general_tab, text="Enable Tutorials:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
-        self.settings["tutorials_enabled"] = tk.BooleanVar(value=True)
-        tutorial_check = ttk.Checkbutton(self.general_tab, variable=self.settings["tutorials_enabled"])
-        tutorial_check.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+        # Trim (Checkbox)
+        ttk.Label(self.data_tab, text="Trim Sequences:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["trim"] = tk.BooleanVar(value=False)
+        check_trim = ttk.Checkbutton(
+            self.data_tab,
+            variable=self.settings_vars["trim"]
+        )
+        check_trim.grid(row=2, column=1, padx=10, pady=5, sticky="w")
 
-        # Add a "Run General" button at the bottom of the tab
-        run_button = ttk.Button(self.general_tab, text="Run General", command=self.run_general)
+        run_button = ttk.Button(self.data_tab, text="Get Data", command=self._get_data)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
-    def build_graphics_tab(self):
-        """Initialize all widgets for the Graphics settings tab."""
-        # Example: Screen Resolution
-        ttk.Label(self.graphics_tab, text="Resolution:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.settings["resolution"] = tk.StringVar(value="1920x1080")
-        resolution_combo = ttk.Combobox(
-            self.graphics_tab, 
-            textvariable=self.settings["resolution"], 
-            values=["1920x1080", "1280x720", "1600x900", "2560x1440"]
+    def _build_embed_tab(self):
+        # batch_size
+        ttk.Label(self.embed_tab, text="Batch Size:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["batch_size"] = tk.IntVar(value=4)
+        spin_batch_size = ttk.Spinbox(self.embed_tab, from_=1, to=1024, textvariable=self.settings_vars["batch_size"])
+        spin_batch_size.grid(row=1, column=1, padx=10, pady=5)
+
+        # num_workers
+        ttk.Label(self.embed_tab, text="Num Workers:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["num_workers"] = tk.IntVar(value=0)
+        spin_num_workers = ttk.Spinbox(self.embed_tab, from_=0, to=64, textvariable=self.settings_vars["num_workers"])
+        spin_num_workers.grid(row=2, column=1, padx=10, pady=5)
+
+        # download_embeddings
+        ttk.Label(self.embed_tab, text="Download Embeddings:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["download_embeddings"] = tk.BooleanVar(value=False)
+        check_download = ttk.Checkbutton(self.embed_tab, variable=self.settings_vars["download_embeddings"])
+        check_download.grid(row=3, column=1, padx=10, pady=5, sticky="w")
+
+        # matrix_embed
+        ttk.Label(self.embed_tab, text="Matrix Embedding:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["matrix_embed"] = tk.BooleanVar(value=False)
+        check_matrix = ttk.Checkbutton(self.embed_tab, variable=self.settings_vars["matrix_embed"])
+        check_matrix.grid(row=4, column=1, padx=10, pady=5, sticky="w")
+
+        # pooling_types
+        ttk.Label(self.embed_tab, text="Pooling Types (comma-separated):").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["pooling_types"] = tk.StringVar(value="mean")
+        entry_pooling = ttk.Entry(self.embed_tab, textvariable=self.settings_vars["pooling_types"], width=20)
+        entry_pooling.grid(row=5, column=1, padx=10, pady=5)
+
+        # embed_dtype
+        ttk.Label(self.embed_tab, text="Embedding DType:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["embed_dtype"] = tk.StringVar(value="float32")
+        combo_dtype = ttk.Combobox(
+            self.embed_tab,
+            textvariable=self.settings_vars["embed_dtype"],
+            values=["float32", "float16", "bfloat16", "float64"]
         )
-        resolution_combo.grid(row=0, column=1, padx=10, pady=5)
+        combo_dtype.grid(row=7, column=1, padx=10, pady=5)
 
-        # Example: Fullscreen
-        ttk.Label(self.graphics_tab, text="Fullscreen:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        self.settings["fullscreen"] = tk.BooleanVar(value=True)
-        fullscreen_check = ttk.Checkbutton(self.graphics_tab, variable=self.settings["fullscreen"])
-        fullscreen_check.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+        # sql
+        ttk.Label(self.embed_tab, text="Use SQL:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["sql"] = tk.BooleanVar(value=False)
+        check_sql = ttk.Checkbutton(self.embed_tab, variable=self.settings_vars["sql"])
+        check_sql.grid(row=8, column=1, padx=10, pady=5, sticky="w")
 
-        # Example: Graphics Quality (dropdown)
-        ttk.Label(self.graphics_tab, text="Graphics Quality:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
-        self.settings["graphics_quality"] = tk.StringVar(value="High")
-        quality_combo = ttk.Combobox(
-            self.graphics_tab,
-            textvariable=self.settings["graphics_quality"],
-            values=["Low", "Medium", "High", "Ultra"]
-        )
-        quality_combo.grid(row=2, column=1, padx=10, pady=5)
+        # save_dir
+        ttk.Label(self.embed_tab, text="Save Dir:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["save_dir"] = tk.StringVar(value="embeddings")
+        entry_save_dir = ttk.Entry(self.embed_tab, textvariable=self.settings_vars["save_dir"], width=20)
+        entry_save_dir.grid(row=9, column=1, padx=10, pady=5)
 
-        # Example: Frame Rate Limit (Spinbox)
-        ttk.Label(self.graphics_tab, text="Frame Limit:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
-        self.settings["frame_limit"] = tk.IntVar(value=60)
-        fr_spinbox = ttk.Spinbox(
-            self.graphics_tab, 
-            from_=30, 
-            to=240, 
-            textvariable=self.settings["frame_limit"]
-        )
-        fr_spinbox.grid(row=3, column=1, padx=10, pady=5)
-
-        # Add a "Run Graphics" button at the bottom of the tab
-        run_button = ttk.Button(self.graphics_tab, text="Run Graphics", command=self.run_graphics)
+        run_button = ttk.Button(self.embed_tab, text="Embed sequences to disk", command=self._get_embeddings)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
-    def build_audio_tab(self):
-        """Initialize all widgets for the Audio settings tab."""
-        # Example: Master Volume
-        ttk.Label(self.audio_tab, text="Master Volume:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.settings["master_volume"] = tk.DoubleVar(value=100)
-        volume_scale = ttk.Scale(
-            self.audio_tab, 
-            from_=0, 
-            to=100, 
-            orient="horizontal", 
-            variable=self.settings["master_volume"]
-        )
-        volume_scale.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
+    def _build_model_tab(self):
+        ttk.Label(self.model_tab, text="Model Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
-        # Example: Mute
-        ttk.Label(self.audio_tab, text="Mute:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        self.settings["mute"] = tk.BooleanVar(value=False)
-        mute_check = ttk.Checkbutton(self.audio_tab, variable=self.settings["mute"])
-        mute_check.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+        self.model_listbox = tk.Listbox(self.model_tab, selectmode="extended", height=10)
+        for model_name in standard_benchmark:
+            self.model_listbox.insert(tk.END, model_name)
+        self.model_listbox.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
 
-        # Example: Music Volume
-        ttk.Label(self.audio_tab, text="Music Volume:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
-        self.settings["music_volume"] = tk.DoubleVar(value=80)
-        music_scale = ttk.Scale(
-            self.audio_tab, 
-            from_=0, 
-            to=100, 
-            orient="horizontal", 
-            variable=self.settings["music_volume"]
-        )
-        music_scale.grid(row=2, column=1, padx=10, pady=5, sticky="ew")
-
-        # Add a "Run Audio" button at the bottom of the tab
-        run_button = ttk.Button(self.audio_tab, text="Run Audio", command=self.run_audio)
+        run_button = ttk.Button(self.model_tab, text="Select Models", command=self._select_models)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
-    def run_general(self):
-        """
-        Called when the user clicks "Run General".
-        Here, you can do whatever you need to do with the general settings.
-        """
-        print("=== Running General Code ===")
-        print(f"Username: {self.settings['username'].get()}")
-        print(f"Difficulty: {self.settings['difficulty'].get()}")
-        print(f"Tutorials Enabled: {self.settings['tutorials_enabled'].get()}")
-        print("General code executed!")
-        print("============================\n")
+    def _get_data(self):
+        print("=== Getting Data ===")
 
-    def run_graphics(self):
-        """
-        Called when the user clicks "Run Graphics".
-        """
-        print("=== Running Graphics Code ===")
-        print(f"Resolution: {self.settings['resolution'].get()}")
-        print(f"Fullscreen: {self.settings['fullscreen'].get()}")
-        print(f"Graphics Quality: {self.settings['graphics_quality'].get()}")
-        print(f"Frame Limit: {self.settings['frame_limit'].get()}")
-        print("Graphics code executed!")
-        print("============================\n")
+        # Gather selected indices from the listbox
+        selected_indices = self.data_listbox.curselection()
+        selected_datasets = [self.data_listbox.get(i) for i in selected_indices]
 
-    def run_audio(self):
-        """
-        Called when the user clicks "Run Audio".
-        """
-        print("=== Running Audio Code ===")
-        print(f"Master Volume: {self.settings['master_volume'].get()}")
-        print(f"Mute: {self.settings['mute'].get()}")
-        print(f"Music Volume: {self.settings['music_volume'].get()}")
-        print("Audio code executed!")
-        print("==========================\n")
+        # Optional: if nothing is selected, use all
+        if not selected_datasets:
+            selected_datasets = possible_with_vector_reps
 
-    def save_settings(self):
-        """Retrieve current values from all widget variables and do something with them."""
-        # For demonstration, just print them to the console.
-        print("=== Saving All Settings ===")
-        for key, var in self.settings.items():
-            print(f"{key}: {var.get()}")
-        print("===========================\n")
+        data_paths = [supported_datasets[name] for name in selected_datasets]
+        self.data_args = HFDataArguments(
+            data_paths=data_paths,
+            max_len=self.settings_vars["max_len"].get(),
+            trim=self.settings_vars["trim"].get()
+        )
+        print("Data Arguments:")
+        print(self.data_args)
+        print("========================\n")
+
+        self.get_datasets()
+        print("Data downloaded and stored")
+
+    def _get_embeddings(self):
+        if not self.all_seqs:
+            print('Sequences are not loaded yet. Please run the data tab first.')
+            return
+
+        print("=== Embedding Sequences Code ===")
+
+        # Convert comma-separated pooling_types into a list
+        pooling_str = self.settings_vars["pooling_types"].get().strip()
+        pooling_list = [p.strip() for p in pooling_str.split(",") if p.strip()]
+
+        # Convert embed_dtype string to actual torch.dtype if desired
+        dtype_str = self.settings_vars["embed_dtype"].get()
+        if dtype_str == "float32":
+            dtype_val = torch.float32
+        elif dtype_str == "float16":
+            dtype_val = torch.float16
+        elif dtype_str == "bfloat16":
+            dtype_val = torch.bfloat16
+        elif dtype_str == "float64":
+            dtype_val = torch.float64
+        else:
+            dtype_val = torch.float32  # fallback
+
+        self.embedding_args = EmbeddingArguments(
+            all_seqs=self.all_seqs,
+            batch_size=self.settings_vars["batch_size"].get(),
+            num_workers=self.settings_vars["num_workers"].get(),
+            download_embeddings=self.settings_vars["download_embeddings"].get(),
+            matrix_embed=self.settings_vars["matrix_embed"].get(),
+            pooling_types=pooling_list,
+            save_embeddings=True,
+            embed_dtype=dtype_val,
+            sql=self.settings_vars["sql"].get(),
+            save_dir=self.settings_vars["save_dir"].get()
+        )
+
+        print("Saving embeddings to disk")
+        self.save_embeddings_to_disk()
+        print("Embeddings saved to disk")
+
+    def _select_models(self):
+        # Gather selected model names
+        selected_indices = self.model_listbox.curselection()
+        selected_models = [self.model_listbox.get(i) for i in selected_indices]
+
+        # If no selection, default to the entire standard_benchmark
+        if not selected_models:
+            selected_models = standard_benchmark
+
+        self.model_args = BaseModelArguments(model_names=selected_models)
+
+        # Do something with model_args here
+        print("Models selected:")
+        print(self.model_args)
+        print("=========================\n")
+
 
 def main():
     root = tk.Tk()
-    app = SettingsGUI(root)
+    app = GUI(root)
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()

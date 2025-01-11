@@ -30,6 +30,7 @@ def get_hf_data(args: HFDataArguments):
     for data_path in args.data_paths:
         data_name = data_path.split('/')[-1]
         ppi = 'ppi' in data_name.lower()
+        print(f'Loading {data_name}')
         dataset = load_dataset(data_path)
         train_set, valid_set, test_set = dataset['train'], dataset['valid'], dataset['test']
         datasets.append((train_set, valid_set, test_set, ppi))
