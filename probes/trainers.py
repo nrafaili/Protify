@@ -1,5 +1,8 @@
-from transformers import TrainingArguments
-from dataclasses import dataclass, field
+from transformers import TrainingArguments, EarlyStoppingCallback
+from dataclasses import dataclass
+from ..data.torch_classes import (
+    
+)
 
 
 @dataclass
@@ -31,3 +34,6 @@ class TrainerArguments:
         )
 
 
+def get_trainer(embedding_args, model, train_dataset, valid_dataset, test_dataset):
+    if embedding_args.sql:
+        

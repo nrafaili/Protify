@@ -313,13 +313,13 @@ class FineTuneDatasetEmbedsFromDisk(TorchDataset):
 
 
 class FineTuneDatasetEmbeds(TorchDataset):
-    def __init__(self, args, seqs, labels, emb_dict, task_type='binary'):
+    def __init__(self, seqs, labels, emb_dict, task_type='binary', full=False):
         self.embeddings = self.get_embs(emb_dict, seqs)
         self.labels = labels
         self.task_type = task_type
         self.max_length = len(max(seqs, key=len))
         print('Max length: ', self.max_length)
-        self.full = args.full
+        self.full = full
 
     def __len__(self):
         return len(self.labels)
