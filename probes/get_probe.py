@@ -7,23 +7,44 @@ from .transformer_probe import TransformerForSequenceClassification, Transformer
 
 @dataclass
 class ProbeArguments:
-    probe_type: str # linear, transformer, crossconv
-    tokenwise: bool = field(default=False)
-    ### Linear Probe
-    input_dim: int = field(default=960)
-    hidden_dim: int = field(default=8192)
-    dropout: float = field(default=0.2)
-    num_labels: int = field(default=2)
-    n_layers: int = field(default=1)
-    task_type: str = field(default='binary')
-    pre_ln: bool = field(default=True)
-    ### Transformer Probe
-    ff_dim: int = field(default=4096)
-    transformer_dropout: float = field(default=0.1)
-    classifier_dropout: float = field(default=0.2)
-    n_heads: int = field(default=4)
-    rotary: bool = field(default=True)
-    pooling_types: List[str] = field(default_factory=lambda: ['mean', 'cls'])
+    def __init__(
+            self,
+            probe_type: str = 'linear', # valid options: linear, transformer, crossconv
+            tokenwise: bool = False,
+            ### Linear Probe
+            input_dim: int = 960,
+            hidden_dim: int = 8192,
+            dropout: float = 0.2,
+            num_labels: int = 2,
+            n_layers: int = 1,
+            task_type: str = 'binary',
+            pre_ln: bool = True,
+            ### Transformer Probe
+            ff_dim: int = 4096,
+            transformer_dropout: float = 0.1,
+            classifier_dropout: float = 0.2,
+            n_heads: int = 4,
+            rotary: bool = True,
+            pooling_types: List[str] = field(default_factory=lambda: ['mean', 'cls']),
+            **kwargs,
+            ### CrossConv
+            # TODO
+    ):
+        self.probe_type = probe_type
+        self.tokenwise = tokenwise
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.dropout = dropout
+        self.num_labels = num_labels
+        self.n_layers = n_layers
+        self.task_type = task_type
+        self.pre_ln = pre_ln
+        self.ff_dim = ff_dim
+        self.transformer_dropout = transformer_dropout
+        self.classifier_dropout = classifier_dropout
+        self.n_heads = n_heads
+        self.rotary = rotary
+        self.pooling_types = pooling_types
 
 
 def get_probe(args: ProbeArguments):

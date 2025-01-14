@@ -9,17 +9,32 @@ from typing import Optional, Callable
 
 @dataclass
 class EmbeddingArguments:
-    all_seqs: list[str]
-    batch_size: int = 4
-    num_workers: int = 0
-    download_embeddings: bool = False
-    download_dir: str = 'Synthyra/plm_embeddings'
-    matrix_embed: bool = False
-    pooling_types: list[str] = field(default_factory=lambda: ['mean'])
-    save_embeddings: bool = False
-    embed_dtype: torch.dtype = torch.float32
-    sql: bool = False
-    save_dir: str = 'embeddings'
+    def __init__(
+            self,
+            all_seqs: list[str],
+            batch_size: int = 4,
+            num_workers: int = 0,
+            download_embeddings: bool = False,
+            download_dir: str = 'Synthyra/plm_embeddings',
+            matrix_embed: bool = False,
+            pooling_types: list[str] = field(default_factory=lambda: ['mean']),
+            save_embeddings: bool = False,
+            embed_dtype: torch.dtype = torch.float32,
+            sql: bool = False,
+            save_dir: str = 'embeddings',
+            **kwargs
+    ):
+        self.all_seqs = all_seqs
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.download_embeddings = download_embeddings
+        self.download_dir = download_dir
+        self.matrix_embed = matrix_embed
+        self.pooling_types = pooling_types
+        self.save_embeddings = save_embeddings
+        self.embed_dtype = embed_dtype
+        self.sql = sql
+        self.save_dir = save_dir
 
 
 class Pooler:

@@ -15,9 +15,15 @@ class HFDataArguments:
     trim: bool
         whether to trim sequences to max_len
     """
-    data_paths: List[str]
-    max_len: int = 1024
-    trim: bool = False
+    def __init__(
+            self,
+            data_paths: List[str],
+            max_len: int = 1024,
+            trim: bool = False,
+            **kwargs):
+        self.data_paths = data_paths
+        self.max_len = max_len
+        self.trim = trim
 
 
 def get_hf_data(args: HFDataArguments):

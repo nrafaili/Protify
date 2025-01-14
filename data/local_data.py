@@ -22,11 +22,19 @@ class LocalDataArguments:
     trim: bool
         whether to trim sequences to max_len
     """
-    data_dirs: List[str]
-    delimiter: str = ','
-    col_names: List[str] = ['seqs', 'labels']
-    max_len: int = 1024
-    trim: bool = False
+    def __init__(
+            self,
+            data_dirs: List[str],
+            delimiter: str = ',',
+            col_names: List[str] = ['seqs', 'labels'],
+            max_len: int = 1024,
+            trim: bool = False,
+            **kwargs):
+        self.data_dirs = data_dirs
+        self.delimiter = delimiter
+        self.col_names = col_names
+        self.max_len = max_len
+        self.trim = trim
 
 
 def get_local_data(args: LocalDataArguments):

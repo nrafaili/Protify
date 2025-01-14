@@ -13,7 +13,6 @@ from main import MainProcess
 
 class GUI(MainProcess):
     def __init__(self, master):
-        super().__init__()
         self.master = master
         self.master.title("Settings GUI")
         self.master.geometry("600x800")
@@ -167,52 +166,30 @@ class GUI(MainProcess):
 
         # Linear Probe Settings
         ttk.Label(self.probe_tab, text="=== Linear Probe Settings ===").grid(row=2, column=0, columnspan=2, pady=10)
-        
-        # Input Dimension
-        ttk.Label(self.probe_tab, text="Input Dimension:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["input_dim"] = tk.IntVar(value=960)
-        spin_input_dim = ttk.Spinbox(self.probe_tab, from_=1, to=10000, textvariable=self.settings_vars["input_dim"])
-        spin_input_dim.grid(row=3, column=1, padx=10, pady=5)
 
         # Hidden Dimension
-        ttk.Label(self.probe_tab, text="Hidden Dimension:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.probe_tab, text="Hidden Dimension:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["hidden_dim"] = tk.IntVar(value=8192)
         spin_hidden_dim = ttk.Spinbox(self.probe_tab, from_=1, to=10000, textvariable=self.settings_vars["hidden_dim"])
-        spin_hidden_dim.grid(row=4, column=1, padx=10, pady=5)
+        spin_hidden_dim.grid(row=3, column=1, padx=10, pady=5)
 
         # Dropout
-        ttk.Label(self.probe_tab, text="Dropout:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.probe_tab, text="Dropout:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["dropout"] = tk.DoubleVar(value=0.2)
         spin_dropout = ttk.Spinbox(self.probe_tab, from_=0.0, to=1.0, increment=0.1, textvariable=self.settings_vars["dropout"])
-        spin_dropout.grid(row=5, column=1, padx=10, pady=5)
-
-        # Number of Labels
-        ttk.Label(self.probe_tab, text="Number of Labels:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["num_labels"] = tk.IntVar(value=2)
-        spin_num_labels = ttk.Spinbox(self.probe_tab, from_=1, to=1000, textvariable=self.settings_vars["num_labels"])
-        spin_num_labels.grid(row=6, column=1, padx=10, pady=5)
+        spin_dropout.grid(row=4, column=1, padx=10, pady=5)
 
         # Number of Layers
-        ttk.Label(self.probe_tab, text="Number of Layers:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.probe_tab, text="Number of Layers:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["n_layers"] = tk.IntVar(value=1)
         spin_n_layers = ttk.Spinbox(self.probe_tab, from_=1, to=100, textvariable=self.settings_vars["n_layers"])
-        spin_n_layers.grid(row=7, column=1, padx=10, pady=5)
-
-        # Task Type
-        ttk.Label(self.probe_tab, text="Task Type:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["task_type"] = tk.StringVar(value="binary")
-        combo_task = ttk.Combobox(
-            self.probe_tab,
-            textvariable=self.settings_vars["task_type"],
-            values=["binary", "multiclass", "regression"]
-        )
-        combo_task.grid(row=8, column=1, padx=10, pady=5)
+        spin_n_layers.grid(row=6, column=1, padx=10, pady=5)
 
         # Pre Layer Norm
-        ttk.Label(self.probe_tab, text="Pre Layer Norm:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.probe_tab, text="Pre Layer Norm:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["pre_ln"] = tk.BooleanVar(value=True)
         check_pre_ln = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["pre_ln"])
-        check_pre_ln.grid(row=9, column=1, padx=10, pady=5, sticky="w")
+        check_pre_ln.grid(row=7, column=1, padx=10, pady=5, sticky="w")
 
         # Transformer Probe Settings
         ttk.Label(self.probe_tab, text="=== Transformer Probe Settings ===").grid(row=10, column=0, columnspan=2, pady=10)
@@ -257,6 +234,9 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.probe_tab, text="Save Probe Arguments", command=self._create_probe_args)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
+    def _build_trainer_tab(self):
+        pass
+
     def _create_probe_args(self):
         print("=== Creating Probe ===")
         
@@ -266,12 +246,12 @@ class GUI(MainProcess):
         self.probe_args = ProbeArguments(
             probe_type=self.settings_vars["probe_type"].get(),
             tokenwise=self.settings_vars["tokenwise"].get(),
-            input_dim=self.settings_vars["input_dim"].get(),
+            input_dim=1, # holder, is filled in later
             hidden_dim=self.settings_vars["hidden_dim"].get(),
             dropout=self.settings_vars["dropout"].get(),
-            num_labels=self.settings_vars["num_labels"].get(),
+            num_labels=1, # holder, is filled in later
             n_layers=self.settings_vars["n_layers"].get(),
-            task_type=self.settings_vars["task_type"].get(),
+            task_type='binary', # holder, is filled in later
             pre_ln=self.settings_vars["pre_ln"].get(),
             ff_dim=self.settings_vars["ff_dim"].get(),
             transformer_dropout=self.settings_vars["transformer_dropout"].get(),

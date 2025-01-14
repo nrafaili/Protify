@@ -118,5 +118,5 @@ def process_datasets(hf_datasets: List[Dataset], data_name: str, max_len: int, t
 
     all_seqs = list(all_seqs)
     all_seqs = sorted(all_seqs, key=len, reverse=True) # longest first
-    datasets[data_name] = (train_set, valid_set, test_set, num_labels, label_type)
+    datasets[data_name] = (train_set, valid_set, test_set, num_labels, label_type, ppi)
     return datasets, all_seqs
