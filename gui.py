@@ -3,9 +3,10 @@ import tkinter as tk
 from tkinter import ttk
 
 from base_models.get_base_models import BaseModelArguments, standard_benchmark
-from data.hf_data import HFDataArguments, get_hf_data
+from data.hf_data import HFDataArguments
 from data.supported_datasets import supported_datasets, possible_with_vector_reps
 from embedder import EmbeddingArguments
+from probes.get_probe import ProbeArguments
 
 from main import MainProcess
 
@@ -32,16 +33,19 @@ class GUI(MainProcess):
         self.data_tab = ttk.Frame(self.notebook)
         self.embed_tab = ttk.Frame(self.notebook)
         self.model_tab = ttk.Frame(self.notebook)
+        self.probe_tab = ttk.Frame(self.notebook)
 
         # Add tabs to the notebook
         self.notebook.add(self.model_tab, text="Model")
         self.notebook.add(self.data_tab, text="Data")
         self.notebook.add(self.embed_tab, text="Embedding")
+        self.notebook.add(self.probe_tab, text="Probe")
 
         # Build each tab
         self._build_model_tab()
         self._build_data_tab()
         self._build_embed_tab()
+        self._build_probe_tab()
 
         #apply_button = ttk.Button(master, text="Stop code", command=self._clear_console)
         #apply_button.pack(side="bottom", pady=10)
@@ -143,6 +147,143 @@ class GUI(MainProcess):
 
         run_button = ttk.Button(self.model_tab, text="Select Models", command=self._select_models)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
+
+    def _build_probe_tab(self):
+        # Probe Type
+        ttk.Label(self.probe_tab, text="Probe Type:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["probe_type"] = tk.StringVar(value="linear")
+        combo_probe = ttk.Combobox(
+            self.probe_tab,
+            textvariable=self.settings_vars["probe_type"],
+            values=["linear", "transformer", "crossconv"]
+        )
+        combo_probe.grid(row=0, column=1, padx=10, pady=5)
+
+        # Tokenwise
+        ttk.Label(self.probe_tab, text="Tokenwise:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["tokenwise"] = tk.BooleanVar(value=False)
+        check_tokenwise = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["tokenwise"])
+        check_tokenwise.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+
+        # Linear Probe Settings
+        ttk.Label(self.probe_tab, text="=== Linear Probe Settings ===").grid(row=2, column=0, columnspan=2, pady=10)
+        
+        # Input Dimension
+        ttk.Label(self.probe_tab, text="Input Dimension:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["input_dim"] = tk.IntVar(value=960)
+        spin_input_dim = ttk.Spinbox(self.probe_tab, from_=1, to=10000, textvariable=self.settings_vars["input_dim"])
+        spin_input_dim.grid(row=3, column=1, padx=10, pady=5)
+
+        # Hidden Dimension
+        ttk.Label(self.probe_tab, text="Hidden Dimension:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["hidden_dim"] = tk.IntVar(value=8192)
+        spin_hidden_dim = ttk.Spinbox(self.probe_tab, from_=1, to=10000, textvariable=self.settings_vars["hidden_dim"])
+        spin_hidden_dim.grid(row=4, column=1, padx=10, pady=5)
+
+        # Dropout
+        ttk.Label(self.probe_tab, text="Dropout:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["dropout"] = tk.DoubleVar(value=0.2)
+        spin_dropout = ttk.Spinbox(self.probe_tab, from_=0.0, to=1.0, increment=0.1, textvariable=self.settings_vars["dropout"])
+        spin_dropout.grid(row=5, column=1, padx=10, pady=5)
+
+        # Number of Labels
+        ttk.Label(self.probe_tab, text="Number of Labels:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["num_labels"] = tk.IntVar(value=2)
+        spin_num_labels = ttk.Spinbox(self.probe_tab, from_=1, to=1000, textvariable=self.settings_vars["num_labels"])
+        spin_num_labels.grid(row=6, column=1, padx=10, pady=5)
+
+        # Number of Layers
+        ttk.Label(self.probe_tab, text="Number of Layers:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["n_layers"] = tk.IntVar(value=1)
+        spin_n_layers = ttk.Spinbox(self.probe_tab, from_=1, to=100, textvariable=self.settings_vars["n_layers"])
+        spin_n_layers.grid(row=7, column=1, padx=10, pady=5)
+
+        # Task Type
+        ttk.Label(self.probe_tab, text="Task Type:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["task_type"] = tk.StringVar(value="binary")
+        combo_task = ttk.Combobox(
+            self.probe_tab,
+            textvariable=self.settings_vars["task_type"],
+            values=["binary", "multiclass", "regression"]
+        )
+        combo_task.grid(row=8, column=1, padx=10, pady=5)
+
+        # Pre Layer Norm
+        ttk.Label(self.probe_tab, text="Pre Layer Norm:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["pre_ln"] = tk.BooleanVar(value=True)
+        check_pre_ln = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["pre_ln"])
+        check_pre_ln.grid(row=9, column=1, padx=10, pady=5, sticky="w")
+
+        # Transformer Probe Settings
+        ttk.Label(self.probe_tab, text="=== Transformer Probe Settings ===").grid(row=10, column=0, columnspan=2, pady=10)
+
+        # FF Dimension
+        ttk.Label(self.probe_tab, text="FF Dimension:").grid(row=11, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["ff_dim"] = tk.IntVar(value=4096)
+        spin_ff_dim = ttk.Spinbox(self.probe_tab, from_=1, to=10000, textvariable=self.settings_vars["ff_dim"])
+        spin_ff_dim.grid(row=11, column=1, padx=10, pady=5)
+
+        # Transformer Dropout
+        ttk.Label(self.probe_tab, text="Transformer Dropout:").grid(row=12, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["transformer_dropout"] = tk.DoubleVar(value=0.1)
+        spin_trans_dropout = ttk.Spinbox(self.probe_tab, from_=0.0, to=1.0, increment=0.1, textvariable=self.settings_vars["transformer_dropout"])
+        spin_trans_dropout.grid(row=12, column=1, padx=10, pady=5)
+
+        # Classifier Dropout
+        ttk.Label(self.probe_tab, text="Classifier Dropout:").grid(row=13, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["classifier_dropout"] = tk.DoubleVar(value=0.2)
+        spin_class_dropout = ttk.Spinbox(self.probe_tab, from_=0.0, to=1.0, increment=0.1, textvariable=self.settings_vars["classifier_dropout"])
+        spin_class_dropout.grid(row=13, column=1, padx=10, pady=5)
+
+        # Number of Heads
+        ttk.Label(self.probe_tab, text="Number of Heads:").grid(row=14, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["n_heads"] = tk.IntVar(value=4)
+        spin_n_heads = ttk.Spinbox(self.probe_tab, from_=1, to=32, textvariable=self.settings_vars["n_heads"])
+        spin_n_heads.grid(row=14, column=1, padx=10, pady=5)
+
+        # Rotary
+        ttk.Label(self.probe_tab, text="Rotary:").grid(row=15, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["rotary"] = tk.BooleanVar(value=True)
+        check_rotary = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["rotary"])
+        check_rotary.grid(row=15, column=1, padx=10, pady=5, sticky="w")
+
+        # Pooling Types
+        ttk.Label(self.probe_tab, text="Pooling Types (comma-separated):").grid(row=16, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["probe_pooling_types"] = tk.StringVar(value="mean,cls")
+        entry_pooling = ttk.Entry(self.probe_tab, textvariable=self.settings_vars["probe_pooling_types"], width=20)
+        entry_pooling.grid(row=16, column=1, padx=10, pady=5)
+
+        # Add a button to create the probe
+        run_button = ttk.Button(self.probe_tab, text="Save Probe Arguments", command=self._create_probe_args)
+        run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
+
+    def _create_probe_args(self):
+        print("=== Creating Probe ===")
+        
+        # Convert pooling types string to list
+        pooling_types = [p.strip() for p in self.settings_vars["probe_pooling_types"].get().split(",")]
+        
+        self.probe_args = ProbeArguments(
+            probe_type=self.settings_vars["probe_type"].get(),
+            tokenwise=self.settings_vars["tokenwise"].get(),
+            input_dim=self.settings_vars["input_dim"].get(),
+            hidden_dim=self.settings_vars["hidden_dim"].get(),
+            dropout=self.settings_vars["dropout"].get(),
+            num_labels=self.settings_vars["num_labels"].get(),
+            n_layers=self.settings_vars["n_layers"].get(),
+            task_type=self.settings_vars["task_type"].get(),
+            pre_ln=self.settings_vars["pre_ln"].get(),
+            ff_dim=self.settings_vars["ff_dim"].get(),
+            transformer_dropout=self.settings_vars["transformer_dropout"].get(),
+            classifier_dropout=self.settings_vars["classifier_dropout"].get(),
+            n_heads=self.settings_vars["n_heads"].get(),
+            rotary=self.settings_vars["rotary"].get(),
+            pooling_types=pooling_types
+        )
+        
+        print("Probe Arguments:")
+        print(self.probe_args)
+        print("========================\n")
 
     def _get_data(self):
         print("=== Getting Data ===")

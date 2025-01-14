@@ -1,12 +1,11 @@
-import torch
 from torch import nn
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.modeling_outputs import SequenceClassifierOutput, TokenClassifierOutput
 from typing import List
+from embedder import Pooler
 from .mlp import swiglu_correction_fn
 from .losses import get_loss_fct
 from .transformer import Transformer
-from ..embedder import Pooler
 
 
 class TransformerProbeConfig(PretrainedConfig):
@@ -24,6 +23,7 @@ class TransformerProbeConfig(PretrainedConfig):
             task_type: str = 'binary',
             rotary: bool = True,
             pooling_types: List[str] = ['mean', 'cls'],
+            **kwargs,
     ):
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim

@@ -9,7 +9,6 @@ from typing import Optional, Tuple
 Linear = partial(nn.Linear, bias=False)
 
 
-
 def rotate_half(x, interleaved=False):
     if not interleaved:
         x1, x2 = x.chunk(2, dim=-1)

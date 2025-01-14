@@ -5,8 +5,8 @@ supported_datasets = {
     'GO-BP': 'GleghornLab/BP_reg',
     'GO-MF': 'GleghornLab/MF_reg',
     'MB': 'GleghornLab/MB_reg',
-    'DeepLoc2': 'GleghornLab/DL2_reg',
-    'DeepLoc10': 'GleghornLab/DL10_reg',
+    'DeepLoc-2': 'GleghornLab/DL2_reg',
+    'DeepLoc-10': 'GleghornLab/DL10_reg',
     'enzyme-kcat': 'GleghornLab/enzyme_kcat',
     'solubility': 'GleghornLab/solubility_prediction',
     'localization': 'GleghornLab/localization_prediction',
@@ -20,8 +20,8 @@ supported_datasets = {
     'cloning-clf': 'GleghornLab/cloning_clf',
     'stability-prediction': 'GleghornLab/stability_prediction',
     'human-ppi': 'GleghornLab/HPPI',
-    'SecondaryStructure3': 'GleghornLab/SS3',
-    'SecondaryStructure8': 'GleghornLab/SS8',
+    'SecondaryStructure-3': 'GleghornLab/SS3',
+    'SecondaryStructure-8': 'GleghornLab/SS8',
     'fluorescence-prediction': 'GleghornLab/fluorescence_prediction',
 }
 
@@ -32,8 +32,8 @@ possible_with_vector_reps = [
     'GO-BP',
     'GO-MF',
     'MB',
-    'DeepLoc2',
-    'DeepLoc10',
+    'DeepLoc-2',
+    'DeepLoc-10',
     'enzyme-kcat',
     'solubility',
     'localization',
@@ -52,15 +52,15 @@ possible_with_vector_reps = [
 
 testing = [
     'EC', # multilabel
-    'DeepLoc2', # binary
-    'DeepLoc10', # multiclass
+    'DeepLoc-2', # binary
+    'DeepLoc-10', # multiclass
     'enzyme-kcat', # regression
     'human-ppi', # ppi
 ]
 
 
 residue_wise_problems = [
-    'SecondaryStructure3',
-    'SecondaryStructure8',
+    'SecondaryStructure-3',
+    'SecondaryStructure-8',
     'fluorescence-prediction',
 ]

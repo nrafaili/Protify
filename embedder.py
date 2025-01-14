@@ -178,7 +178,7 @@ class Embedder:
 
         if self.sql:
             import sqlite3
-            save_path = os.path.join(self.save_dir, f'{model_name}.db')
+            save_path = os.path.join(self.save_dir, f'{model_name}_{self.matrix_embed}.db')
             conn = sqlite3.connect(save_path)
             c = conn.cursor()
             c.execute('CREATE TABLE IF NOT EXISTS embeddings (sequence text PRIMARY KEY, embedding blob)')
@@ -209,12 +209,12 @@ class Embedder:
         
         from safetensors.torch import save_file, safe_open
         embeddings_dict = {}
-        save_path = os.path.join(self.save_dir, f'{model_name}.safetensors')
+        save_path = os.path.join(self.save_dir, f'{model_name}_{self.matrix_embed}.safetensors')
         if os.path.exists(save_path):
             print(f"Loading embeddings from {save_path}")
             with safe_open(save_path, framework="pt", device="cpu") as f:
                 for key in f.keys():
-                    embeddings_dict[key] = f.get_tensor(key)
+                    embeddings_dict[key] = f.get_tensor(key).clone()
             print(f"Loaded {len(embeddings_dict)} embeddings from {save_path}")
             to_embed = [seq for seq in self.all_seqs if seq not in embeddings_dict]
             print(f"Embedding {len(to_embed)} new sequences")
@@ -234,11 +234,6 @@ class Embedder:
                         embeddings_dict[seq] = emb
         
         if self.save_embeddings:
-            """
-            TODO
-            probably need to remove before saving again
-            """
-            # os.remove(save_path) # this does not have permission
             print(f"Saving embeddings to {save_path}")
             save_file(embeddings_dict, save_path)
         return embeddings_dict

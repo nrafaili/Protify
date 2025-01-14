@@ -18,6 +18,7 @@ class LinearProbeConfig(PretrainedConfig):
             n_layers: int = 1,
             task_type: str = 'binary',
             pre_ln: bool = True,
+            **kwargs,
     ):
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim

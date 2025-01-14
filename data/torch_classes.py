@@ -3,6 +3,7 @@ import random
 import torch
 import numpy as np
 import sqlite3
+import torch.nn.functional as F
 from tqdm.auto import tqdm
 from torch.utils.data import Dataset as TorchDataset
 from torch.nn.utils.rnn import pad_sequence
@@ -40,8 +41,8 @@ def ppi_from_embs_collate_wrapper(full_attention):
             emb_b_padded = pad_sequence(emb_b_list, batch_first=True, padding_value=0)
             # Pad sequences to the same length
             max_len = max(emb_a_padded.size(1), emb_b_padded.size(1))
-            emb_a_padded = torch.nn.functional.pad(emb_a_padded, (0, 0, 0, max_len - emb_a_padded.size(1)), value=0)
-            emb_b_padded = torch.nn.functional.pad(emb_b_padded, (0, 0, 0, max_len - emb_b_padded.size(1)), value=0)
+            emb_a_padded = F.pad(emb_a_padded, (0, 0, 0, max_len - emb_a_padded.size(1)), value=0)
+            emb_b_padded = F.pad(emb_b_padded, (0, 0, 0, max_len - emb_b_padded.size(1)), value=0)
             # Concatenate along the feature dimension
             embeddings = torch.cat([emb_a_padded, emb_b_padded], dim=2)
             return {'hidden_state_a': emb_a_padded, 'hidden_state_b': emb_b_padded, 'labels': labels}
@@ -61,7 +62,6 @@ def collate_seq_labels(tokenizer):
         batch['labels'] = torch.stack([torch.tensor(label, dtype=torch.float) for label in labels])
         return batch
     return _collate_fn
-
 
 def collate_fn_embeds(full=False, max_length=512, task_type='tokenwise'):
     def _collate_fn(batch):
@@ -91,7 +91,6 @@ def collate_fn_embeds(full=False, max_length=512, task_type='tokenwise'):
             'labels': labels
         }
     return _collate_fn
-
 
 
 class PPIDatasetEmbedsFromDisk(TorchDataset):
@@ -206,8 +205,7 @@ class PPIDatasetEmbeds(TorchDataset):
         return len(self.labels)
         
     def __getitem__(self, idx):
-        seq_a = self.seqs_a[idx]
-        seq_b = self.seqs_b[idx]
+        seq_a, seq_b = self.seqs_a[idx], self.seqs_b[idx]
         emb_a = torch.tensor(self.emb_dict.get(seq_a).reshape(-1, self.emb_dim))
         emb_b = torch.tensor(self.emb_dict.get(seq_b).reshape(-1, self.emb_dim))
         
@@ -287,7 +285,7 @@ class FineTuneDatasetEmbedsFromDisk(TorchDataset):
             emb = torch.tensor(np.frombuffer(emb_data, dtype=np.float32).reshape(-1, self.emb_dim))
             if self.full:
                 padding_needed = self.max_length - emb.size(0)
-                emb = torch.nn.functional.pad(emb, (0, 0, 0, padding_needed), value=0)
+                emb = F.pad(emb, (0, 0, 0, padding_needed), value=0)
             embeddings.append(emb)
             labels.append(self.labels[i])
         conn.close()
@@ -339,7 +337,7 @@ class FineTuneDatasetEmbeds(TorchDataset):
         emb = torch.tensor(self.embeddings[idx], dtype=torch.float)
         if self.full:
             padding_needed = self.max_length - emb.size(0)
-            emb = torch.nn.functional.pad(emb, (0, 0, 0, padding_needed), value=0)
+            emb = F.pad(emb, (0, 0, 0, padding_needed), value=0)
         return emb.squeeze(0), label
     
 
@@ -363,8 +361,7 @@ class SequenceLabelDatasetFromHF(TorchDataset):
 
 class PairDatasetTrainHF(TorchDataset):
     def __init__(self, data, col_a, col_b, label_col):
-        self.seqs_a = data[col_a]
-        self.seqs_b = data[col_b]
+        self.seqs_a, self.seqs_b = data[col_a], data[col_b]
         self.labels = data[label_col]
 
     def avg(self):
