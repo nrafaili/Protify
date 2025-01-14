@@ -1,4 +1,5 @@
 import os
+from torchinfo import summary
 from typing import List, Tuple
 from datasets import Dataset
 from dataclasses import field
@@ -42,10 +43,6 @@ class MainProcess:
         production = False # TODO: make this a setting
         pass
 
-    def load_probe(self):
-        probe = get_probe(self.probe_args)
-        return probe
-
     def run_probes(self):
         model_names = self.model_args.model_names
         probe_args = self.probe_args
@@ -76,7 +73,15 @@ class MainProcess:
                 embedding = embedding.reshape(seq_len, -1)
             input_dim = embedding.shape[1]
             probe_args.input_dim = input_dim
-            
+
+            for dataset in self.datasets:
+                train_set, valid_set, test_set, num_labels, label_type = dataset
+                probe_args.num_labels = num_labels
+                probe_args.label_type = label_type
+                probe = get_probe(self.probe_args)
+                summary(probe)
+
+                
 
 
         pass

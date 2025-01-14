@@ -13,6 +13,7 @@ class EmbeddingArguments:
     batch_size: int = 4
     num_workers: int = 0
     download_embeddings: bool = False
+    download_dir: str = 'Synthyra/plm_embeddings'
     matrix_embed: bool = False
     pooling_types: list[str] = field(default_factory=lambda: ['mean'])
     save_embeddings: bool = False
@@ -132,6 +133,7 @@ class Embedder:
         self.matrix_embed = args.matrix_embed
         self.pooling_types = args.pooling_types
         self.download_embeddings = args.download_embeddings
+        self.download_dir = args.download_dir
         self.save_embeddings = args.save_embeddings
         self.embed_dtype = args.embed_dtype
         self.sql = args.sql
@@ -264,9 +266,9 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--num_workers', type=int, default=0)
     parser.add_argument('--pooling_types', nargs='+', default=['mean'])
-    parser.add_argument('--save_embeddings', action='store_true')
     parser.add_argument('--embed_dtype', type=str, default='float16')
     parser.add_argument('--save_dir', type=str, default='embeddings')
+    parser.add_argument('--download_dir', type=str, default='Synthyra/mean_pooled_embeddings')
     args = parser.parse_args()
 
     if args.token is not None:
@@ -282,7 +284,7 @@ if __name__ == '__main__':
         raise ValueError(f"Invalid embedding dtype: {args.embed_dtype}")
 
     # Get data
-    data_paths = [supported_datasets[dataset] for dataset in testing]
+    data_paths = [supported_datasets[dataset] for dataset in possible_with_vector_reps]
     data_args = HFDataArguments(data_paths=data_paths, max_len=2048, trim=False)
     all_seqs = get_hf_data(data_args)[1]
 
@@ -294,7 +296,7 @@ if __name__ == '__main__':
         download_embeddings=False,
         matrix_embed=False,
         pooling_types=args.pooling_types,
-        save_embeddings=args.save_embeddings,
+        save_embeddings=True,
         embed_dtype=dtype,
         sql=False,
         save_dir='embeddings'
@@ -310,7 +312,7 @@ if __name__ == '__main__':
         upload_file(
             path_or_fileobj=save_path,
             path_in_repo=f'embeddings/{model_name}.safetensors',
-            repo_id='Synthyra/plm_embeddings',
+            repo_id=embedder_args.download_dir,
             repo_type='dataset')
 
     print('Done')
