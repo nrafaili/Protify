@@ -48,7 +48,7 @@ class MainProcess:
 
     def run_probes(self):
         model_names = self.model_args.model_names
-
+        probe_args = self.probe_args
         for model_name in model_names:
             sql = self.embedding_args.sql
             max_len = self.data_args.max_len
@@ -75,7 +75,10 @@ class MainProcess:
             if full:
                 embedding = embedding.reshape(seq_len, -1)
             input_dim = embedding.shape[1]
+            probe_args.input_dim = input_dim
             
+
+
         pass
 
     def init_hybrid_probe(self):
