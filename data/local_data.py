@@ -17,23 +17,23 @@ class LocalDataArguments:
         delimiter for the dataset
     col_names: List[str]
         column names for the dataset
-    max_len: int
+    max_length: int
         max length of sequences
     trim: bool
-        whether to trim sequences to max_len
+        whether to trim sequences to max_length
     """
     def __init__(
             self,
             data_dirs: List[str],
             delimiter: str = ',',
             col_names: List[str] = ['seqs', 'labels'],
-            max_len: int = 1024,
+            max_length: int = 1024,
             trim: bool = False,
             **kwargs):
         self.data_dirs = data_dirs
         self.delimiter = delimiter
         self.col_names = col_names
-        self.max_len = max_len
+        self.max_length = max_length
         self.trim = trim
 
 
@@ -62,4 +62,4 @@ def get_local_data(args: LocalDataArguments):
         valid_set = Dataset.from_pandas(valid_set)
         test_set = Dataset.from_pandas(test_set)
         datasets.append((train_set, valid_set, test_set))
-    return process_datasets(datasets=datasets, data_name=data_name, max_len=args.max_len, trim=args.trim, ppi=ppi)
+    return process_datasets(datasets=datasets, data_name=data_name, max_length=args.max_length, trim=args.trim, ppi=ppi)

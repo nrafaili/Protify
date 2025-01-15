@@ -33,7 +33,11 @@ standard_benchmark = [
 
 @dataclass
 class BaseModelArguments:
-    model_names: list[str] = field(default_factory=lambda: standard_benchmark)
+    def __init__(self, model_names: list[str] = None, **kwargs):
+        if model_names is None:
+            self.model_names = standard_benchmark
+        else:
+            self.model_names = model_names
 
 
 def get_base_model(model_name: str):

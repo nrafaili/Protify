@@ -32,9 +32,9 @@ class T5Attention(TransformerT5Attention):
         self.relative_attention_max_distance = config.relative_attention_max_distance
         self.d_model = config.d_model
         self.key_value_proj_dim = config.d_kv
-        self.n_heads = config.num_heads
+        self.num_heads = config.num_heads
         self.dropout = config.dropout_rate
-        self.inner_dim = self.n_heads * self.key_value_proj_dim
+        self.inner_dim = self.num_heads * self.key_value_proj_dim
         self.layer_idx = layer_idx
 
         # Mesh TensorFlow initialization to avoid scaling before softmax
@@ -44,7 +44,7 @@ class T5Attention(TransformerT5Attention):
         self.o = nn.Linear(self.inner_dim, self.d_model, bias=False)
 
         if self.has_relative_attention_bias:
-            self.relative_attention_bias = nn.Embedding(self.relative_attention_num_buckets, self.n_heads)
+            self.relative_attention_bias = nn.Embedding(self.relative_attention_num_buckets, self.num_heads)
         self.pruned_heads = set()
         self.gradient_checkpointing = False
 
@@ -72,7 +72,7 @@ class T5Attention(TransformerT5Attention):
         is_cross_attention = key_value_states is not None
 
         query_states = self.q(hidden_states)
-        query_states = query_states.view(batch_size, -1, self.n_heads, self.key_value_proj_dim).transpose(1, 2)
+        query_states = query_states.view(batch_size, -1, self.num_heads, self.key_value_proj_dim).transpose(1, 2)
 
         if past_key_value is not None:
             is_updated = past_key_value.is_updated.get(self.layer_idx)
@@ -90,8 +90,8 @@ class T5Attention(TransformerT5Attention):
         else:
             key_states = self.k(current_states)
             value_states = self.v(current_states)
-            key_states = key_states.view(batch_size, -1, self.n_heads, self.key_value_proj_dim).transpose(1, 2)
-            value_states = value_states.view(batch_size, -1, self.n_heads, self.key_value_proj_dim).transpose(1, 2)
+            key_states = key_states.view(batch_size, -1, self.num_heads, self.key_value_proj_dim).transpose(1, 2)
+            value_states = value_states.view(batch_size, -1, self.num_heads, self.key_value_proj_dim).transpose(1, 2)
 
             if past_key_value is not None:
                 # save all key/value_states to cache to be re-used for fast auto-regressive generation
@@ -117,7 +117,7 @@ class T5Attention(TransformerT5Attention):
             real_seq_length = query_length if query_length is not None else cache_position[-1] + 1
             if not self.has_relative_attention_bias:
                 position_bias = torch.zeros(
-                    (1, self.n_heads, seq_length, key_length), device=scores.device, dtype=scores.dtype
+                    (1, self.num_heads, seq_length, key_length), device=scores.device, dtype=scores.dtype
                 )
                 if self.gradient_checkpointing and self.training:
                     position_bias.requires_grad = True
@@ -140,7 +140,7 @@ class T5Attention(TransformerT5Attention):
 
         scores += position_bias_masked
 
-        # (batch_size, n_heads, seq_length, key_length)
+        # (batch_size, num_heads, seq_length, key_length)
         attn_weights = nn.functional.softmax(scores.float(), dim=-1).type_as(scores)
         attn_weights = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
 

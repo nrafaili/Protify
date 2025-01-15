@@ -15,7 +15,7 @@ class LinearProbeConfig(PretrainedConfig):
             hidden_dim: int = 8192,
             dropout: float = 0.2,
             num_labels: int = 2,
-            n_layers: int = 1,
+            num_layers: int = 1,
             task_type: str = 'binary',
             pre_ln: bool = True,
             **kwargs,
@@ -25,7 +25,7 @@ class LinearProbeConfig(PretrainedConfig):
         self.dropout = dropout
         self.task_type = task_type
         self.num_labels = num_labels
-        self.n_layers = n_layers
+        self.num_layers = num_layers
         self.pre_ln = pre_ln
 
 
@@ -44,7 +44,7 @@ class LinearProbe(PreTrainedModel):
         layers.append(nn.ReLU())
         layers.append(nn.Dropout(config.dropout))
         
-        for _ in range(config.n_layers):
+        for _ in range(config.num_layers):
             layers.append(nn.Linear(config.hidden_dim, config.hidden_dim))
             layers.append(nn.ReLU())
             layers.append(nn.Dropout(config.dropout))

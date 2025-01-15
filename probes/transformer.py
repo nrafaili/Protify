@@ -9,13 +9,13 @@ class TransformerBlock(nn.Module):
     def __init__(
         self,
         d_model: int,
-        n_heads: int,
+        num_heads: int,
         expansion_ratio: float = 8 / 3,
         dropout: float = 0.1,
         rotary: bool = False,
     ):
         super().__init__()
-        self.attn = MultiHeadAttention(d_model, n_heads, rotary)
+        self.attn = MultiHeadAttention(d_model, num_heads, rotary)
         self.ffn = swiglu_ln_ffn(d_model, expansion_ratio, dropout)
 
     def forward(
@@ -34,15 +34,15 @@ class Transformer(nn.Module):
     def __init__(
             self,
             d_model: int,
-            n_heads: int,
-            n_layers: int,
+            num_heads: int,
+            num_layers: int,
             expansion_ratio: float = 8 / 3,
             dropout: float = 0.1,
             rotary: bool = False,
     ):
         super().__init__()
         self.layers = nn.ModuleList([
-            TransformerBlock(d_model, n_heads, expansion_ratio, dropout, rotary) for _ in range(n_layers)
+            TransformerBlock(d_model, num_heads, expansion_ratio, dropout, rotary) for _ in range(num_layers)
         ])
 
     def forward(self, x: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:

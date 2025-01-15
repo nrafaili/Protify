@@ -12,12 +12,14 @@ from probes.trainers import TrainerArguments, train_probe
 
 class MainProcess:
     def __init__(self, full_args):
-        self.data_args = HFDataArguments(**full_args)
-        self.embedding_args = EmbeddingArguments(**full_args)
-        self.model_args = BaseModelArguments(**full_args)
-        self.probe_args = ProbeArguments(**full_args)
-        self.trainer_args = TrainerArguments(**full_args)
-        self.get_datasets()
+        self.full_args = full_args
+
+    def apply_current_settings(self):
+        self.data_args = HFDataArguments(**self.full_args.__dict__)
+        self.embedding_args = EmbeddingArguments(**self.full_args.__dict__)
+        self.model_args = BaseModelArguments(**self.full_args.__dict__)
+        self.probe_args = ProbeArguments(**self.full_args.__dict__)
+        self.trainer_args = TrainerArguments(**self.full_args.__dict__)
 
     def get_datasets(self):
         self.datasets, self.all_seqs = get_hf_data(self.data_args)
@@ -31,38 +33,29 @@ class MainProcess:
             model, tokenizer = get_base_model(model_name)
             _ = embedder(model_name, model, tokenizer) 
 
-    def find_best_scikit_model(self):
-        pass
-
-    def cross_validate_scikit_model(self):
-        pass
-
-    def scikit_workflow(self):
-        production = False # TODO: make this a setting
-        pass
-
     def run_probes(self):
         model_names = self.model_args.model_names
         probe_args = self.probe_args
         for model_name in model_names:
             sql = self.embedding_args.sql
-            max_len = self.data_args.max_len
-            seq = self.all_seqs[0]
+            max_length = self.data_args.max_length
+            test_seq = self.all_seqs[0]
             full = self.embedding_args.matrix_embed
-            if len(seq) < max_len - 2:
-                seq_len = max_len
+
+            if len(test_seq) < max_length - 2:
+                test_seq_len = max_length
             else:
-                seq_len = len(seq) + 2
+                test_seq_len = len(test_seq) + 2
+    
             if sql:
                 import sqlite3
                 save_path = os.path.join(self.embedding_args.save_dir, f'{model_name}_{full}.db')
                 with sqlite3.connect(save_path) as conn:
                     c = conn.cursor()
-                    c.execute("SELECT embedding FROM embeddings WHERE sequence = ?", (self.all_seqs[0],))
+                    c.execute("SELECT embedding FROM embeddings WHERE sequence = ?", (test_seq,))
                     test_embedding = c.fetchone()[0]
                     test_embedding = torch.tensor(np.frombuffer(test_embedding, dtype=np.float32).reshape(1, -1))
                 emb_dict = None
-
             else:
                 from safetensors.torch import safe_open
                 save_path = os.path.join(self.embedding_args.save_dir, f'{model_name}_{full}.safetensors')
@@ -70,10 +63,10 @@ class MainProcess:
                 with safe_open(save_path, framework="pt", device="cpu") as f:
                     for key in f.keys():
                         emb_dict[key] = f.get_tensor(key).clone()
-                    test_embedding = emb_dict[self.all_seqs[0]].reshape(1, -1)
+                    test_embedding = emb_dict[test_seq].reshape(1, -1)
 
             if full:
-                test_embedding = test_embedding.reshape(seq_len, -1)
+                test_embedding = test_embedding.reshape(test_seq_len, -1)
             input_dim = test_embedding.shape[-1]
             probe_args.input_dim = input_dim
 
@@ -115,17 +108,29 @@ class MainProcess:
     def run_full_finetuning_model(self):
         pass
 
+    def find_best_scikit_model(self):
+        pass
+
+    def cross_validate_scikit_model(self):
+        pass
+
+    def scikit_workflow(self):
+        production = False # TODO: make this a setting
+        pass
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Script with arguments mirroring the provided YAML settings.")
-    # get settings from yaml
+    # ----------------- Misc ----------------- #
     parser.add_argument("--yaml_path", type=str, default=None, help="Path to the YAML file.")
+    parser.add_argument("--hf_username", default="Synthyra", help="Hugging Face username.")
+    parser.add_argument("--hf_token", default=None, help="Hugging Face token.")
 
     # ----------------- DataArguments ----------------- #
-    parser.add_argument("--data_dirs", nargs="+", default=["DeepLoc-2"], help="List of data directories.")
+    parser.add_argument("--data_paths", nargs="+", default=["DeepLoc-2"], help="List of data directories.")
     parser.add_argument("--delimiter", default=",", help="Delimiter for data.")
     parser.add_argument("--col_names", nargs="+", default=["seqs", "labels"], help="Column names.")
-    parser.add_argument("--max_len", type=int, default=1024, help="Maximum sequence length.")
+    parser.add_argument("--max_length", type=int, default=1024, help="Maximum sequence length.")
     parser.add_argument("--trim", action="store_true", default=False, help="Whether to trim sequences (default: False).")
 
     # ----------------- BaseModelArguments ----------------- #
@@ -137,19 +142,19 @@ def parse_arguments():
     parser.add_argument("--tokenwise", action="store_true", default=False, help="Tokenwise probe (default: False).")
     parser.add_argument("--hidden_dim", type=int, default=8192, help="Hidden dimension size.")
     parser.add_argument("--dropout", type=float, default=0.2, help="Dropout rate.")
-    parser.add_argument("--n_layers", type=int, default=1, help="Number of layers.")
+    parser.add_argument("--num_layers", type=int, default=1, help="Number of layers.")
     parser.add_argument("--pre_ln", action="store_false", default=True,
                         help="Disable pre-layernorm (default: enabled). Use --pre_ln to toggle off.")
-    parser.add_argument("--ff_dim", type=int, default=4096, help="Feed-forward dimension.")
+    parser.add_argument("--classifier_dim", type=int, default=4096, help="Feed-forward dimension.")
     parser.add_argument("--transformer_dropout", type=float, default=0.1, help="Dropout rate for the transformer layers.")
     parser.add_argument("--classifier_dropout", type=float, default=0.2, help="Dropout rate for the classifier.")
-    parser.add_argument("--n_heads", type=int, default=4, help="Number of heads in multi-head attention.")
+    parser.add_argument("--num_heads", type=int, default=4, help="Number of heads in multi-head attention.")
     parser.add_argument("--rotary", action="store_false", default=True,
                         help="Disable rotary embeddings (default: enabled). Use --rotary to toggle off.")
     parser.add_argument("--pooling_types", nargs="+", default=["cls"], help="Pooling types to use.")
 
     # ----------------- EmbeddingArguments ----------------- #
-    parser.add_argument("--batch_size", type=int, default=4, help="Batch size for embedding generation.")
+    parser.add_argument("--embedding_batch_size", type=int, default=4, help="Batch size for embedding generation.")
     parser.add_argument("--num_workers", type=int, default=0, help="Number of worker processes for data loading.")
     parser.add_argument("--download_embeddings", action="store_true", default=False, help="Whether to download embeddings (default: False).")
     parser.add_argument("--download_dir", default="Synthyra/mean_pooled_embeddings", help="Directory to download embeddings to.")
@@ -158,24 +163,32 @@ def parse_arguments():
     parser.add_argument("--save_embeddings", action="store_true", default=False, help="Save computed embeddings (default: False).")
     parser.add_argument("--embed_dtype", default="float16", help="Data type for embeddings.")
     parser.add_argument("--sql", action="store_true", default=False, help="Whether to use SQL storage (default: False).")
-    parser.add_argument("--save_dir", default="embeddings", help="Directory to save embeddings.")
+    parser.add_argument("--embedding_save_dir", default="embeddings", help="Directory to save embeddings.")
 
     # ----------------- TrainerArguments ----------------- #
-    parser.add_argument("--output_dir", default="Synthyra/probes", help="Directory to save probes.")
+    parser.add_argument("--model_save_dir", default="probe", help="Directory to save probes.")
     parser.add_argument("--num_epochs", type=int, default=200, help="Number of epochs to train for.")
-    parser.add_argument("--batch_size", type=int, default=64, help="Batch size for training.")
+    parser.add_argument("--trainer_batch_size", type=int, default=64, help="Batch size for training.")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="Gradient accumulation steps.")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
     parser.add_argument("--patience", type=int, default=3, help="Patience for early stopping.")
+
+    args = parser.parse_args()
+
+    if args.hf_token is not None:
+        from huggingface_hub import login
+        login(args.hf_token)
 
     if args.yaml_path is not None:
         with open(args.yaml_path, 'r') as file: 
             settings = yaml.safe_load(file)
         return settings
     else:
-        return parser.parse_args()
+        return args 
 
 
 if __name__ == "__main__":
     args = parse_arguments()
     print(args)
+    main = MainProcess(args)
+    print(main)

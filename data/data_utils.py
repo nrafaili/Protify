@@ -32,7 +32,7 @@ def _label_type_checker(labels):
     return label_type
 
 
-def process_datasets(hf_datasets: List[Dataset], data_name: str, max_len: int, trim: bool = False):
+def process_datasets(hf_datasets: List[Dataset], data_name: str, max_length: int, trim: bool = False):
     datasets, all_seqs = {}, set()
     for dataset in hf_datasets:
         print(f'Processing {data_name}')
@@ -40,27 +40,27 @@ def process_datasets(hf_datasets: List[Dataset], data_name: str, max_len: int, t
         if trim: # trim by length if necessary
             original_train_size, original_valid_size, original_test_size = len(train_set), len(valid_set), len(test_set)
             if ppi:
-                train_set = train_set.filter(lambda x: len(x['SeqA']) + len(x['SeqB']) <= max_len)
-                valid_set = valid_set.filter(lambda x: len(x['SeqA']) + len(x['SeqB']) <= max_len)
-                test_set = test_set.filter(lambda x: len(x['SeqA']) + len(x['SeqB']) <= max_len)
+                train_set = train_set.filter(lambda x: len(x['SeqA']) + len(x['SeqB']) <= max_length)
+                valid_set = valid_set.filter(lambda x: len(x['SeqA']) + len(x['SeqB']) <= max_length)
+                test_set = test_set.filter(lambda x: len(x['SeqA']) + len(x['SeqB']) <= max_length)
             else:
-                train_set = train_set.filter(lambda x: len(x['seqs']) <= max_len)
-                valid_set = valid_set.filter(lambda x: len(x['seqs']) <= max_len)
-                test_set = test_set.filter(lambda x: len(x['seqs']) <= max_len)
+                train_set = train_set.filter(lambda x: len(x['seqs']) <= max_length)
+                valid_set = valid_set.filter(lambda x: len(x['seqs']) <= max_length)
+                test_set = test_set.filter(lambda x: len(x['seqs']) <= max_length)
         
             print(f'Trimmed {100 * round((original_train_size-len(train_set)) / original_train_size, 2)}% from train')
             print(f'Trimmed {100 * round((original_valid_size-len(valid_set)) / original_valid_size, 2)}% from valid')
             print(f'Trimmed {100 * round((original_test_size-len(test_set)) / original_test_size, 2)}% from test')
 
-        else: # truncate to max_len
+        else: # truncate to max_length
             if ppi:
-                train_set = train_set.map(lambda x: {'SeqA': x['SeqA'][:max_len], 'SeqB': x['SeqB'][:max_len]})
-                valid_set = valid_set.map(lambda x: {'SeqA': x['SeqA'][:max_len], 'SeqB': x['SeqB'][:max_len]})
-                test_set = test_set.map(lambda x: {'SeqA': x['SeqA'][:max_len], 'SeqB': x['SeqB'][:max_len]})
+                train_set = train_set.map(lambda x: {'SeqA': x['SeqA'][:max_length], 'SeqB': x['SeqB'][:max_length]})
+                valid_set = valid_set.map(lambda x: {'SeqA': x['SeqA'][:max_length], 'SeqB': x['SeqB'][:max_length]})
+                test_set = test_set.map(lambda x: {'SeqA': x['SeqA'][:max_length], 'SeqB': x['SeqB'][:max_length]})
             else:
-                train_set = train_set.map(lambda x: {'seqs': x['seqs'][:max_len]})
-                valid_set = valid_set.map(lambda x: {'seqs': x['seqs'][:max_len]})
-                test_set = test_set.map(lambda x: {'seqs': x['seqs'][:max_len]})
+                train_set = train_set.map(lambda x: {'seqs': x['seqs'][:max_length]})
+                valid_set = valid_set.map(lambda x: {'seqs': x['seqs'][:max_length]})
+                test_set = test_set.map(lambda x: {'seqs': x['seqs'][:max_length]})
 
         # sanitize
         if ppi:

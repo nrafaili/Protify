@@ -22,8 +22,8 @@ class ESMplusplusConfig(PretrainedConfig):
     Args:
         vocab_size: Size of the vocabulary
         hidden_size: Dimension of hidden layers
-        num_attention_heads: Number of attention heads
-        num_hidden_layers: Number of transformer layers
+        num_attentionum_heads: Number of attention heads
+        num_hiddenum_layers: Number of transformer layers
         num_labels: Number of output labels for classification
         problem_type: Type of problem - regression, single/multi label classification
     """
@@ -32,8 +32,8 @@ class ESMplusplusConfig(PretrainedConfig):
         self,
         vocab_size: int = 64,
         hidden_size: int = 960,
-        num_attention_heads: int = 15,
-        num_hidden_layers: int = 30,
+        num_attentionum_heads: int = 15,
+        num_hiddenum_layers: int = 30,
         num_labels: int = 2,
         problem_type: str | None = None,
         dropout: float = 0.0,
@@ -43,8 +43,8 @@ class ESMplusplusConfig(PretrainedConfig):
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
-        self.num_attention_heads = num_attention_heads
-        self.num_hidden_layers = num_hidden_layers
+        self.num_attentionum_heads = num_attentionum_heads
+        self.num_hiddenum_layers = num_hiddenum_layers
         self.num_labels = num_labels
         self.problem_type = problem_type
         self.dropout = dropout
@@ -257,26 +257,26 @@ class MultiHeadAttention(nn.Module):
     
     Args:
         d_model: Model dimension
-        n_heads: Number of attention heads
+        num_heads: Number of attention heads
     """
-    def __init__(self, d_model: int, n_heads: int):
+    def __init__(self, d_model: int, num_heads: int):
         super().__init__()
         self.d_model = d_model
-        self.n_heads = n_heads
-        self.d_head = self.d_model // self.n_heads
+        self.num_heads = num_heads
+        self.d_head = self.d_model // self.num_heads
         self.layernorm_qkv = nn.Sequential(
             nn.LayerNorm(d_model), nn.Linear(d_model, d_model * 3, bias=False)
         )
         self.out_proj = nn.Linear(d_model, d_model, bias=False)
         self.q_ln = nn.LayerNorm(d_model, bias=False)
         self.k_ln = nn.LayerNorm(d_model, bias=False)
-        self.reshaper = partial(rearrange, pattern="b s (h d) -> b h s d", h=n_heads)
-        self.rotary = RotaryEmbedding(d_model // n_heads)
+        self.reshaper = partial(rearrange, pattern="b s (h d) -> b h s d", h=num_heads)
+        self.rotary = RotaryEmbedding(d_model // num_heads)
 
     def _apply_rotary(self, q: torch.Tensor, k: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Apply rotary embeddings to query and key."""
-        q = q.unflatten(-1, (self.n_heads, self.d_head))
-        k = k.unflatten(-1, (self.n_heads, self.d_head))
+        q = q.unflatten(-1, (self.num_heads, self.d_head))
+        k = k.unflatten(-1, (self.num_heads, self.d_head))
         q, k = self.rotary(q, k)
         q = q.flatten(-2, -1)
         k = k.flatten(-2, -1)
@@ -350,20 +350,20 @@ class UnifiedTransformerBlock(nn.Module):
     
     Args:
         d_model: Model dimension
-        n_heads: Number of attention heads
+        num_heads: Number of attention heads
         residue_scaling_factor: Factor for scaling residual connections
         expansion_ratio: Expansion ratio for feedforward network
     """
     def __init__(
         self,
         d_model: int,
-        n_heads: int,
+        num_heads: int,
         residue_scaling_factor: float = 1,
         expansion_ratio: float = 8 / 3,
         dropout: float = 0.0,
     ):
         super().__init__()
-        self.attn = MultiHeadAttention(d_model, n_heads)
+        self.attn = MultiHeadAttention(d_model, num_heads)
         self.ffn = swiglu_ln_ffn(d_model, expansion_ratio)
         self.scaling_factor = residue_scaling_factor
         self.dropout = nn.Dropout(dropout)
@@ -414,15 +414,15 @@ class TransformerStack(nn.Module):
     
     Args:
         d_model: Model dimension
-        n_heads: Number of attention heads
-        n_layers: Number of transformer layers
+        num_heads: Number of attention heads
+        num_layers: Number of transformer layers
         dropout: Dropout rate
     """
     def __init__(
         self,
         d_model: int,
-        n_heads: int,
-        n_layers: int,
+        num_heads: int,
+        num_layers: int,
         dropout: float = 0.0,
     ):
         super().__init__()
@@ -430,11 +430,11 @@ class TransformerStack(nn.Module):
             [
                 UnifiedTransformerBlock(
                     d_model,
-                    n_heads,
-                    residue_scaling_factor=math.sqrt(n_layers / 36),
+                    num_heads,
+                    residue_scaling_factor=math.sqrt(num_layers / 36),
                     dropout=dropout,
                 )
-                for i in range(n_layers)
+                for i in range(num_layers)
             ]
         )
         self.norm = nn.LayerNorm(d_model, bias=False)
@@ -527,7 +527,7 @@ class ESMplusplusForEmbedding(PreTrainedESMplusplusModel):
         self.config = config
         self.vocab_size = config.vocab_size
         self.embed = nn.Embedding(self.vocab_size, config.hidden_size)
-        self.transformer = TransformerStack(config.hidden_size, config.num_attention_heads, config.num_hidden_layers, config.dropout)
+        self.transformer = TransformerStack(config.hidden_size, config.num_attentionum_heads, config.num_hiddenum_layers, config.dropout)
 
     def get_input_embeddings(self):
         return self.embed

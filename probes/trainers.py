@@ -20,7 +20,7 @@ from probes.get_probe import get_probe
 class TrainerArguments:
     def __init__(
             self,
-            save_dir: str,
+            model_save_dir: str,
             num_epochs: int = 200,
             batch_size: int = 64,
             gradient_accumulation_steps: int = 1,
@@ -31,7 +31,7 @@ class TrainerArguments:
             save: bool = False,
             **kwargs
     ):
-        self.save_dir = save_dir
+        self.model_save_dir = model_save_dir
         self.num_epochs = num_epochs
         self.batch_size = batch_size
         self.gradient_accumulation_steps = gradient_accumulation_steps
@@ -42,10 +42,10 @@ class TrainerArguments:
         self.read_scaler = read_scaler
 
     def __call__(self):
-        if '/' in self.save_dir:
-            save_dir = self.save_dir.split('/')[-1]
+        if '/' in self.model_save_dir:
+            save_dir = self.model_save_dir.split('/')[-1]
         else:
-            save_dir = self.save_dir
+            save_dir = self.model_save_dir
         return TrainingArguments(
             output_dir=save_dir,
             num_train_epochs=self.num_epochs,
@@ -79,7 +79,7 @@ def train_probe(
     probe = get_probe(probe_args)
     summary(probe)
     full = embedding_args.matrix_embed
-    db_path = os.path.join(embedding_args.save_dir, f'{model_name}_{full}.db')
+    db_path = os.path.join(embedding_args.embedding_save_dir, f'{model_name}_{full}.db')
     if embedding_args.sql:
         if ppi:
             if full:
@@ -98,10 +98,10 @@ def train_probe(
             collate_builder = string_labels_collator_builder
 
     """
-    For collator need to pass tokenizer, max_length, full, task_type
+    For collator need to pass tokenizer, max_lengthgth, full, task_type
     For dataset need to pass hf_dataset, col_a, col_b, label_col, input_dim, task_type, db_path, emb_dict, batch_size, read_scaler, full, train
     """
-    data_collator = collate_builder(tokenizer=tokenizer, max_length=embedding_args.max_length, full=full, task_type=embedding_args.task_type)
+    data_collator = collate_builder(tokenizer=tokenizer, max_lengthgth=embedding_args.max_lengthgth, full=full, task_type=embedding_args.task_type)
     train_dataset = DatasetClass(
         hf_dataset=train_dataset,
         input_dim=probe_args.input_dim,
@@ -133,7 +133,7 @@ def train_probe(
 
     if trainer_args.save:
         try:
-            trainer.model.push_to_hub(trainer_args.save_dir, private=True)
+            trainer.model.push_to_hub(trainer_args.model_save_dir, private=True)
         except Exception as e:
             print(f'Error saving model: {e}')
 

@@ -11,7 +11,7 @@ from typing import Optional, Callable
 class EmbeddingArguments:
     def __init__(
             self,
-            all_seqs: list[str],
+            all_seqs: list[str] = None,
             batch_size: int = 4,
             num_workers: int = 0,
             download_embeddings: bool = False,
@@ -300,7 +300,7 @@ if __name__ == '__main__':
 
     # Get data
     data_paths = [supported_datasets[dataset] for dataset in possible_with_vector_reps]
-    data_args = HFDataArguments(data_paths=data_paths, max_len=2048, trim=False)
+    data_args = HFDataArguments(data_paths=data_paths, max_length=2048, trim=False)
     all_seqs = get_hf_data(data_args)[1]
 
     # Set up embedder
