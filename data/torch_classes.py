@@ -24,20 +24,22 @@ def string_labels_collator_builder(tokenizer, **kwargs):
     return _collate_fn
 
 
-def embeds_labels_collator_builder(full=False, max_lengthgth=512, task_type='tokenwise', **kwargs):
+def embeds_labels_collator_builder(full=False, task_type='tokenwise', **kwargs):
     def _collate_fn(batch):
+        print(batch)
         embeds = torch.stack([ex[0] for ex in batch])
         labels = torch.stack([torch.tensor(ex[1]) for ex in batch])
         
         if full and task_type == 'tokenwise':
             padded_labels = []
+            max_len = max(label.size(0) for label in labels)
             for label in labels:
-                padding_size = max_lengthgth - label.size(0)
+                padding_size = max_len - label.size(0)
                 if padding_size > 0:
                     padding = torch.full((padding_size,), -100, dtype=label.dtype)
                     padded_label = torch.cat((label.squeeze(-1), padding))
                 else:
-                    padded_label = label[:max_lengthgth].squeeze(-1)  # Truncate if longer than max_lengthgth
+                    padded_label = label.squeeze(-1)
                 padded_labels.append(padded_label)
             labels = torch.stack(padded_labels)
         return {
@@ -242,13 +244,13 @@ class EmbedsLabelsDatasetFromDisk(TorchDataset):
             batch_size=64,
             read_scaler=1000,
             input_dim=768,
-            task_type='binary',
+            task_type='singlelabel',
             **kwargs
         ): 
         self.seqs, self.labels = hf_dataset[col_name], hf_dataset[label_col]
         self.length = len(self.labels)
-        self.max_lengthgth = len(max(self.seqs, key=len))
-        print('Max length: ', self.max_lengthgth)
+        self.max_length = len(max(self.seqs, key=len))
+        print('Max length: ', self.max_length)
 
         self.db_file = db_path
         self.batch_size = batch_size
@@ -300,7 +302,7 @@ class EmbedsLabelsDatasetFromDisk(TorchDataset):
             emb_data = row[0]
             emb = torch.tensor(np.frombuffer(emb_data, dtype=np.float32).reshape(-1, self.input_dim))
             if self.full:
-                padding_needed = self.max_lengthgth - emb.size(0)
+                padding_needed = self.max_length - emb.size(0)
                 emb = F.pad(emb, (0, 0, 0, padding_needed), value=0)
             embeddings.append(emb)
             labels.append(self.labels[i])
@@ -327,12 +329,12 @@ class EmbedsLabelsDatasetFromDisk(TorchDataset):
 
 
 class EmbedsLabelsDataset(TorchDataset):
-    def __init__(self, hf_dataset, emb_dict, col_name='seqs', label_col='labels', task_type='binary', full=False, **kwargs):
+    def __init__(self, hf_dataset, emb_dict, col_name='seqs', label_col='labels', task_type='singlelabel', full=False, **kwargs):
         self.embeddings = self.get_embs(emb_dict, hf_dataset[col_name])
         self.labels = hf_dataset[label_col]
         self.task_type = task_type
-        self.max_lengthgth = len(max(hf_dataset[col_name], key=len))
-        print('Max length: ', self.max_lengthgth)
+        self.max_length = len(max(hf_dataset[col_name], key=len))
+        print('Max length: ', self.max_length)
         self.full = full
 
     def __len__(self):
@@ -352,7 +354,7 @@ class EmbedsLabelsDataset(TorchDataset):
             label = torch.tensor(self.labels[idx], dtype=torch.long)
         emb = torch.tensor(self.embeddings[idx], dtype=torch.float)
         if self.full:
-            padding_needed = self.max_lengthgth - emb.size(0)
+            padding_needed = self.max_length - emb.size(0)
             emb = F.pad(emb, (0, 0, 0, padding_needed), value=0)
         return emb.squeeze(0), label
     

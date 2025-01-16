@@ -20,7 +20,7 @@ class TransformerProbeConfig(PretrainedConfig):
             num_labels: int = 2,
             num_layers: int = 1,
             num_heads: int = 4,
-            task_type: str = 'binary',
+            task_type: str = 'singlelabel',
             rotary: bool = True,
             pooling_types: List[str] = ['mean', 'cls'],
             **kwargs,

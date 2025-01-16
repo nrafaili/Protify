@@ -17,7 +17,7 @@ class ProbeArguments:
             dropout: float = 0.2,
             num_labels: int = 2,
             num_layers: int = 1,
-            task_type: str = 'binary',
+            task_type: str = 'singlelabel',
             pre_ln: bool = True,
             ### Transformer Probe
             classifier_dim: int = 4096,
@@ -49,13 +49,13 @@ class ProbeArguments:
 
 def get_probe(args: ProbeArguments):
     if args.probe_type == 'linear' and not args.tokenwise:
-        config = LinearProbeConfig(args)
+        config = LinearProbeConfig(**args.__dict__)
         return LinearProbe(config)
     elif args.probe_type == 'transformer' and not args.tokenwise:
-        config = TransformerProbeConfig(args)
+        config = TransformerProbeConfig(**args.__dict__)
         return TransformerForSequenceClassification(config)
     elif args.probe_type == 'transformer' and args.tokenwise:
-        config = TransformerProbeConfig(args)
+        config = TransformerProbeConfig(**args.__dict__)
         return TransformerForTokenClassification(config)
     elif args.probe_type == 'crossconv' and args.tokenwise:
         # TODO

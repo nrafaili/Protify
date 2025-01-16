@@ -22,8 +22,8 @@ class ESMplusplusConfig(PretrainedConfig):
     Args:
         vocab_size: Size of the vocabulary
         hidden_size: Dimension of hidden layers
-        num_attentionum_heads: Number of attention heads
-        num_hiddenum_layers: Number of transformer layers
+        num_attention_heads: Number of attention heads
+        num_hidden_layers: Number of transformer layers
         num_labels: Number of output labels for classification
         problem_type: Type of problem - regression, single/multi label classification
     """
@@ -32,8 +32,8 @@ class ESMplusplusConfig(PretrainedConfig):
         self,
         vocab_size: int = 64,
         hidden_size: int = 960,
-        num_attentionum_heads: int = 15,
-        num_hiddenum_layers: int = 30,
+        num_attention_heads: int = 15,
+        num_hidden_layers: int = 30,
         num_labels: int = 2,
         problem_type: str | None = None,
         dropout: float = 0.0,
@@ -43,8 +43,8 @@ class ESMplusplusConfig(PretrainedConfig):
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
-        self.num_attentionum_heads = num_attentionum_heads
-        self.num_hiddenum_layers = num_hiddenum_layers
+        self.num_attention_heads = num_attention_heads
+        self.num_hidden_layers = num_hidden_layers
         self.num_labels = num_labels
         self.problem_type = problem_type
         self.dropout = dropout
@@ -527,7 +527,7 @@ class ESMplusplusForEmbedding(PreTrainedESMplusplusModel):
         self.config = config
         self.vocab_size = config.vocab_size
         self.embed = nn.Embedding(self.vocab_size, config.hidden_size)
-        self.transformer = TransformerStack(config.hidden_size, config.num_attentionum_heads, config.num_hiddenum_layers, config.dropout)
+        self.transformer = TransformerStack(config.hidden_size, config.num_attention_heads, config.num_hidden_layers, config.dropout)
 
     def get_input_embeddings(self):
         return self.embed

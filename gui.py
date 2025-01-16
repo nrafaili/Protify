@@ -7,6 +7,7 @@ from data.hf_data import HFDataArguments
 from data.supported_datasets import supported_datasets, possible_with_vector_reps
 from embedder import EmbeddingArguments
 from probes.get_probe import ProbeArguments
+from probes.trainers import TrainerArguments
 from main import MainProcess
 
 
@@ -145,7 +146,7 @@ class GUI(MainProcess):
         combo_dtype = ttk.Combobox(
             self.embed_tab,
             textvariable=self.settings_vars["embed_dtype"],
-            values=["float32", "float16", "bfloat16", "float64"]
+            values=["float32", "float16", "bfloat16", "float8_e4m3fn", "float8_e5m2"]
         )
         combo_dtype.grid(row=7, column=1, padx=10, pady=5)
 
@@ -217,37 +218,37 @@ class GUI(MainProcess):
         spin_dropout.grid(row=5, column=1, padx=10, pady=5)
 
         # Transformer Probe Settings
-        ttk.Label(self.probe_tab, text="=== Transformer Probe Settings ===").grid(row=10, column=0, columnspan=2, pady=10)
+        ttk.Label(self.probe_tab, text="=== Transformer Probe Settings ===").grid(row=6, column=0, columnspan=2, pady=10)
 
         # FF Dimension
-        ttk.Label(self.probe_tab, text="Classifier Dimension:").grid(row=11, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.probe_tab, text="Classifier Dimension:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["classifier_dim"] = tk.IntVar(value=4096)
         spin_classifier_dim = ttk.Spinbox(self.probe_tab, from_=1, to=10000, textvariable=self.settings_vars["classifier_dim"])
-        spin_classifier_dim.grid(row=11, column=1, padx=10, pady=5)
+        spin_classifier_dim.grid(row=7, column=1, padx=10, pady=5)
 
         # Classifier Dropout
-        ttk.Label(self.probe_tab, text="Classifier Dropout:").grid(row=13, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.probe_tab, text="Classifier Dropout:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["classifier_dropout"] = tk.DoubleVar(value=0.2)
         spin_class_dropout = ttk.Spinbox(self.probe_tab, from_=0.0, to=1.0, increment=0.1, textvariable=self.settings_vars["classifier_dropout"])
-        spin_class_dropout.grid(row=13, column=1, padx=10, pady=5)
+        spin_class_dropout.grid(row=8, column=1, padx=10, pady=5)
 
         # Number of Heads
-        ttk.Label(self.probe_tab, text="Number of Heads:").grid(row=14, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.probe_tab, text="Number of Heads:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["num_heads"] = tk.IntVar(value=4)
         spin_num_heads = ttk.Spinbox(self.probe_tab, from_=1, to=32, textvariable=self.settings_vars["num_heads"])
-        spin_num_heads.grid(row=14, column=1, padx=10, pady=5)
+        spin_num_heads.grid(row=9, column=1, padx=10, pady=5)
 
         # Rotary
-        ttk.Label(self.probe_tab, text="Rotary:").grid(row=15, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.probe_tab, text="Rotary:").grid(row=10, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["rotary"] = tk.BooleanVar(value=True)
         check_rotary = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["rotary"])
-        check_rotary.grid(row=15, column=1, padx=10, pady=5, sticky="w")
+        check_rotary.grid(row=10, column=1, padx=10, pady=5, sticky="w")
 
         # Pooling Types
-        ttk.Label(self.probe_tab, text="Pooling Types (comma-separated):").grid(row=16, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["probe_pooling_types"] = tk.StringVar(value="mean,cls")
+        ttk.Label(self.probe_tab, text="Pooling Types (comma-separated):").grid(row=11, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["probe_pooling_types"] = tk.StringVar(value="mean, cls")
         entry_pooling = ttk.Entry(self.probe_tab, textvariable=self.settings_vars["probe_pooling_types"], width=20)
-        entry_pooling.grid(row=16, column=1, padx=10, pady=5)
+        entry_pooling.grid(row=11, column=1, padx=10, pady=5)
 
         # Add a button to create the probe
         run_button = ttk.Button(self.probe_tab, text="Save Probe Arguments", command=self._create_probe_args)
@@ -260,35 +261,62 @@ class GUI(MainProcess):
         entry_model_save_dir = ttk.Entry(self.trainer_tab, textvariable=self.settings_vars["model_save_dir"], width=20)
         entry_model_save_dir.grid(row=0, column=1, padx=10, pady=5)
 
+        # Lora checkbox
+        ttk.Label(self.trainer_tab, text="Use LoRA:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["use_lora"] = tk.BooleanVar(value=False)
+        check_lora = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["use_lora"])
+        check_lora.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+
+        # Hybrid Probe checkbox
+        ttk.Label(self.trainer_tab, text="Hybrid Probe:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["hybrid_probe"] = tk.BooleanVar(value=False)
+        check_hybrid_probe = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["hybrid_probe"])
+        check_hybrid_probe.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+
+        # Full finetuning checkbox
+        ttk.Label(self.trainer_tab, text="Full Finetuning:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["full_finetuning"] = tk.BooleanVar(value=False)
+        check_full_ft = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["full_finetuning"])
+        check_full_ft.grid(row=3, column=1, padx=10, pady=5, sticky="w")
+
         # num_epochs
-        ttk.Label(self.trainer_tab, text="Number of Epochs:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Number of Epochs:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["num_epochs"] = tk.IntVar(value=200)
         spin_num_epochs = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["num_epochs"])
-        spin_num_epochs.grid(row=1, column=1, padx=10, pady=5)
+        spin_num_epochs.grid(row=4, column=1, padx=10, pady=5)
 
         # trainer_batch_size
-        ttk.Label(self.trainer_tab, text="Trainer Batch Size:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Trainer Batch Size:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["trainer_batch_size"] = tk.IntVar(value=64)
         spin_trainer_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["trainer_batch_size"])
-        spin_trainer_batch_size.grid(row=2, column=1, padx=10, pady=5)
+        spin_trainer_batch_size.grid(row=5, column=1, padx=10, pady=5)
 
         # gradient_accumulation_steps
-        ttk.Label(self.trainer_tab, text="Gradient Accumulation Steps:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Gradient Accumulation Steps:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["gradient_accumulation_steps"] = tk.IntVar(value=1)
         spin_gradient_accumulation_steps = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["gradient_accumulation_steps"])
-        spin_gradient_accumulation_steps.grid(row=3, column=1, padx=10, pady=5)
+        spin_gradient_accumulation_steps.grid(row=6, column=1, padx=10, pady=5)
 
         # lr
-        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["lr"] = tk.DoubleVar(value=1e-4)
         spin_lr = ttk.Spinbox(self.trainer_tab, from_=1e-6, to=1e-2, increment=1e-5, textvariable=self.settings_vars["lr"])
-        spin_lr.grid(row=4, column=1, padx=10, pady=5)
+        spin_lr.grid(row=7, column=1, padx=10, pady=5)
+
+        # weight_decay
+        ttk.Label(self.trainer_tab, text="Weight Decay:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["weight_decay"] = tk.DoubleVar(value=0.00)
+        spin_weight_decay = ttk.Spinbox(self.trainer_tab, from_=0.0, to=1.0, increment=0.01, textvariable=self.settings_vars["weight_decay"])
+        spin_weight_decay.grid(row=8, column=1, padx=10, pady=5)
 
         # patience
-        ttk.Label(self.trainer_tab, text="Patience:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Patience:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["patience"] = tk.IntVar(value=3)
         spin_patience = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["patience"])
-        spin_patience.grid(row=5, column=1, padx=10, pady=5)
+        spin_patience.grid(row=9, column=1, padx=10, pady=5)
+
+        run_button = ttk.Button(self.trainer_tab, text="Run trainer", command=self._run_trainer)
+        run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
     def _create_probe_args(self):
         print("=== Creating Probe ===")
@@ -314,7 +342,9 @@ class GUI(MainProcess):
         self.probe_args = ProbeArguments(**self.full_args.__dict__)
         
         print("Probe Arguments:")
-        print(self.probe_args)
+        for k, v in self.probe_args.__dict__.items():
+            if k != 'model_names':
+                print(f"{k}:\n{v}")
         print("========================\n")
 
     def _get_data(self):
@@ -339,7 +369,9 @@ class GUI(MainProcess):
         self.data_args = HFDataArguments(**self.full_args.__dict__)
         
         print("Data Arguments:")
-        print(self.data_args)
+        for k, v in self.data_args.__dict__.items():
+            if k != 'data_paths':
+                print(f"{k}:\n{v}")
         print("========================\n")
 
         self.get_datasets()
@@ -350,21 +382,14 @@ class GUI(MainProcess):
             print('Sequences are not loaded yet. Please run the data tab first.')
             return
 
-        print("=== Embedding Sequences Code ===")
-
         # Convert comma-separated pooling_types into a list
         pooling_str = self.settings_vars["pooling_types"].get().strip()
         pooling_list = [p.strip() for p in pooling_str.split(",") if p.strip()]
 
         # Convert embed_dtype string to actual torch.dtype
         dtype_str = self.settings_vars["embed_dtype"].get()
-        dtype_map = {
-            "float32": torch.float32,
-            "float16": torch.float16,
-            "bfloat16": torch.bfloat16,
-            "float64": torch.float64
-        }
-        dtype_val = dtype_map.get(dtype_str, torch.float32)
+
+        dtype_val = self.dtype_map.get(dtype_str, torch.float32)
 
         # Update full_args with embedding settings
         self.full_args.all_seqs = self.all_seqs
@@ -380,6 +405,12 @@ class GUI(MainProcess):
 
         # Create embedding args from full args
         self.embedding_args = EmbeddingArguments(**self.full_args.__dict__)
+
+        print("Embedding Args:")
+        for k, v in self.embedding_args.__dict__.items():
+            if k != 'all_seqs':
+                print(f"{k}:\n{v}")
+        print("========================\n")
 
         print("Saving embeddings to disk")
         self.save_embeddings_to_disk()
@@ -400,10 +431,40 @@ class GUI(MainProcess):
         # Create model args from full args
         self.model_args = BaseModelArguments(**self.full_args.__dict__)
 
-        print("Models selected:")
-        print(self.model_args.__dict__)
+        print("Model Args:")
+        for k, v in self.model_args.__dict__.items():
+            if k != 'model_names':
+                print(f"{k}:\n{v}")
         print("=========================\n")
 
+    def _run_trainer(self):
+        self.full_args.model_save_dir = self.settings_vars["model_save_dir"].get()
+        self.full_args.use_lora = self.settings_vars["use_lora"].get()
+        self.full_args.hybrid_probe = self.settings_vars["hybrid_probe"].get()
+        self.full_args.full_finetuning = self.settings_vars["full_finetuning"].get()
+        self.full_args.num_epochs = self.settings_vars["num_epochs"].get()
+        self.full_args.trainer_batch_size = self.settings_vars["trainer_batch_size"].get()
+        self.full_args.gradient_accumulation_steps = self.settings_vars["gradient_accumulation_steps"].get()
+        self.full_args.lr = self.settings_vars["lr"].get()
+        self.full_args.weight_decay = self.settings_vars["weight_decay"].get()
+        self.full_args.patience = self.settings_vars["patience"].get()
+
+        self.trainer_args = TrainerArguments(**self.full_args.__dict__)
+
+        print("Trainer Args:")
+        for k, v in self.trainer_args.__dict__.items():
+            if k != 'model_names':
+                print(f"{k}:\n{v}")
+        print("=========================\n")
+
+        if self.settings_vars["use_lora"].get():
+            pass
+        elif self.settings_vars["full_finetuning"].get():
+            pass
+        elif self.settings_vars["hybrid_probe"].get():
+            pass
+        else:
+            self.run_probes()
 
 def main():
     root = tk.Tk()

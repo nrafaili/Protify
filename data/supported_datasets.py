@@ -52,7 +52,7 @@ possible_with_vector_reps = [
 
 testing = [
     'EC', # multilabel
-    'DeepLoc-2', # binary
+    'DeepLoc-2', # 
     'DeepLoc-10', # multiclass
     'enzyme-kcat', # regression
     'human-ppi', # ppi

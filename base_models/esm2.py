@@ -25,8 +25,8 @@ class FastEsmConfig(PretrainedConfig):
         mask_token_id=None,
         pad_token_id=None,
         hidden_size=768,
-        num_hiddenum_layers=12,
-        num_attentionum_heads=12,
+        num_hidden_layers=12,
+        num_attention_heads=12,
         intermediate_size=3072,
         hidden_dropout_prob=0.1,
         attention_probs_dropout_prob=0.1,
@@ -41,8 +41,8 @@ class FastEsmConfig(PretrainedConfig):
 
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
-        self.num_hiddenum_layers = num_hiddenum_layers
-        self.num_attentionum_heads = num_attentionum_heads
+        self.num_hidden_layers = num_hidden_layers
+        self.num_attention_heads = num_attention_heads
         self.intermediate_size = intermediate_size
         self.hidden_dropout_prob = hidden_dropout_prob
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
@@ -222,15 +222,15 @@ class EsmEmbeddings(nn.Module):
 class EsmSelfAttention(nn.Module):
     def __init__(self, config, position_embedding_type=None):
         super().__init__()
-        if config.hidden_size % config.num_attentionum_heads != 0 and not hasattr(config, "embedding_size"):
+        if config.hidden_size % config.num_attention_heads != 0 and not hasattr(config, "embedding_size"):
             raise ValueError(
                 f"The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
-                f"heads ({config.num_attentionum_heads})"
+                f"heads ({config.num_attention_heads})"
             )
 
-        self.num_attentionum_heads = config.num_attentionum_heads
-        self.attention_head_size = int(config.hidden_size / config.num_attentionum_heads)
-        self.all_head_size = self.num_attentionum_heads * self.attention_head_size
+        self.num_attention_heads = config.num_attention_heads
+        self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
+        self.all_head_size = self.num_attention_heads * self.attention_head_size
 
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
         self.key = nn.Linear(config.hidden_size, self.all_head_size)
@@ -246,7 +246,7 @@ class EsmSelfAttention(nn.Module):
             self.rotary_embeddings = RotaryEmbedding(dim=self.attention_head_size)
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
-        return rearrange(x, 'b s (h d) -> b h s d', h=self.num_attentionum_heads)
+        return rearrange(x, 'b s (h d) -> b h s d', h=self.num_attention_heads)
 
     def forward(
         self,
@@ -387,7 +387,7 @@ class EsmEncoder(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.layer = nn.ModuleList([EsmLayer(config) for _ in range(config.num_hiddenum_layers)])
+        self.layer = nn.ModuleList([EsmLayer(config) for _ in range(config.num_hidden_layers)])
         self.emb_layer_norm_after = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.gradient_checkpointing = False
 

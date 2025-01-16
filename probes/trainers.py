@@ -1,17 +1,15 @@
 import torch
 import os
 from torchinfo import summary
-from transformers import Trainer,TrainingArguments, EarlyStoppingCallback
+from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
 from dataclasses import dataclass
 from data.torch_classes import (
-    string_labels_collator_builder,
     embeds_labels_collator_builder,
-    pair_string_collator_builder,
     pair_embeds_labels_collator_builder,
     EmbedsLabelsDatasetFromDisk,
     PairEmbedsLabelsDatasetFromDisk,
-    StringLabelDatasetFromHF,
-    PairStringLabelDatasetFromHF
+    EmbedsLabelsDataset,
+    PairEmbedsLabelsDataset
 )
 from probes.get_probe import get_probe
 
@@ -25,6 +23,7 @@ class TrainerArguments:
             batch_size: int = 64,
             gradient_accumulation_steps: int = 1,
             lr: float = 1e-4,
+            weight_decay: float = 0.00,
             task_type: str = 'regression',
             patience: int = 3,
             read_scaler: int = 1000,
@@ -36,6 +35,7 @@ class TrainerArguments:
         self.batch_size = batch_size
         self.gradient_accumulation_steps = gradient_accumulation_steps
         self.lr = lr
+        self.weight_decay = weight_decay
         self.task_type = task_type
         self.patience = patience
         self.save = save
@@ -53,7 +53,7 @@ class TrainerArguments:
             per_device_eval_batch_size=self.batch_size,
             gradient_accumulation_steps=self.gradient_accumulation_steps,
             learning_rate=self.lr,
-            weight_decay=0.01,
+            weight_decay=self.weight_decay,
             save_total_limit=3,
             save_strategy="epoch",
             eval_strategy="epoch",
@@ -80,6 +80,8 @@ def train_probe(
     summary(probe)
     full = embedding_args.matrix_embed
     db_path = os.path.join(embedding_args.embedding_save_dir, f'{model_name}_{full}.db')
+    print(embedding_args.sql, ppi, full)
+
     if embedding_args.sql:
         if ppi:
             if full:
@@ -91,17 +93,17 @@ def train_probe(
             collate_builder = embeds_labels_collator_builder
     else:
         if ppi:
-            DatasetClass = PairStringLabelDatasetFromHF
-            collate_builder = pair_string_collator_builder
+            DatasetClass = PairEmbedsLabelsDataset
+            collate_builder = pair_embeds_labels_collator_builder
         else:
-            DatasetClass = StringLabelDatasetFromHF
-            collate_builder = string_labels_collator_builder
+            DatasetClass = EmbedsLabelsDataset
+            collate_builder = embeds_labels_collator_builder
 
     """
-    For collator need to pass tokenizer, max_lengthgth, full, task_type
+    For collator need to pass tokenizer, full, task_type
     For dataset need to pass hf_dataset, col_a, col_b, label_col, input_dim, task_type, db_path, emb_dict, batch_size, read_scaler, full, train
     """
-    data_collator = collate_builder(tokenizer=tokenizer, max_lengthgth=embedding_args.max_lengthgth, full=full, task_type=embedding_args.task_type)
+    data_collator = collate_builder(tokenizer=tokenizer, full=full, task_type=probe_args.task_type)
     train_dataset = DatasetClass(
         hf_dataset=train_dataset,
         input_dim=probe_args.input_dim,

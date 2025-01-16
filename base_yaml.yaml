@@ -67,4 +67,5 @@ num_epochs: 200
 trainer_batch_size: 64
 gradient_accumulation_steps: 1
 lr: 1e-4
+weight_decay: 0.00
 patience: 3

@@ -14,7 +14,17 @@ class MainProcess:
     def __init__(self, full_args):
         self.full_args = full_args
 
+        self.dtype_map = {
+            "float32": torch.float32,
+            "float16": torch.float16,
+            "bfloat16": torch.bfloat16,
+            "float8_e4m3fn": torch.float8_e4m3fn,
+            "float8_e5m2": torch.float8_e5m2,
+            #"int8": torch.int8,
+        }
+
     def apply_current_settings(self):
+        self.full_args.embed_dtype = self.dtype_map[self.full_args.embed_dtype]
         self.data_args = HFDataArguments(**self.full_args.__dict__)
         self.embedding_args = EmbeddingArguments(**self.full_args.__dict__)
         self.model_args = BaseModelArguments(**self.full_args.__dict__)
@@ -26,7 +36,7 @@ class MainProcess:
 
     def save_embeddings_to_disk(self):
         self.embedding_args.save_embeddings = True
-        embedder = Embedder(self.embedding_args)
+        embedder = Embedder(self.embedding_args, self.all_seqs)
         model_names = self.model_args.model_names
         for model_name in model_names:
             print(f'Embedding sequences with {model_name}')
@@ -49,7 +59,7 @@ class MainProcess:
     
             if sql:
                 import sqlite3
-                save_path = os.path.join(self.embedding_args.save_dir, f'{model_name}_{full}.db')
+                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{full}.db')
                 with sqlite3.connect(save_path) as conn:
                     c = conn.cursor()
                     c.execute("SELECT embedding FROM embeddings WHERE sequence = ?", (test_seq,))
@@ -58,7 +68,7 @@ class MainProcess:
                 emb_dict = None
             else:
                 from safetensors.torch import safe_open
-                save_path = os.path.join(self.embedding_args.save_dir, f'{model_name}_{full}.safetensors')
+                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{full}.safetensors')
                 emb_dict = {}
                 with safe_open(save_path, framework="pt", device="cpu") as f:
                     for key in f.keys():
@@ -70,10 +80,10 @@ class MainProcess:
             input_dim = test_embedding.shape[-1]
             probe_args.input_dim = input_dim
 
-            for dataset in self.datasets:
+            for data_name, dataset in self.datasets.items():
                 train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
                 probe_args.num_labels = num_labels
-                probe_args.label_type = label_type
+                probe_args.task_type = label_type
                 tokenizer = get_tokenizer(model_name)
                 train_probe(
                     self.trainer_args,
@@ -171,6 +181,7 @@ def parse_arguments():
     parser.add_argument("--trainer_batch_size", type=int, default=64, help="Batch size for training.")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="Gradient accumulation steps.")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
+    parser.add_argument("--weight_decay", type=float, default=0.00, help="Weight decay.")
     parser.add_argument("--patience", type=int, default=3, help="Patience for early stopping.")
 
     args = parser.parse_args()
@@ -189,6 +200,11 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
-    print(args)
     main = MainProcess(args)
-    print(main)
+    for k, v in main.full_args.__dict__.items():
+        print(f"{k}:\t{v}")
+    main.apply_current_settings()
+    main.get_datasets()
+    print(len(main.all_seqs))
+    main.save_embeddings_to_disk()
+    main.run_probes()

@@ -16,7 +16,7 @@ class LinearProbeConfig(PretrainedConfig):
             dropout: float = 0.2,
             num_labels: int = 2,
             num_layers: int = 1,
-            task_type: str = 'binary',
+            task_type: str = 'singlelabel',
             pre_ln: bool = True,
             **kwargs,
     ):
