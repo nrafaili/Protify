@@ -5,3 +5,5 @@
 *.json
 *.pth
 *.bin
+*.txt
+*.tsv
