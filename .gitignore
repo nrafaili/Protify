@@ -1,3 +1,7 @@
 
 *.pyc
 *.safetensors
+*.pt
+*.json
+*.pth
+*.bin

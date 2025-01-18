@@ -11,8 +11,8 @@ from typing import Optional, Callable
 class EmbeddingArguments:
     def __init__(
             self,
-            batch_size: int = 4,
-            num_workers: int = 0,
+            embedding_batch_size: int = 4,
+            embedding_num_workers: int = 0,
             download_embeddings: bool = False,
             download_dir: str = 'Synthyra/plm_embeddings',
             matrix_embed: bool = False,
@@ -23,8 +23,8 @@ class EmbeddingArguments:
             embedding_save_dir: str = 'embeddings',
             **kwargs
     ):
-        self.batch_size = batch_size
-        self.num_workers = num_workers
+        self.batch_size = embedding_batch_size
+        self.num_workers = embedding_num_workers
         self.download_embeddings = download_embeddings
         self.download_dir = download_dir
         self.matrix_embed = matrix_embed
@@ -113,8 +113,8 @@ class Pooler:
     def __call__(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # [mean, max]
         final_emb = []
         for pooling_type in self.pooling_types:
-            final_emb.append(self.pooling_options[pooling_type](emb, attention_mask).flatten())
-        return torch.cat(final_emb, dim=0) # (n_pooling_types * d,)
+            final_emb.append(self.pooling_options[pooling_type](emb, attention_mask)) # (b, d)
+        return torch.cat(final_emb, dim=-1) # (b, n_pooling_types * d)
 
 
 ### Dataset for Embedding
@@ -252,8 +252,7 @@ class Embedder:
                 for i, batch in tqdm(enumerate(dataloader), total=len(dataloader), desc='Embedding batches'):
                     seqs = to_embed[i * self.batch_size:(i + 1) * self.batch_size]
                     input_ids, attention_mask = batch['input_ids'].to(device), batch['attention_mask'].to(device)
-                    residue_embeddings = model(input_ids, attention_mask)
-                    residue_embeddings = residue_embeddings.to(self.embed_dtype)
+                    residue_embeddings = model(input_ids, attention_mask).to(self.embed_dtype)
                     embeddings = _get_embeddings(residue_embeddings, attention_mask).cpu()
                     for seq, emb in zip(seqs, embeddings):
                         embeddings_dict[seq] = emb

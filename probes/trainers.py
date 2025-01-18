@@ -20,7 +20,7 @@ class TrainerArguments:
             self,
             model_save_dir: str,
             num_epochs: int = 200,
-            batch_size: int = 64,
+            trainer_batch_size: int = 64,
             gradient_accumulation_steps: int = 1,
             lr: float = 1e-4,
             weight_decay: float = 0.00,
@@ -32,7 +32,7 @@ class TrainerArguments:
     ):
         self.model_save_dir = model_save_dir
         self.num_epochs = num_epochs
-        self.batch_size = batch_size
+        self.batch_size = trainer_batch_size
         self.gradient_accumulation_steps = gradient_accumulation_steps
         self.lr = lr
         self.weight_decay = weight_decay
@@ -78,9 +78,12 @@ def train_probe(
     ):
     probe = get_probe(probe_args)
     summary(probe)
+    input_dim = probe_args.input_dim
+    task_type = probe_args.task_type
+    batch_size = trainer_args.batch_size
+    read_scaler = trainer_args.read_scaler
     full = embedding_args.matrix_embed
     db_path = os.path.join(embedding_args.embedding_save_dir, f'{model_name}_{full}.db')
-    print(embedding_args.sql, ppi, full)
 
     if embedding_args.sql:
         if ppi:
@@ -103,17 +106,55 @@ def train_probe(
     For collator need to pass tokenizer, full, task_type
     For dataset need to pass hf_dataset, col_a, col_b, label_col, input_dim, task_type, db_path, emb_dict, batch_size, read_scaler, full, train
     """
+    if task_type == 'singlelabel':
+        from metrics import compute_single_label_classification_metrics
+        compute_metrics = compute_single_label_classification_metrics
+    elif task_type == 'multilabel':
+        from metrics import compute_multi_label_classification_metrics
+        compute_metrics = compute_multi_label_classification_metrics
+    elif task_type == 'regression':
+        from metrics import compute_regression_metrics
+        compute_metrics = compute_regression_metrics
+    elif task_type == 'tokenwise':
+        from metrics import compute_tokenwise_classification_metrics
+        compute_metrics = compute_tokenwise_classification_metrics
+    else:
+        raise ValueError(f'Task type {task_type} not supported')
+
+
     data_collator = collate_builder(tokenizer=tokenizer, full=full, task_type=probe_args.task_type)
     train_dataset = DatasetClass(
         hf_dataset=train_dataset,
-        input_dim=probe_args.input_dim,
-        task_type=probe_args.task_type,
+        input_dim=input_dim,
+        task_type=task_type,
         db_path=db_path,
         emb_dict=emb_dict,
-        batch_size=trainer_args.batch_size,
-        read_scaler=trainer_args.read_scaler,
+        batch_size=batch_size,
+        read_scaler=read_scaler,
         full=full,
         train=True
+    )
+    valid_dataset = DatasetClass(
+        hf_dataset=valid_dataset,
+        input_dim=input_dim,
+        task_type=task_type,
+        db_path=db_path,
+        emb_dict=emb_dict,
+        batch_size=batch_size,
+        read_scaler=read_scaler,
+        full=full,
+        train=False
+    )
+    test_dataset = DatasetClass(
+        hf_dataset=test_dataset,
+        input_dim=input_dim,
+        task_type=task_type,
+        db_path=db_path,
+        emb_dict=emb_dict,
+        batch_size=batch_size,
+        read_scaler=read_scaler,
+        full=full,
+        train=False
     )
     hf_trainer_args = trainer_args()
     trainer = Trainer(
@@ -122,6 +163,7 @@ def train_probe(
         train_dataset=train_dataset,
         eval_dataset=valid_dataset,
         data_collator=data_collator,
+        compute_metrics=compute_metrics,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=trainer_args.patience)]
     )
     ### TODO logging
@@ -139,6 +181,5 @@ def train_probe(
         except Exception as e:
             print(f'Error saving model: {e}')
 
-    trainer.accelerate.free_memory()
+    trainer.accelerator.free_memory()
     torch.cuda.empty_cache()
-

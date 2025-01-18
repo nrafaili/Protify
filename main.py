@@ -84,6 +84,7 @@ class MainProcess:
                 train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
                 probe_args.num_labels = num_labels
                 probe_args.task_type = label_type
+                self.trainer_args.task_type = label_type
                 tokenizer = get_tokenizer(model_name)
                 train_probe(
                     self.trainer_args,

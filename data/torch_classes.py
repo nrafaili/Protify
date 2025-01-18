@@ -26,9 +26,8 @@ def string_labels_collator_builder(tokenizer, **kwargs):
 
 def embeds_labels_collator_builder(full=False, task_type='tokenwise', **kwargs):
     def _collate_fn(batch):
-        print(batch)
         embeds = torch.stack([ex[0] for ex in batch])
-        labels = torch.stack([torch.tensor(ex[1]) for ex in batch])
+        labels = torch.stack([ex[1] for ex in batch])
         
         if full and task_type == 'tokenwise':
             padded_labels = []
@@ -331,11 +330,11 @@ class EmbedsLabelsDatasetFromDisk(TorchDataset):
 class EmbedsLabelsDataset(TorchDataset):
     def __init__(self, hf_dataset, emb_dict, col_name='seqs', label_col='labels', task_type='singlelabel', full=False, **kwargs):
         self.embeddings = self.get_embs(emb_dict, hf_dataset[col_name])
+        self.full = full
         self.labels = hf_dataset[label_col]
         self.task_type = task_type
         self.max_length = len(max(hf_dataset[col_name], key=len))
         print('Max length: ', self.max_length)
-        self.full = full
 
     def __len__(self):
         return len(self.labels)
@@ -343,7 +342,7 @@ class EmbedsLabelsDataset(TorchDataset):
     def get_embs(self, emb_dict, seqs):
         embeddings = []
         for seq in tqdm(seqs, desc='Loading Embeddings'):
-            emb = emb_dict.get(seq)
+            emb = emb_dict[seq]
             embeddings.append(emb)
         return embeddings
 
@@ -352,7 +351,7 @@ class EmbedsLabelsDataset(TorchDataset):
             label = torch.tensor(self.labels[idx], dtype=torch.float)
         else:
             label = torch.tensor(self.labels[idx], dtype=torch.long)
-        emb = torch.tensor(self.embeddings[idx], dtype=torch.float)
+        emb = self.embeddings[idx].float()
         if self.full:
             padding_needed = self.max_length - emb.size(0)
             emb = F.pad(emb, (0, 0, 0, padding_needed), value=0)
