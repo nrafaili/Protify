@@ -76,6 +76,7 @@ class CAMP(PreTrainedModel):
     def seq_vector_inference(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None):
         # (b, L) -> (b, L, d) -> (b, d)
         esm_state = self.esm(input_ids, attention_mask).last_hidden_state.float()
+        esm_state = self.esm_proj(esm_state)
         if attention_mask is not None:
             batch_size, seq_len = attention_mask.shape
             attention_mask = attention_mask[:, None, None, :].expand(batch_size, 1, seq_len, seq_len).bool()
@@ -130,11 +131,11 @@ class CAMPForEmbedding(nn.Module):
         self.camp = CAMP.from_pretrained(model_path)
 
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        return self.camp(input_ids, attention_mask=attention_mask)
+        return self.camp.seq_vector_inference(input_ids, attention_mask=attention_mask)
 
 
 presets = {
-    'camp_a': 'lhallee/camp_1_25_5',
+    'camp_a': 'lhallee/camp_1_25',
     'camp_b': 'lhallee/camp_1_25_2_epoch',
     'camp_c': 'lhallee/camp_1_25_3_epoch',
     'camp_d': 'lhallee/camp_1_25_3-5',

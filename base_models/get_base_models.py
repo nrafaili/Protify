@@ -30,10 +30,10 @@ standard_benchmark = [
 ]
 
 experimental_models = [
-    'camp_a',
-    'camp_b',
-    'camp_c',
-    'camp_d',
+    #'camp_a',
+    #'camp_b',
+    #'camp_c',
+    #'camp_d',
     'camp_e',
 ]
 
@@ -70,7 +70,7 @@ def get_tokenizer(model_name: str):
     if 'esm2' in model_name.lower() or 'random' in model_name.lower():
         from transformers import EsmTokenizer
         return EsmTokenizer.from_pretrained('facebook/esm2_t6_8M_UR50D')
-    elif 'esmc' in model_name.lower():
+    elif 'esmc' in model_name.lower() or 'camp' in model_name.lower():
         from .esmc import EsmSequenceTokenizer
         return EsmSequenceTokenizer()
     else:
