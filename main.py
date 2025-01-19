@@ -223,7 +223,8 @@ def parse_arguments():
     if args.yaml_path is not None:
         with open(args.yaml_path, 'r') as file: 
             settings = yaml.safe_load(file)
-        return settings
+        args = SimpleNamespace(**settings)
+        return args
     else:
         return args
 

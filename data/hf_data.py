@@ -24,7 +24,7 @@ class HFDataArguments:
             **kwargs):
         self.data_paths = []
         if data_paths[0] == 'vector_benchmark':
-            self.data_paths = possible_with_vector_reps
+            data_paths = possible_with_vector_reps
 
         for data_path in data_paths:
             if data_path in supported_datasets:
