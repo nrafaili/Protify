@@ -1,6 +1,10 @@
 import torch
 import tkinter as tk
 import argparse
+import threading
+import queue
+import traceback
+from types import SimpleNamespace
 from tkinter import ttk
 from base_models.get_base_models import BaseModelArguments, standard_benchmark
 from data.hf_data import HFDataArguments
@@ -8,12 +12,37 @@ from data.supported_datasets import supported_datasets, possible_with_vector_rep
 from embedder import EmbeddingArguments
 from probes.get_probe import ProbeArguments
 from probes.trainers import TrainerArguments
-from main import MainProcess, LoggerArgs
+from main import MainProcess
+from concurrent.futures import ThreadPoolExecutor
+
+
+class BackgroundTask:
+    def __init__(self, target, *args, **kwargs):
+        self.target = target
+        self.args = args
+        self.kwargs = kwargs
+        self.result = None
+        self.error = None
+        self._complete = False
+        
+    def run(self):
+        try:
+            self.result = self.target(*self.args, **self.kwargs)
+        except Exception as e:
+            self.error = e
+            print(f"Error in background task: {str(e)}")
+            traceback.print_exc()
+        finally:
+            self._complete = True
+    
+    @property
+    def complete(self):
+        return self._complete
 
 
 class GUI(MainProcess):
     def __init__(self, master):
-        super().__init__(argparse.Namespace())  # Initialize MainProcess with empty namespace
+        super().__init__(argparse.Namespace(), GUI=True)  # Initialize MainProcess with empty namespace
         self.master = master
         self.master.title("Settings GUI")
         self.master.geometry("600x800")
@@ -50,16 +79,44 @@ class GUI(MainProcess):
         self.notebook.add(self.trainer_tab, text="Trainer")
         self.notebook.add(self.replay_tab, text="Replay")
 
-        # Build each tab
-        self._build_info_tab()
-        self._build_model_tab()
-        self._build_data_tab()
-        self._build_embed_tab()
-        self._build_probe_tab()
-        self._build_trainer_tab()
-        self._build_replay_tab()
+        # Build these lines
+        self.task_queue = queue.Queue()
+        self.thread_pool = ThreadPoolExecutor(max_workers=1)
+        self.current_task = None
+        
+        # Start the queue checker
+        self.check_task_queue()
 
-    def _build_info_tab(self):
+        # Build each tab
+        self.build_info_tab()
+        self.build_model_tab()
+        self.build_data_tab()
+        self.build_embed_tab()
+        self.build_probe_tab()
+        self.build_trainer_tab()
+        self.build_replay_tab()
+
+    def check_task_queue(self):
+        """Periodically check for completed background tasks"""
+        if self.current_task and self.current_task.complete:
+            if self.current_task.error:
+                print(f"Task failed: {self.current_task.error}")
+            self.current_task = None
+            
+        if not self.current_task and not self.task_queue.empty():
+            self.current_task = self.task_queue.get()
+            self.thread_pool.submit(self.current_task.run)
+        
+        # Schedule next check
+        self.master.after(100, self.check_task_queue)
+    
+    def run_in_background(self, target, *args, **kwargs):
+        """Queue a task to run in background"""
+        task = BackgroundTask(target, *args, **kwargs)
+        self.task_queue.put(task)
+        return task
+
+    def build_info_tab(self):
         # Create a frame for IDs
         id_frame = ttk.LabelFrame(self.info_tab, text="Identification")
         id_frame.pack(fill="x", padx=10, pady=5)
@@ -93,63 +150,66 @@ class GUI(MainProcess):
         paths_frame.pack(fill="x", padx=10, pady=5)
 
         # Log directory
-        ttk.Label(paths_frame, text="Log Directory:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Log Directory:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["log_dir"] = tk.StringVar(value="logs")
         entry_log_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["log_dir"], width=30)
-        entry_log_dir.grid(row=4, column=1, padx=10, pady=5)
+        entry_log_dir.grid(row=0, column=1, padx=10, pady=5)
 
         # Results directory
-        ttk.Label(paths_frame, text="Results Directory:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Results Directory:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["results_dir"] = tk.StringVar(value="results")
         entry_results_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["results_dir"], width=30)
-        entry_results_dir.grid(row=5, column=1, padx=10, pady=5)
+        entry_results_dir.grid(row=1, column=1, padx=10, pady=5)
 
         # Model save directory
-        ttk.Label(paths_frame, text="Model Save Directory:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Model Save Directory:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["model_save_dir"] = tk.StringVar(value="weights")
         entry_model_save = ttk.Entry(paths_frame, textvariable=self.settings_vars["model_save_dir"], width=30)
-        entry_model_save.grid(row=6, column=1, padx=10, pady=5)
+        entry_model_save.grid(row=2, column=1, padx=10, pady=5)
 
         # Embedding save directory
-        ttk.Label(paths_frame, text="Embedding Save Directory:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Embedding Save Directory:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["embedding_save_dir"] = tk.StringVar(value="embeddings")
         entry_embed_save = ttk.Entry(paths_frame, textvariable=self.settings_vars["embedding_save_dir"], width=30)
-        entry_embed_save.grid(row=7, column=1, padx=10, pady=5)
+        entry_embed_save.grid(row=3, column=1, padx=10, pady=5)
 
         # Download directory
-        ttk.Label(paths_frame, text="Download Directory:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Download Directory:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["download_dir"] = tk.StringVar(value="Synthyra/mean_pooled_embeddings")
         entry_download = ttk.Entry(paths_frame, textvariable=self.settings_vars["download_dir"], width=30)
-        entry_download.grid(row=8, column=1, padx=10, pady=5)
+        entry_download.grid(row=4, column=1, padx=10, pady=5)
 
         # button to start logging
-        start_logging_button = ttk.Button(id_frame, text="Start session", command=self._session_start)
-        start_logging_button.grid(row=99, column=0, columnspan=2, pady=10)
+        start_logging_button = ttk.Button(self.info_tab, text="Start session", command=self._session_start)
+        start_logging_button.pack(pady=10)
 
     def _session_start(self):
+        # Update session variables
         hf_token = self.settings_vars["huggingface_token"].get()
         synthyra_api_key = self.settings_vars["synthyra_api_key"].get()
         wandb_api_key = self.settings_vars["wandb_api_key"].get()
-        if hf_token:
-            from huggingface_hub import login
-            login(hf_token)
-        if synthyra_api_key:
-            pass
-        if wandb_api_key:
-            pass
+        
+        def background_login():
+            if hf_token:
+                from huggingface_hub import login
+                login(hf_token)
+            # Handle other logins...
+            
+            self.full_args.hf_token = hf_token
+            self.full_args.synthyra_api_key = synthyra_api_key
+            self.full_args.wandb_api_key = wandb_api_key
+            self.full_args.log_dir = self.settings_vars["log_dir"].get()
+            self.full_args.results_dir = self.settings_vars["results_dir"].get()
+            self.full_args.model_save_dir = self.settings_vars["model_save_dir"].get()
+            self.full_args.embedding_save_dir = self.settings_vars["embedding_save_dir"].get()
+            self.full_args.download_dir = self.settings_vars["download_dir"].get()
+            self.full_args.replay_path = None
+            self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+            self.start_log_gui()
+        
+        self.run_in_background(background_login)
 
-        self.full_args.hf_token = hf_token
-        self.full_args.synthyra_api_key = synthyra_api_key
-        self.full_args.wandb_api_key = wandb_api_key
-        self.full_args.log_dir = self.settings_vars["log_dir"].get()
-        self.full_args.results_dir = self.settings_vars["results_dir"].get()
-        self.full_args.model_save_dir = self.settings_vars["model_save_dir"].get()
-        self.full_args.embedding_save_dir = self.settings_vars["embedding_save_dir"].get()
-        self.full_args.download_dir = self.settings_vars["download_dir"].get()
-        self.logger_args = LoggerArgs(**self.full_args.__dict__)
-        self.start_log()
-
-    def _build_data_tab(self):
+    def build_data_tab(self):
         # Label + Listbox for dataset names
         ttk.Label(self.data_tab, text="Dataset Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
         self.data_listbox = tk.Listbox(self.data_tab, selectmode="extended", height=25, width=25)
@@ -180,7 +240,34 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.data_tab, text="Get Data", command=self._get_data)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
-    def _build_embed_tab(self):
+    def _get_data(self):
+        print("=== Getting Data ===")
+        
+        # Gather settings
+        selected_indices = self.data_listbox.curselection()
+        selected_datasets = [self.data_listbox.get(i) for i in selected_indices]
+        
+        if not selected_datasets:
+            selected_datasets = possible_with_vector_reps
+            
+        data_paths = [supported_datasets[name] for name in selected_datasets]
+        
+        def background_get_data():
+            # Update full_args with data settings
+            self.full_args.data_paths = data_paths
+            self.full_args.max_length = self.settings_vars["max_length"].get()
+            self.full_args.trim = self.settings_vars["trim"].get()
+            
+            # Create data args and get datasets
+            self.data_args = HFDataArguments(**self.full_args.__dict__)
+            self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+            self._write_args()
+            self.get_datasets()
+            print("Data downloaded and stored")
+            
+        self.run_in_background(background_get_data)
+
+    def build_embed_tab(self):
         # batch_size
         ttk.Label(self.embed_tab, text="Batch Size:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["batch_size"] = tk.IntVar(value=4)
@@ -236,7 +323,41 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.embed_tab, text="Embed sequences to disk", command=self._get_embeddings)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
-    def _build_model_tab(self):
+    def _get_embeddings(self):
+        if not self.all_seqs:
+            print('Sequences are not loaded yet. Please run the data tab first.')
+            return
+            
+        # Gather settings
+        pooling_str = self.settings_vars["pooling_types"].get().strip()
+        pooling_list = [p.strip() for p in pooling_str.split(",") if p.strip()]
+        dtype_str = self.settings_vars["embed_dtype"].get()
+        dtype_val = self.dtype_map.get(dtype_str, torch.float32)
+        
+        def background_get_embeddings():
+            # Update full args
+            self.full_args.all_seqs = self.all_seqs
+            self.full_args.batch_size = self.settings_vars["batch_size"].get()
+            self.full_args.num_workers = self.settings_vars["num_workers"].get()
+            self.full_args.download_embeddings = self.settings_vars["download_embeddings"].get()
+            self.full_args.matrix_embed = self.settings_vars["matrix_embed"].get()
+            self.full_args.pooling_types = pooling_list
+            self.full_args.save_embeddings = True
+            self.full_args.embed_dtype = dtype_val
+            self.full_args.sql = self.settings_vars["sql"].get()
+            self.full_args.save_dir = self.settings_vars["save_dir"].get()
+            
+            self.embedding_args = EmbeddingArguments(**self.full_args.__dict__)
+            self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+            self._write_args()
+            
+            print("Saving embeddings to disk")
+            self.save_embeddings_to_disk()
+            print("Embeddings saved to disk")
+            
+        self.run_in_background(background_get_embeddings)
+
+    def build_model_tab(self):
         ttk.Label(self.model_tab, text="Model Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
         self.model_listbox = tk.Listbox(self.model_tab, selectmode="extended", height=10)
@@ -247,7 +368,30 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.model_tab, text="Select Models", command=self._select_models)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
-    def _build_probe_tab(self):
+    def _select_models(self):
+        # Gather selected model names
+        selected_indices = self.model_listbox.curselection()
+        selected_models = [self.model_listbox.get(i) for i in selected_indices]
+
+        # If no selection, default to the entire standard_benchmark
+        if not selected_models:
+            selected_models = standard_benchmark
+
+        # Update full_args with model settings
+        self.full_args.model_names = selected_models
+        print(self.full_args.model_names)
+        # Create model args from full args
+        self.model_args = BaseModelArguments(**self.full_args.__dict__)
+
+        print("Model Args:")
+        for k, v in self.model_args.__dict__.items():
+            if k != 'model_names':
+                print(f"{k}:\n{v}")
+        print("=========================\n")
+        self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+        self._write_args()
+
+    def build_probe_tab(self):
         # Probe Type
         ttk.Label(self.probe_tab, text="Probe Type:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["probe_type"] = tk.StringVar(value="linear")
@@ -325,89 +469,6 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.probe_tab, text="Save Probe Arguments", command=self._create_probe_args)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
-    def _build_trainer_tab(self):
-        # model_save_dir
-        ttk.Label(self.trainer_tab, text="Model Save Dir:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["model_save_dir"] = tk.StringVar(value="probe")
-        entry_model_save_dir = ttk.Entry(self.trainer_tab, textvariable=self.settings_vars["model_save_dir"], width=20)
-        entry_model_save_dir.grid(row=0, column=1, padx=10, pady=5)
-
-        # Lora checkbox
-        ttk.Label(self.trainer_tab, text="Use LoRA:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["use_lora"] = tk.BooleanVar(value=False)
-        check_lora = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["use_lora"])
-        check_lora.grid(row=1, column=1, padx=10, pady=5, sticky="w")
-
-        # Hybrid Probe checkbox
-        ttk.Label(self.trainer_tab, text="Hybrid Probe:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["hybrid_probe"] = tk.BooleanVar(value=False)
-        check_hybrid_probe = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["hybrid_probe"])
-        check_hybrid_probe.grid(row=2, column=1, padx=10, pady=5, sticky="w")
-
-        # Full finetuning checkbox
-        ttk.Label(self.trainer_tab, text="Full Finetuning:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["full_finetuning"] = tk.BooleanVar(value=False)
-        check_full_ft = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["full_finetuning"])
-        check_full_ft.grid(row=3, column=1, padx=10, pady=5, sticky="w")
-
-        # num_epochs
-        ttk.Label(self.trainer_tab, text="Number of Epochs:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["num_epochs"] = tk.IntVar(value=200)
-        spin_num_epochs = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["num_epochs"])
-        spin_num_epochs.grid(row=4, column=1, padx=10, pady=5)
-
-        # trainer_batch_size
-        ttk.Label(self.trainer_tab, text="Trainer Batch Size:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["trainer_batch_size"] = tk.IntVar(value=64)
-        spin_trainer_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["trainer_batch_size"])
-        spin_trainer_batch_size.grid(row=5, column=1, padx=10, pady=5)
-
-        # gradient_accumulation_steps
-        ttk.Label(self.trainer_tab, text="Gradient Accumulation Steps:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["gradient_accumulation_steps"] = tk.IntVar(value=1)
-        spin_gradient_accumulation_steps = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["gradient_accumulation_steps"])
-        spin_gradient_accumulation_steps.grid(row=6, column=1, padx=10, pady=5)
-
-        # lr
-        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["lr"] = tk.DoubleVar(value=1e-4)
-        spin_lr = ttk.Spinbox(self.trainer_tab, from_=1e-6, to=1e-2, increment=1e-5, textvariable=self.settings_vars["lr"])
-        spin_lr.grid(row=7, column=1, padx=10, pady=5)
-
-        # weight_decay
-        ttk.Label(self.trainer_tab, text="Weight Decay:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["weight_decay"] = tk.DoubleVar(value=0.00)
-        spin_weight_decay = ttk.Spinbox(self.trainer_tab, from_=0.0, to=1.0, increment=0.01, textvariable=self.settings_vars["weight_decay"])
-        spin_weight_decay.grid(row=8, column=1, padx=10, pady=5)
-
-        # patience
-        ttk.Label(self.trainer_tab, text="Patience:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["patience"] = tk.IntVar(value=3)
-        spin_patience = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["patience"])
-        spin_patience.grid(row=9, column=1, padx=10, pady=5)
-
-        run_button = ttk.Button(self.trainer_tab, text="Run trainer", command=self._run_trainer)
-        run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
-
-    def _build_replay_tab(self):
-        # Create a frame for replay settings
-        replay_frame = ttk.LabelFrame(self.replay_tab, text="Log Replay Settings")
-        replay_frame.pack(fill="x", padx=10, pady=5)
-
-        # Replay log path
-        ttk.Label(replay_frame, text="Replay Log Path:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["replay_path"] = tk.StringVar(value="")
-        entry_replay = ttk.Entry(replay_frame, textvariable=self.settings_vars["replay_path"], width=40)
-        entry_replay.grid(row=0, column=1, padx=10, pady=5)
-
-        # Browse button for selecting log file
-        browse_button = ttk.Button(replay_frame, text="Browse", command=self._browse_replay_log)
-        browse_button.grid(row=0, column=2, padx=5, pady=5)
-
-        # Start replay button
-        replay_button = ttk.Button(replay_frame, text="Start Replay", command=self._start_replay)
-        replay_button.grid(row=1, column=0, columnspan=3, pady=20)
-
     def _create_probe_args(self):
         print("=== Creating Probe ===")
         
@@ -436,99 +497,69 @@ class GUI(MainProcess):
             if k != 'model_names':
                 print(f"{k}:\n{v}")
         print("========================\n")
+        self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+        self._write_args()
 
-    def _get_data(self):
-        print("=== Getting Data ===")
+    def build_trainer_tab(self):
+        # Lora checkbox
+        ttk.Label(self.trainer_tab, text="Use LoRA:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["use_lora"] = tk.BooleanVar(value=False)
+        check_lora = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["use_lora"])
+        check_lora.grid(row=0, column=1, padx=10, pady=5, sticky="w")
 
-        # Gather selected indices from the listbox
-        selected_indices = self.data_listbox.curselection()
-        selected_datasets = [self.data_listbox.get(i) for i in selected_indices]
+        # Hybrid Probe checkbox
+        ttk.Label(self.trainer_tab, text="Hybrid Probe:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["hybrid_probe"] = tk.BooleanVar(value=False)
+        check_hybrid_probe = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["hybrid_probe"])
+        check_hybrid_probe.grid(row=1, column=1, padx=10, pady=5, sticky="w")
 
-        # Optional: if nothing is selected, use all
-        if not selected_datasets:
-            selected_datasets = possible_with_vector_reps
+        # Full finetuning checkbox
+        ttk.Label(self.trainer_tab, text="Full Finetuning:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["full_finetuning"] = tk.BooleanVar(value=False)
+        check_full_ft = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["full_finetuning"])
+        check_full_ft.grid(row=2, column=1, padx=10, pady=5, sticky="w")
 
-        data_paths = [supported_datasets[name] for name in selected_datasets]
-        
-        # Update full_args with data settings
-        self.full_args.data_paths = data_paths
-        self.full_args.max_length = self.settings_vars["max_length"].get()
-        self.full_args.trim = self.settings_vars["trim"].get()
+        # num_epochs
+        ttk.Label(self.trainer_tab, text="Number of Epochs:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["num_epochs"] = tk.IntVar(value=200)
+        spin_num_epochs = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["num_epochs"])
+        spin_num_epochs.grid(row=3, column=1, padx=10, pady=5)
 
-        # Create data args from full args
-        self.data_args = HFDataArguments(**self.full_args.__dict__)
-        
-        print("Data Arguments:")
-        for k, v in self.data_args.__dict__.items():
-            if k != 'data_paths':
-                print(f"{k}:\n{v}")
-        print("========================\n")
+        # trainer_batch_size
+        ttk.Label(self.trainer_tab, text="Trainer Batch Size:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["trainer_batch_size"] = tk.IntVar(value=64)
+        spin_trainer_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["trainer_batch_size"])
+        spin_trainer_batch_size.grid(row=4, column=1, padx=10, pady=5)
 
-        self.get_datasets()
-        print("Data downloaded and stored")
+        # gradient_accumulation_steps
+        ttk.Label(self.trainer_tab, text="Gradient Accumulation Steps:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["gradient_accumulation_steps"] = tk.IntVar(value=1)
+        spin_gradient_accumulation_steps = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["gradient_accumulation_steps"])
+        spin_gradient_accumulation_steps.grid(row=5, column=1, padx=10, pady=5)
 
-    def _get_embeddings(self):
-        if not self.all_seqs:
-            print('Sequences are not loaded yet. Please run the data tab first.')
-            return
+        # lr
+        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["lr"] = tk.DoubleVar(value=1e-4)
+        spin_lr = ttk.Spinbox(self.trainer_tab, from_=1e-6, to=1e-2, increment=1e-5, textvariable=self.settings_vars["lr"])
+        spin_lr.grid(row=6, column=1, padx=10, pady=5)
 
-        # Convert comma-separated pooling_types into a list
-        pooling_str = self.settings_vars["pooling_types"].get().strip()
-        pooling_list = [p.strip() for p in pooling_str.split(",") if p.strip()]
+        # weight_decay
+        ttk.Label(self.trainer_tab, text="Weight Decay:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["weight_decay"] = tk.DoubleVar(value=0.00)
+        spin_weight_decay = ttk.Spinbox(self.trainer_tab, from_=0.0, to=1.0, increment=0.01, textvariable=self.settings_vars["weight_decay"])
+        spin_weight_decay.grid(row=7, column=1, padx=10, pady=5)
 
-        # Convert embed_dtype string to actual torch.dtype
-        dtype_str = self.settings_vars["embed_dtype"].get()
+        # patience
+        ttk.Label(self.trainer_tab, text="Patience:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["patience"] = tk.IntVar(value=3)
+        spin_patience = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["patience"])
+        spin_patience.grid(row=8, column=1, padx=10, pady=5)
 
-        dtype_val = self.dtype_map.get(dtype_str, torch.float32)
-
-        # Update full_args with embedding settings
-        self.full_args.all_seqs = self.all_seqs
-        self.full_args.batch_size = self.settings_vars["batch_size"].get()
-        self.full_args.num_workers = self.settings_vars["num_workers"].get()
-        self.full_args.download_embeddings = self.settings_vars["download_embeddings"].get()
-        self.full_args.matrix_embed = self.settings_vars["matrix_embed"].get()
-        self.full_args.pooling_types = pooling_list
-        self.full_args.save_embeddings = True
-        self.full_args.embed_dtype = dtype_val
-        self.full_args.sql = self.settings_vars["sql"].get()
-        self.full_args.save_dir = self.settings_vars["save_dir"].get()
-
-        # Create embedding args from full args
-        self.embedding_args = EmbeddingArguments(**self.full_args.__dict__)
-
-        print("Embedding Args:")
-        for k, v in self.embedding_args.__dict__.items():
-            if k != 'all_seqs':
-                print(f"{k}:\n{v}")
-        print("========================\n")
-
-        print("Saving embeddings to disk")
-        self.save_embeddings_to_disk()
-        print("Embeddings saved to disk")
-
-    def _select_models(self):
-        # Gather selected model names
-        selected_indices = self.model_listbox.curselection()
-        selected_models = [self.model_listbox.get(i) for i in selected_indices]
-
-        # If no selection, default to the entire standard_benchmark
-        if not selected_models:
-            selected_models = standard_benchmark
-
-        # Update full_args with model settings
-        self.full_args.model_names = selected_models
-        print(self.full_args.model_names)
-        # Create model args from full args
-        self.model_args = BaseModelArguments(**self.full_args.__dict__)
-
-        print("Model Args:")
-        for k, v in self.model_args.__dict__.items():
-            if k != 'model_names':
-                print(f"{k}:\n{v}")
-        print("=========================\n")
+        run_button = ttk.Button(self.trainer_tab, text="Run trainer", command=self._run_trainer)
+        run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
     def _run_trainer(self):
-        self.full_args.model_save_dir = self.settings_vars["model_save_dir"].get()
+        # Gather settings
         self.full_args.use_lora = self.settings_vars["use_lora"].get()
         self.full_args.hybrid_probe = self.settings_vars["hybrid_probe"].get()
         self.full_args.full_finetuning = self.settings_vars["full_finetuning"].get()
@@ -539,28 +570,46 @@ class GUI(MainProcess):
         self.full_args.weight_decay = self.settings_vars["weight_decay"].get()
         self.full_args.patience = self.settings_vars["patience"].get()
 
-        self.trainer_args = TrainerArguments(**self.full_args.__dict__)
+        def background_run_trainer():
+            self.trainer_args = TrainerArguments(**self.full_args.__dict__)
+            self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+            self._write_args()
+            
+            if self.settings_vars["use_lora"].get():
+                pass
+            elif self.settings_vars["full_finetuning"].get():
+                pass
+            elif self.settings_vars["hybrid_probe"].get():
+                pass
+            else:
+                self.run_probes()
+                
+        self.run_in_background(background_run_trainer)
 
-        print("Trainer Args:")
-        for k, v in self.trainer_args.__dict__.items():
-            if k != 'model_names':
-                print(f"{k}:\n{v}")
-        print("=========================\n")
+    def build_replay_tab(self):
+        # Create a frame for replay settings
+        replay_frame = ttk.LabelFrame(self.replay_tab, text="Log Replay Settings")
+        replay_frame.pack(fill="x", padx=10, pady=5)
 
-        if self.settings_vars["use_lora"].get():
-            pass
-        elif self.settings_vars["full_finetuning"].get():
-            pass
-        elif self.settings_vars["hybrid_probe"].get():
-            pass
-        else:
-            self.run_probes()
+        # Replay log path
+        ttk.Label(replay_frame, text="Replay Log Path:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["replay_path"] = tk.StringVar(value="")
+        entry_replay = ttk.Entry(replay_frame, textvariable=self.settings_vars["replay_path"], width=40)
+        entry_replay.grid(row=0, column=1, padx=10, pady=5)
+
+        # Browse button for selecting log file
+        browse_button = ttk.Button(replay_frame, text="Browse", command=self._browse_replay_log)
+        browse_button.grid(row=0, column=2, padx=5, pady=5)
+
+        # Start replay button
+        replay_button = ttk.Button(replay_frame, text="Start Replay", command=self._start_replay)
+        replay_button.grid(row=1, column=0, columnspan=3, pady=20)
 
     def _browse_replay_log(self):
         from tkinter import filedialog
         filename = filedialog.askopenfilename(
             title="Select Replay Log",
-            filetypes=(("Log files", "*.log"), ("All files", "*.*"))
+            filetypes=(("Txt files", "*.txt"), ("All files", "*.*"))
         )
         if filename:
             self.settings_vars["replay_path"].set(filename)

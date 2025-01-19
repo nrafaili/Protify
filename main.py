@@ -3,22 +3,22 @@ import argparse
 import yaml
 import torch
 import numpy as np
+from types import SimpleNamespace
 from probes.get_probe import ProbeArguments
 from base_models.get_base_models import BaseModelArguments, get_base_model, get_tokenizer
 from data.hf_data import HFDataArguments, get_hf_data
 from probes.trainers import TrainerArguments, train_probe
 from embedder import EmbeddingArguments, Embedder
-from logger import MetricsLogger, LoggerArgs, log_method_calls
+from logger import MetricsLogger, log_method_calls
 
 
 class MainProcess(MetricsLogger):
-    def __init__(self, full_args):
+    def __init__(self, full_args, GUI=False):
         super().__init__(full_args)
         self.full_args = full_args
-        try:
-            self.start_log() # running from main 
-        except:
-            pass # running from GUI
+        if not GUI:
+            self.start_log_main()
+
         self.dtype_map = {
             "float32": torch.float32,
             "float16": torch.float16,
@@ -36,7 +36,7 @@ class MainProcess(MetricsLogger):
         self.model_args = BaseModelArguments(**self.full_args.__dict__)
         self.probe_args = ProbeArguments(**self.full_args.__dict__)
         self.trainer_args = TrainerArguments(**self.full_args.__dict__)
-        self.logger_args = LoggerArgs(**self.full_args.__dict__)
+        self.logger_args = SimpleNamespace(**self.full_args.__dict__)
 
     @log_method_calls
     def get_datasets(self):
@@ -233,12 +233,12 @@ if __name__ == "__main__":
         replayer = LogReplayer(args.replay_path)
         replay_args = replayer.parse_log()
         replay_args.replay_path = args.replay_path
-        main = MainProcess(replay_args)
+        main = MainProcess(replay_args, GUI=False)
         for k, v in main.full_args.__dict__.items():
             print(f"{k}:\t{v}")
         replayer.run_replay(main)
     else:
-        main = MainProcess(args)
+        main = MainProcess(args, GUI=False)
         for k, v in main.full_args.__dict__.items():
             print(f"{k}:\t{v}")
         main.apply_current_settings()

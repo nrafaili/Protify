@@ -7,7 +7,6 @@ import datetime
 import ast
 import random
 import string
-from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -21,20 +20,6 @@ def log_method_calls(func):
     return wrapper
 
 
-@dataclass
-class LoggerArgs:
-    def __init__(
-            self,
-            log_dir: str,
-            results_dir: str,
-            replay_path: str = None,
-            **kwargs,
-    ):
-        self.log_dir = log_dir
-        self.results_dir = results_dir
-        self.replay_path = replay_path
-
-
 class MetricsLogger:
     """
     Logs method calls to a text file, and keeps a TSV-based matrix of metrics:
@@ -45,8 +30,9 @@ class MetricsLogger:
 
     def __init__(self, args):
         self.logger_args = args
+        self._section_break = '\n' + '=' * 55 + '\n'
 
-    def start_log(self):
+    def _start_file(self):
         args = self.logger_args
         self.log_dir = args.log_dir
         self.results_dir = args.results_dir
@@ -55,27 +41,15 @@ class MetricsLogger:
 
         # Generate random ID with date and 4-letter code
         random_letters = ''.join(random.choices(string.ascii_uppercase, k=4))
-        date_str = datetime.datetime.now().strftime('%Y-%m-%d')
-        self.random_id = f"{date_str}_{random_letters}"
+        date_str = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')
+        self.random_id = f"{random_letters}_{date_str}"
         
         if args.replay_path is not None:
             self.random_id = 'replay_' + args.replay_path.split('/')[-1].split('.')[0]
         self.log_file = os.path.join(self.log_dir, f"{self.random_id}.txt")
         self.results_file = os.path.join(self.results_dir, f"{self.random_id}.tsv")
 
-        if not os.path.exists(self.log_file):
-            with open(self.log_file, 'w') as f:
-                now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                if args.replay_path is not None:
-                    message = f'=== REPLAY OF {args.replay_path} ===\n'
-                    f.write(message)
-                header = f"=== Logging session started at {now} ===\n"
-                f.write(header)
-                for k, v in args.__dict__.items():
-                    if 'token' not in k.lower() and 'api' not in k.lower():
-                        f.write(f"{k}:\t{v}\n")
-                f.write("\n" + "=" * len(header) + "\n")
-
+    def _minimial_logger(self):
         # Set up a minimal logger
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.INFO)
@@ -92,6 +66,40 @@ class MetricsLogger:
         # TSV tracking
         self.results_file = self.results_file
         self.logger_data_tracking = {}  # { dataset_name: { model_name: metrics_dict } }
+
+    def _write_args(self):
+        with open(self.log_file, 'a') as f:
+            f.write(self._section_break)
+            for k, v in self.logger_args.__dict__.items():
+                if 'token' not in k.lower() and 'api' not in k.lower():
+                    f.write(f"{k}:\t{v}\n")
+            f.write(self._section_break)
+
+    def start_log_main(self):
+        self._start_file()
+
+        with open(self.log_file, 'w') as f:
+            now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if self.logger_args.replay_path is not None:
+                message = f'=== REPLAY OF {self.logger_args.replay_path} ===\n'
+                f.write(message)
+            header = f"=== Logging session started at {now} ===\n"
+            f.write(header)
+            self._write_args()
+
+        self._minimial_logger()
+
+    def start_log_gui(self):
+        self._start_file()
+        with open(self.log_file, 'w') as f:
+            now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if self.logger_args.replay_path is not None:
+                message = f'=== REPLAY OF {self.logger_args.replay_path} ===\n'
+                f.write(message)
+            header = f"=== Logging session started at {now} ===\n"
+            f.write(header)
+            f.write(self._section_break)
+        self._minimial_logger()
 
     def load_tsv(self):
         """Load existing TSV data into self.logger_data_tracking (row=dataset, col=model)."""
@@ -192,6 +200,6 @@ class LogReplayer:
             print(f"Replaying call to: {method}()")
             func = getattr(target_obj, method, None)
             if not func:
-                print(f"Warning: {method}() not found on target object.")
+                print(f"Warning: {method} not found on target object.")
                 continue
             func()
