@@ -17,16 +17,16 @@ class FastEsmForEmbedding(nn.Module):
 
 
 presets = {
-    'ESM2-8': 'facebook/esm2_t6_8M_UR50D',
-    'ESM2-35': 'facebook/esm2_t12_35M_UR50D',
-    'ESM2-150': 'facebook/esm2_t30_150M_UR50D',
-    'ESM2-650': 'facebook/esm2_t33_650M_UR50D',
-    'ESM2-3B': 'facebook/esm2_t36_3B_UR50D',
+    'ESM2-8': 'Synthyra/ESM2-8M',
+    'ESM2-35': 'Synthyra/ESM2-35M',
+    'ESM2-150': 'Synthyra/ESM2-150M',
+    'ESM2-650': 'Synthyra/ESM2-650M',
+    'ESM2-3B': 'Synthyra/ESM2-3B',
 }
 
 
 def build_esm2_model(preset: str):
-    model = FastEsmForEmbedding.from_pretrained(presets[preset]).eval()
+    model = FastEsmForEmbedding(presets[preset]).eval()
     tokenizer = model.esm.tokenizer
     return model, tokenizer
 

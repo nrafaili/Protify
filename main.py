@@ -6,14 +6,19 @@ import numpy as np
 from probes.get_probe import ProbeArguments
 from base_models.get_base_models import BaseModelArguments, get_base_model, get_tokenizer
 from data.hf_data import HFDataArguments, get_hf_data
-from embedder import EmbeddingArguments, Embedder
 from probes.trainers import TrainerArguments, train_probe
+from embedder import EmbeddingArguments, Embedder
+from logger import MetricsLogger, LoggerArgs, log_method_calls
 
 
-class MainProcess:
+class MainProcess(MetricsLogger):
     def __init__(self, full_args):
+        super().__init__(full_args)
         self.full_args = full_args
-
+        try:
+            self.start_log() # running from main 
+        except:
+            pass # running from GUI
         self.dtype_map = {
             "float32": torch.float32,
             "float16": torch.float16,
@@ -23,6 +28,7 @@ class MainProcess:
             #"int8": torch.int8,
         }
 
+    @log_method_calls
     def apply_current_settings(self):
         self.full_args.embed_dtype = self.dtype_map[self.full_args.embed_dtype]
         self.data_args = HFDataArguments(**self.full_args.__dict__)
@@ -30,10 +36,13 @@ class MainProcess:
         self.model_args = BaseModelArguments(**self.full_args.__dict__)
         self.probe_args = ProbeArguments(**self.full_args.__dict__)
         self.trainer_args = TrainerArguments(**self.full_args.__dict__)
+        self.logger_args = LoggerArgs(**self.full_args.__dict__)
 
+    @log_method_calls
     def get_datasets(self):
         self.datasets, self.all_seqs = get_hf_data(self.data_args)
 
+    @log_method_calls
     def save_embeddings_to_disk(self):
         self.embedding_args.save_embeddings = True
         embedder = Embedder(self.embedding_args, self.all_seqs)
@@ -43,6 +52,7 @@ class MainProcess:
             model, tokenizer = get_base_model(model_name)
             _ = embedder(model_name, model, tokenizer) 
 
+    @log_method_calls
     def run_probes(self):
         model_names = self.model_args.model_names
         probe_args = self.probe_args
@@ -86,7 +96,7 @@ class MainProcess:
                 probe_args.task_type = label_type
                 self.trainer_args.task_type = label_type
                 tokenizer = get_tokenizer(model_name)
-                train_probe(
+                metrics = train_probe(
                     self.trainer_args,
                     self.embedding_args,
                     probe_args,
@@ -98,33 +108,41 @@ class MainProcess:
                     emb_dict=emb_dict,
                     ppi=ppi,
                 )
+                self.log_metrics(data_name, model_name, metrics)
 
+    @log_method_calls
     def init_hybrid_probe(self):
         # freeze base model
         # train probe
-        self.run_probe()
         # unfreeze base model
         # train base model
         pass
 
+    @log_method_calls
     def init_lora_model(self):
         pass
 
+    @log_method_calls
     def run_lora_model(self):
         pass
 
+    @log_method_calls
     def get_full_finetuning_model(self):
         pass
 
+    @log_method_calls
     def run_full_finetuning_model(self):
         pass
 
+    @log_method_calls
     def find_best_scikit_model(self):
         pass
 
+    @log_method_calls
     def cross_validate_scikit_model(self):
         pass
 
+    @log_method_calls
     def scikit_workflow(self):
         production = False # TODO: make this a setting
         pass
@@ -132,13 +150,23 @@ class MainProcess:
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Script with arguments mirroring the provided YAML settings.")
-    # ----------------- Misc ----------------- #
-    parser.add_argument("--yaml_path", type=str, default=None, help="Path to the YAML file.")
+    # ----------------- ID ----------------- #
     parser.add_argument("--hf_username", default="Synthyra", help="Hugging Face username.")
     parser.add_argument("--hf_token", default=None, help="Hugging Face token.")
+    parser.add_argument("--synthyra_api_key", default=None, help="Synthyra API key.")
+    parser.add_argument("--wandb_api_key", default=None, help="Wandb API key.")
+
+    # ----------------- Paths ----------------- #
+    parser.add_argument("--yaml_path", type=str, default=None, help="Path to the YAML file.")
+    parser.add_argument("--log_dir", type=str, default="logs", help="Path to the log directory.")
+    parser.add_argument("--results_dir", type=str, default="results", help="Path to the results directory.")
+    parser.add_argument("--data_paths", nargs="+", default=["DeepLoc-2"], help="List of data directories.")
+    parser.add_argument("--model_save_dir", default="weights", help="Directory to save models.")
+    parser.add_argument("--embedding_save_dir", default="embeddings", help="Directory to save embeddings.")
+    parser.add_argument("--download_dir", default="Synthyra/mean_pooled_embeddings", help="Directory to download embeddings to.")
+    parser.add_argument("--replay_path", type=str, default=None, help="Path to the replay file.")
 
     # ----------------- DataArguments ----------------- #
-    parser.add_argument("--data_paths", nargs="+", default=["DeepLoc-2"], help="List of data directories.")
     parser.add_argument("--delimiter", default=",", help="Delimiter for data.")
     parser.add_argument("--col_names", nargs="+", default=["seqs", "labels"], help="Column names.")
     parser.add_argument("--max_length", type=int, default=1024, help="Maximum sequence length.")
@@ -168,22 +196,20 @@ def parse_arguments():
     parser.add_argument("--embedding_batch_size", type=int, default=4, help="Batch size for embedding generation.")
     parser.add_argument("--num_workers", type=int, default=0, help="Number of worker processes for data loading.")
     parser.add_argument("--download_embeddings", action="store_true", default=False, help="Whether to download embeddings (default: False).")
-    parser.add_argument("--download_dir", default="Synthyra/mean_pooled_embeddings", help="Directory to download embeddings to.")
     parser.add_argument("--matrix_embed", action="store_true", default=False, help="Use matrix embedding (default: False).")
     parser.add_argument("--embedding_pooling_types", nargs="+", default=["mean"], help="Pooling types for embeddings.")
     parser.add_argument("--save_embeddings", action="store_true", default=False, help="Save computed embeddings (default: False).")
     parser.add_argument("--embed_dtype", default="float16", help="Data type for embeddings.")
     parser.add_argument("--sql", action="store_true", default=False, help="Whether to use SQL storage (default: False).")
-    parser.add_argument("--embedding_save_dir", default="embeddings", help="Directory to save embeddings.")
 
     # ----------------- TrainerArguments ----------------- #
-    parser.add_argument("--model_save_dir", default="probe", help="Directory to save probes.")
     parser.add_argument("--num_epochs", type=int, default=200, help="Number of epochs to train for.")
     parser.add_argument("--trainer_batch_size", type=int, default=64, help="Batch size for training.")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="Gradient accumulation steps.")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
     parser.add_argument("--weight_decay", type=float, default=0.00, help="Weight decay.")
     parser.add_argument("--patience", type=int, default=3, help="Patience for early stopping.")
+    parser.add_argument("--seed", type=int, default=42, help="Seed for random number generation.")
 
     args = parser.parse_args()
 
@@ -201,11 +227,23 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
-    main = MainProcess(args)
-    for k, v in main.full_args.__dict__.items():
-        print(f"{k}:\t{v}")
-    main.apply_current_settings()
-    main.get_datasets()
-    print(len(main.all_seqs))
-    main.save_embeddings_to_disk()
-    main.run_probes()
+
+    if args.replay_path is not None:
+        from logger import LogReplayer
+        replayer = LogReplayer(args.replay_path)
+        replay_args = replayer.parse_log()
+        replay_args.replay_path = args.replay_path
+        main = MainProcess(replay_args)
+        for k, v in main.full_args.__dict__.items():
+            print(f"{k}:\t{v}")
+        replayer.run_replay(main)
+    else:
+        main = MainProcess(args)
+        for k, v in main.full_args.__dict__.items():
+            print(f"{k}:\t{v}")
+        main.apply_current_settings()
+        main.get_datasets()
+        print(len(main.all_seqs))
+        main.save_embeddings_to_disk()
+        main.run_probes()
+        main.write_results()

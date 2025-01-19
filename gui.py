@@ -8,7 +8,7 @@ from data.supported_datasets import supported_datasets, possible_with_vector_rep
 from embedder import EmbeddingArguments
 from probes.get_probe import ProbeArguments
 from probes.trainers import TrainerArguments
-from main import MainProcess
+from main import MainProcess, LoggerArgs
 
 
 class GUI(MainProcess):
@@ -33,50 +33,121 @@ class GUI(MainProcess):
         self.notebook.pack(fill='both', expand=True)
 
         # Create frames for each settings tab
-        self.id_tab = ttk.Frame(self.notebook)
+        self.info_tab = ttk.Frame(self.notebook)
         self.data_tab = ttk.Frame(self.notebook)
         self.embed_tab = ttk.Frame(self.notebook)
         self.model_tab = ttk.Frame(self.notebook)
         self.probe_tab = ttk.Frame(self.notebook)
         self.trainer_tab = ttk.Frame(self.notebook)
+        self.replay_tab = ttk.Frame(self.notebook)
 
         # Add tabs to the notebook
-        self.notebook.add(self.id_tab, text="ID")
+        self.notebook.add(self.info_tab, text="Info")
         self.notebook.add(self.model_tab, text="Model")
         self.notebook.add(self.data_tab, text="Data")
         self.notebook.add(self.embed_tab, text="Embedding")
         self.notebook.add(self.probe_tab, text="Probe")
         self.notebook.add(self.trainer_tab, text="Trainer")
+        self.notebook.add(self.replay_tab, text="Replay")
 
         # Build each tab
-        self._build_id_tab()
+        self._build_info_tab()
         self._build_model_tab()
         self._build_data_tab()
         self._build_embed_tab()
         self._build_probe_tab()
         self._build_trainer_tab()
+        self._build_replay_tab()
 
-        #apply_button = ttk.Button(master, text="Stop code", command=self._clear_console)
-        #apply_button.pack(side="bottom", pady=10)
+    def _build_info_tab(self):
+        # Create a frame for IDs
+        id_frame = ttk.LabelFrame(self.info_tab, text="Identification")
+        id_frame.pack(fill="x", padx=10, pady=5)
 
-    def _build_id_tab(self):
         # Huggingface Username
-        ttk.Label(self.id_tab, text="Huggingface Username:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["huggingface_username"] = tk.StringVar(value="")
-        entry_huggingface_username = ttk.Entry(self.id_tab, textvariable=self.settings_vars["huggingface_username"], width=20)
+        ttk.Label(id_frame, text="Huggingface Username:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["huggingface_username"] = tk.StringVar(value="Synthyra")
+        entry_huggingface_username = ttk.Entry(id_frame, textvariable=self.settings_vars["huggingface_username"], width=30)
         entry_huggingface_username.grid(row=0, column=1, padx=10, pady=5)
 
         # Huggingface token
-        ttk.Label(self.id_tab, text="Huggingface Token:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(id_frame, text="Huggingface Token:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["huggingface_token"] = tk.StringVar(value="")
-        entry_huggingface_token = ttk.Entry(self.id_tab, textvariable=self.settings_vars["huggingface_token"], width=20)
+        entry_huggingface_token = ttk.Entry(id_frame, textvariable=self.settings_vars["huggingface_token"], width=30)
         entry_huggingface_token.grid(row=1, column=1, padx=10, pady=5)
 
+        # Wandb API key 
+        ttk.Label(id_frame, text="Wandb API Key:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["wandb_api_key"] = tk.StringVar(value="")
+        entry_wandb_api_key = ttk.Entry(id_frame, textvariable=self.settings_vars["wandb_api_key"], width=30)
+        entry_wandb_api_key.grid(row=2, column=1, padx=10, pady=5)
+
         # Synthyra API key
-        ttk.Label(self.id_tab, text="Synthyra API Key:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(id_frame, text="Synthyra API Key:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["synthyra_api_key"] = tk.StringVar(value="")
-        entry_synthyra_api_key = ttk.Entry(self.id_tab, textvariable=self.settings_vars["synthyra_api_key"], width=20)
-        entry_synthyra_api_key.grid(row=2, column=1, padx=10, pady=5)
+        entry_synthyra_api_key = ttk.Entry(id_frame, textvariable=self.settings_vars["synthyra_api_key"], width=30)
+        entry_synthyra_api_key.grid(row=3, column=1, padx=10, pady=5)
+
+        # Create a frame for paths
+        paths_frame = ttk.LabelFrame(self.info_tab, text="Paths")
+        paths_frame.pack(fill="x", padx=10, pady=5)
+
+        # Log directory
+        ttk.Label(paths_frame, text="Log Directory:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["log_dir"] = tk.StringVar(value="logs")
+        entry_log_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["log_dir"], width=30)
+        entry_log_dir.grid(row=4, column=1, padx=10, pady=5)
+
+        # Results directory
+        ttk.Label(paths_frame, text="Results Directory:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["results_dir"] = tk.StringVar(value="results")
+        entry_results_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["results_dir"], width=30)
+        entry_results_dir.grid(row=5, column=1, padx=10, pady=5)
+
+        # Model save directory
+        ttk.Label(paths_frame, text="Model Save Directory:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["model_save_dir"] = tk.StringVar(value="weights")
+        entry_model_save = ttk.Entry(paths_frame, textvariable=self.settings_vars["model_save_dir"], width=30)
+        entry_model_save.grid(row=6, column=1, padx=10, pady=5)
+
+        # Embedding save directory
+        ttk.Label(paths_frame, text="Embedding Save Directory:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["embedding_save_dir"] = tk.StringVar(value="embeddings")
+        entry_embed_save = ttk.Entry(paths_frame, textvariable=self.settings_vars["embedding_save_dir"], width=30)
+        entry_embed_save.grid(row=7, column=1, padx=10, pady=5)
+
+        # Download directory
+        ttk.Label(paths_frame, text="Download Directory:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["download_dir"] = tk.StringVar(value="Synthyra/mean_pooled_embeddings")
+        entry_download = ttk.Entry(paths_frame, textvariable=self.settings_vars["download_dir"], width=30)
+        entry_download.grid(row=8, column=1, padx=10, pady=5)
+
+        # button to start logging
+        start_logging_button = ttk.Button(id_frame, text="Start session", command=self._session_start)
+        start_logging_button.grid(row=99, column=0, columnspan=2, pady=10)
+
+    def _session_start(self):
+        hf_token = self.settings_vars["huggingface_token"].get()
+        synthyra_api_key = self.settings_vars["synthyra_api_key"].get()
+        wandb_api_key = self.settings_vars["wandb_api_key"].get()
+        if hf_token:
+            from huggingface_hub import login
+            login(hf_token)
+        if synthyra_api_key:
+            pass
+        if wandb_api_key:
+            pass
+
+        self.full_args.hf_token = hf_token
+        self.full_args.synthyra_api_key = synthyra_api_key
+        self.full_args.wandb_api_key = wandb_api_key
+        self.full_args.log_dir = self.settings_vars["log_dir"].get()
+        self.full_args.results_dir = self.settings_vars["results_dir"].get()
+        self.full_args.model_save_dir = self.settings_vars["model_save_dir"].get()
+        self.full_args.embedding_save_dir = self.settings_vars["embedding_save_dir"].get()
+        self.full_args.download_dir = self.settings_vars["download_dir"].get()
+        self.logger_args = LoggerArgs(**self.full_args.__dict__)
+        self.start_log()
 
     def _build_data_tab(self):
         # Label + Listbox for dataset names
@@ -318,6 +389,25 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.trainer_tab, text="Run trainer", command=self._run_trainer)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
+    def _build_replay_tab(self):
+        # Create a frame for replay settings
+        replay_frame = ttk.LabelFrame(self.replay_tab, text="Log Replay Settings")
+        replay_frame.pack(fill="x", padx=10, pady=5)
+
+        # Replay log path
+        ttk.Label(replay_frame, text="Replay Log Path:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["replay_path"] = tk.StringVar(value="")
+        entry_replay = ttk.Entry(replay_frame, textvariable=self.settings_vars["replay_path"], width=40)
+        entry_replay.grid(row=0, column=1, padx=10, pady=5)
+
+        # Browse button for selecting log file
+        browse_button = ttk.Button(replay_frame, text="Browse", command=self._browse_replay_log)
+        browse_button.grid(row=0, column=2, padx=5, pady=5)
+
+        # Start replay button
+        replay_button = ttk.Button(replay_frame, text="Start Replay", command=self._start_replay)
+        replay_button.grid(row=1, column=0, columnspan=3, pady=20)
+
     def _create_probe_args(self):
         print("=== Creating Probe ===")
         
@@ -465,6 +555,35 @@ class GUI(MainProcess):
             pass
         else:
             self.run_probes()
+
+    def _browse_replay_log(self):
+        from tkinter import filedialog
+        filename = filedialog.askopenfilename(
+            title="Select Replay Log",
+            filetypes=(("Log files", "*.log"), ("All files", "*.*"))
+        )
+        if filename:
+            self.settings_vars["replay_path"].set(filename)
+
+    def _start_replay(self):
+        replay_path = self.settings_vars["replay_path"].get()
+        if not replay_path:
+            print("Please select a replay log file first")
+            return
+        
+        from logger import LogReplayer
+        replayer = LogReplayer(replay_path)
+        replay_args = replayer.parse_log()
+        replay_args.replay_path = replay_path
+        
+        # Update GUI with replay settings
+        for key, value in replay_args.__dict__.items():
+            if key in self.settings_vars:
+                self.settings_vars[key].set(value)
+        
+        print(f"Loaded settings from {replay_path}")
+        replayer.run_replay(self)
+
 
 def main():
     root = tk.Tk()

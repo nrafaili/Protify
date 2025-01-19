@@ -28,6 +28,7 @@ class TrainerArguments:
             patience: int = 3,
             read_scaler: int = 1000,
             save: bool = False,
+            seed: int = 42,
             **kwargs
     ):
         self.model_save_dir = model_save_dir
@@ -40,6 +41,7 @@ class TrainerArguments:
         self.patience = patience
         self.save = save
         self.read_scaler = read_scaler
+        self.seed = seed
 
     def __call__(self):
         if '/' in self.model_save_dir:
@@ -61,6 +63,7 @@ class TrainerArguments:
             metric_for_best_model='spearman_rho' if self.task_type == 'regression' else 'mcc',
             greater_is_better=True,
             load_best_model_at_end=True,
+            seed=self.seed,
         )
 
 
@@ -183,3 +186,4 @@ def train_probe(
 
     trainer.accelerator.free_memory()
     torch.cuda.empty_cache()
+    return metrics
