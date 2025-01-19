@@ -1,4 +1,6 @@
 torch>=2.5.1
+tf-keras
+tensorflow
 torchinfo
 torchmetrics
 transformers>=4.47
