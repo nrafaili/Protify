@@ -1,0 +1,7 @@
+torch>=2.5.1
+torchinfo
+torchmetrics
+transformers>=4.47
+scikit-learn
+scipy
+datasets
