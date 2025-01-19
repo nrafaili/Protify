@@ -41,7 +41,7 @@ def get_hf_data(args: HFDataArguments):
     OR
     'SeqA', 'SeqB', and 'labels' for PPI datasets
     """
-    datasets = []
+    datasets, data_names = [], []
     for data_path in args.data_paths:
         data_name = data_path.split('/')[-1]
         ppi = 'ppi' in data_name.lower()
@@ -49,4 +49,5 @@ def get_hf_data(args: HFDataArguments):
         dataset = load_dataset(data_path)
         train_set, valid_set, test_set = dataset['train'], dataset['valid'], dataset['test']
         datasets.append((train_set, valid_set, test_set, ppi))
-    return process_datasets(hf_datasets=datasets, data_name=data_name, max_length=args.max_length, trim=args.trim)
+        data_names.append(data_name)
+    return process_datasets(hf_datasets=datasets, data_names=data_names, max_length=args.max_length, trim=args.trim)

@@ -32,9 +32,9 @@ def _label_type_checker(labels):
     return label_type
 
 
-def process_datasets(hf_datasets: List[Dataset], data_name: str, max_length: int, trim: bool = False):
+def process_datasets(hf_datasets: List[Dataset], data_names: List[str], max_length: int, trim: bool = False):
     datasets, all_seqs = {}, set()
-    for dataset in hf_datasets:
+    for dataset, data_name in zip(hf_datasets, data_names):
         print(f'Processing {data_name}')
         train_set, valid_set, test_set, ppi = dataset
         if trim: # trim by length if necessary
