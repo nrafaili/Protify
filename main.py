@@ -173,21 +173,20 @@ def parse_arguments():
     parser.add_argument("--trim", action="store_true", default=False, help="Whether to trim sequences (default: False).")
 
     # ----------------- BaseModelArguments ----------------- #
-    parser.add_argument("--model_names", nargs="+",
-                        default=["ESM2-8", "ESMC-300", "Random", "Random-Transformer"], help="List of model names to use.")
+    parser.add_argument("--model_names", nargs="+", default=["ESM2-8"], help="List of model names to use.")
 
     # ----------------- ProbeArguments ----------------- #
     parser.add_argument("--probe_type", choices=["linear", "transformer", "crossconv"], default="linear", help="Type of probe.")
     parser.add_argument("--tokenwise", action="store_true", default=False, help="Tokenwise probe (default: False).")
     parser.add_argument("--hidden_dim", type=int, default=8192, help="Hidden dimension size.")
     parser.add_argument("--dropout", type=float, default=0.2, help="Dropout rate.")
-    parser.add_argument("--num_layers", type=int, default=1, help="Number of layers.")
+    parser.add_argument("--n_layers", type=int, default=1, help="Number of layers.")
     parser.add_argument("--pre_ln", action="store_false", default=True,
                         help="Disable pre-layernorm (default: enabled). Use --pre_ln to toggle off.")
     parser.add_argument("--classifier_dim", type=int, default=4096, help="Feed-forward dimension.")
     parser.add_argument("--transformer_dropout", type=float, default=0.1, help="Dropout rate for the transformer layers.")
     parser.add_argument("--classifier_dropout", type=float, default=0.2, help="Dropout rate for the classifier.")
-    parser.add_argument("--num_heads", type=int, default=4, help="Number of heads in multi-head attention.")
+    parser.add_argument("--n_heads", type=int, default=4, help="Number of heads in multi-head attention.")
     parser.add_argument("--rotary", action="store_false", default=True,
                         help="Disable rotary embeddings (default: enabled). Use --rotary to toggle off.")
     parser.add_argument("--pooling_types", nargs="+", default=["cls"], help="Pooling types to use.")
@@ -216,6 +215,10 @@ def parse_arguments():
     if args.hf_token is not None:
         from huggingface_hub import login
         login(args.hf_token)
+    if args.wandb_api_key is not None:
+        print('Wandb not integrated yet')
+    if args.synthyra_api_key is not None:
+        print('Synthyra API not integrated yet')
 
     if args.yaml_path is not None:
         with open(args.yaml_path, 'r') as file: 

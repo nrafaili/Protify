@@ -1,7 +1,6 @@
 import torch
 import tkinter as tk
 import argparse
-import threading
 import queue
 import traceback
 from types import SimpleNamespace
@@ -193,7 +192,10 @@ class GUI(MainProcess):
             if hf_token:
                 from huggingface_hub import login
                 login(hf_token)
-            # Handle other logins...
+            if wandb_api_key:
+                print('Wandb not integrated yet')
+            if synthyra_api_key:
+                print('Synthyra API not integrated yet')
             
             self.full_args.hf_token = hf_token
             self.full_args.synthyra_api_key = synthyra_api_key
@@ -223,7 +225,7 @@ class GUI(MainProcess):
         spin_max_length = ttk.Spinbox(
             self.data_tab,
             from_=1,
-            to=8192,
+            to=32768,
             textvariable=self.settings_vars["max_length"]
         )
         spin_max_length.grid(row=1, column=1, padx=10, pady=5, sticky="w")
@@ -260,7 +262,8 @@ class GUI(MainProcess):
             
             # Create data args and get datasets
             self.data_args = HFDataArguments(**self.full_args.__dict__)
-            self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+            args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
+            self.logger_args = SimpleNamespace(**args_dict)
             self._write_args()
             self.get_datasets()
             print("Data downloaded and stored")
@@ -348,7 +351,8 @@ class GUI(MainProcess):
             self.full_args.save_dir = self.settings_vars["save_dir"].get()
             
             self.embedding_args = EmbeddingArguments(**self.full_args.__dict__)
-            self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+            args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
+            self.logger_args = SimpleNamespace(**args_dict)
             self._write_args()
             
             print("Saving embeddings to disk")
@@ -361,7 +365,7 @@ class GUI(MainProcess):
         ttk.Label(self.model_tab, text="Model Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
         self.model_listbox = tk.Listbox(self.model_tab, selectmode="extended", height=10)
-        for model_name in standard_benchmark:
+        for model_name in standard_benchmark + ['experimental']:
             self.model_listbox.insert(tk.END, model_name)
         self.model_listbox.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
 
@@ -388,7 +392,8 @@ class GUI(MainProcess):
             if k != 'model_names':
                 print(f"{k}:\n{v}")
         print("=========================\n")
-        self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+        args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
+        self.logger_args = SimpleNamespace(**args_dict)
         self._write_args()
 
     def build_probe_tab(self):
@@ -416,9 +421,9 @@ class GUI(MainProcess):
 
         # Number of Layers
         ttk.Label(self.probe_tab, text="Number of Layers:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["num_layers"] = tk.IntVar(value=1)
-        spin_num_layers = ttk.Spinbox(self.probe_tab, from_=1, to=100, textvariable=self.settings_vars["num_layers"])
-        spin_num_layers.grid(row=3, column=1, padx=10, pady=5)
+        self.settings_vars["n_layers"] = tk.IntVar(value=1)
+        spin_n_layers = ttk.Spinbox(self.probe_tab, from_=1, to=100, textvariable=self.settings_vars["n_layers"])
+        spin_n_layers.grid(row=3, column=1, padx=10, pady=5)
 
         # Hidden Dimension
         ttk.Label(self.probe_tab, text="Hidden Dimension:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
@@ -449,9 +454,9 @@ class GUI(MainProcess):
 
         # Number of Heads
         ttk.Label(self.probe_tab, text="Number of Heads:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["num_heads"] = tk.IntVar(value=4)
-        spin_num_heads = ttk.Spinbox(self.probe_tab, from_=1, to=32, textvariable=self.settings_vars["num_heads"])
-        spin_num_heads.grid(row=9, column=1, padx=10, pady=5)
+        self.settings_vars["n_heads"] = tk.IntVar(value=4)
+        spin_n_heads = ttk.Spinbox(self.probe_tab, from_=1, to=32, textvariable=self.settings_vars["n_heads"])
+        spin_n_heads.grid(row=9, column=1, padx=10, pady=5)
 
         # Rotary
         ttk.Label(self.probe_tab, text="Rotary:").grid(row=10, column=0, padx=10, pady=5, sticky="w")
@@ -480,12 +485,12 @@ class GUI(MainProcess):
         self.full_args.tokenwise = self.settings_vars["tokenwise"].get()
         self.full_args.hidden_dim = self.settings_vars["hidden_dim"].get()
         self.full_args.dropout = self.settings_vars["dropout"].get()
-        self.full_args.num_layers = self.settings_vars["num_layers"].get()
+        self.full_args.n_layers = self.settings_vars["n_layers"].get()
         self.full_args.pre_ln = self.settings_vars["pre_ln"].get()
         self.full_args.classifier_dim = self.settings_vars["classifier_dim"].get()
         self.full_args.transformer_dropout = self.settings_vars["dropout"].get()
         self.full_args.classifier_dropout = self.settings_vars["classifier_dropout"].get()
-        self.full_args.num_heads = self.settings_vars["num_heads"].get()
+        self.full_args.n_heads = self.settings_vars["n_heads"].get()
         self.full_args.rotary = self.settings_vars["rotary"].get()
         self.full_args.pooling_types = pooling_types
 
@@ -497,7 +502,8 @@ class GUI(MainProcess):
             if k != 'model_names':
                 print(f"{k}:\n{v}")
         print("========================\n")
-        self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+        args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
+        self.logger_args = SimpleNamespace(**args_dict)
         self._write_args()
 
     def build_trainer_tab(self):
@@ -572,7 +578,8 @@ class GUI(MainProcess):
 
         def background_run_trainer():
             self.trainer_args = TrainerArguments(**self.full_args.__dict__)
-            self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+            args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
+            self.logger_args = SimpleNamespace(**args_dict)
             self._write_args()
             
             if self.settings_vars["use_lora"].get():

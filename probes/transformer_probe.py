@@ -3,9 +3,9 @@ from transformers import PreTrainedModel, PretrainedConfig
 from transformers.modeling_outputs import SequenceClassifierOutput, TokenClassifierOutput
 from typing import List
 from embedder import Pooler
-from .mlp import swiglu_correction_fn
+from model_components.mlp import intermediate_correction_fn
+from model_components.transformer import Transformer
 from .losses import get_loss_fct
-from .transformer import Transformer
 
 
 class TransformerProbeConfig(PretrainedConfig):
@@ -18,8 +18,8 @@ class TransformerProbeConfig(PretrainedConfig):
             transformer_dropout: float = 0.1,
             classifier_dropout: float = 0.2,
             num_labels: int = 2,
-            num_layers: int = 1,
-            num_heads: int = 4,
+            n_layers: int = 1,
+            n_heads: int = 4,
             task_type: str = 'singlelabel',
             rotary: bool = True,
             pooling_types: List[str] = ['mean', 'cls'],
@@ -32,8 +32,8 @@ class TransformerProbeConfig(PretrainedConfig):
         self.classifier_dropout = classifier_dropout
         self.task_type = task_type
         self.num_labels = num_labels
-        self.num_heads = num_heads
-        self.num_layers = num_layers
+        self.n_heads = n_heads
+        self.n_layers = n_layers
         self.rotary = rotary
         self.pooling_types = pooling_types
 
@@ -50,14 +50,14 @@ class TransformerForSequenceClassification(PreTrainedModel):
         self.input_layer = nn.Linear(config.input_dim, config.hidden_dim)
         self.transformer = Transformer(
             d_model=config.hidden_dim,
-            num_heads=config.num_heads,
-            num_layers=config.num_layers,
+            n_heads=config.n_heads,
+            n_layers=config.n_layers,
             expansion_ratio=8 / 3,
             dropout=config.transformer_dropout,
             rotary=config.rotary,
         )
 
-        proj_dim = swiglu_correction_fn(expansion_ratio=2, d_model=config.num_labels)
+        proj_dim = intermediate_correction_fn(expansion_ratio=2, d_model=config.num_labels)
         self.classifier = nn.Sequential(
             nn.LayerNorm(config.hidden_dim),
             nn.Linear(config.hidden_dim, config.classifier_dim),
@@ -105,15 +105,15 @@ class TransformerForTokenClassification(PreTrainedModel):
         self.input_layer = nn.Linear(config.input_dim, config.hidden_dim)
         self.transformer = Transformer(
             d_model=config.hidden_dim,
-            num_heads=config.num_heads,
-            num_layers=config.num_layers,
+            n_heads=config.n_heads,
+            n_layers=config.n_layers,
             expansion_ratio=8 / 3,
             dropout=config.dropout,
             rotary=True,
             diff_attn=config.diff_attn
         )
 
-        proj_dim = swiglu_correction_fn(expansion_ratio=2, d_model=config.num_labels)
+        proj_dim = intermediate_correction_fn(expansion_ratio=2, d_model=config.num_labels)
         self.classifier = nn.Sequential(
             nn.LayerNorm(config.hidden_dim),
             nn.Linear(config.hidden_dim, config.classifier_dim),

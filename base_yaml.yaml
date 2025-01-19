@@ -1,5 +1,19 @@
-# Misc:
+# ID
 hf_username: Synthyra
+hf_token: null
+synthyra_api_key: null
+wandb_api_key: null
+
+# Paths
+yaml_path: null
+log_dir: logs
+results_dir: results
+data_paths:
+  - DeepLoc-2
+model_save_dir: weights
+embedding_save_dir: embeddings
+download_dir: Synthyra/mean_pooled_embeddings
+replay_path: null
 
 # DataArguments:
 data_dirs:
@@ -34,12 +48,12 @@ probe_type: linear  # valid options: linear, transformer, crossconv
 tokenwise: false
 hidden_dim: 8192
 dropout: 0.2
-num_layers: 1
+n_layers: 1
 pre_ln: true
 classifier_dim: 4096
 transformer_dropout: 0.1
 classifier_dropout: 0.2
-num_heads: 4
+n_heads: 4
 rotary: true
 pooling_types:
   - cls
@@ -50,15 +64,13 @@ pooling_types:
 embedding_batch_size: 4
 num_workers: 0
 download_embeddings: false
-download_dir: Synthyra/mean_pooled_embeddings
 matrix_embed: false
-pooling_types:
+embedding_pooling_types:
   - mean
   # - var
 save_embeddings: false
 embed_dtype: float16
 sql: false
-embedding_save_dir: embeddings
 
 
 # TrainerArguments:
@@ -69,3 +81,4 @@ gradient_accumulation_steps: 1
 lr: 1e-4
 weight_decay: 0.00
 patience: 3
+seed: 42

@@ -14,7 +14,7 @@ class CrossConvConfig(PretrainedConfig):
             hidden_dim: int = 8192,
             dropout: float = 0.2,
             num_labels: int = 2,
-            num_layers: int = 1,
+            n_layers: int = 1,
             task_type: str = 'singlelabel',
             pre_ln: bool = True,
     ):
@@ -23,7 +23,7 @@ class CrossConvConfig(PretrainedConfig):
         self.dropout = dropout
         self.task_type = task_type
         self.num_labels = num_labels
-        self.num_layers = num_layers
+        self.n_layers = n_layers
         self.pre_ln = pre_ln
 
 

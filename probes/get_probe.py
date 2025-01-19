@@ -16,14 +16,14 @@ class ProbeArguments:
             hidden_dim: int = 8192,
             dropout: float = 0.2,
             num_labels: int = 2,
-            num_layers: int = 1,
+            n_layers: int = 1,
             task_type: str = 'singlelabel',
             pre_ln: bool = True,
             ### Transformer Probe
             classifier_dim: int = 4096,
             transformer_dropout: float = 0.1,
             classifier_dropout: float = 0.2,
-            num_heads: int = 4,
+            n_heads: int = 4,
             rotary: bool = True,
             pooling_types: List[str] = field(default_factory=lambda: ['mean', 'cls']),
             **kwargs,
@@ -36,13 +36,13 @@ class ProbeArguments:
         self.hidden_dim = hidden_dim
         self.dropout = dropout
         self.num_labels = num_labels
-        self.num_layers = num_layers
+        self.n_layers = n_layers
         self.task_type = task_type
         self.pre_ln = pre_ln
         self.classifier_dim = classifier_dim
         self.transformer_dropout = transformer_dropout
         self.classifier_dropout = classifier_dropout
-        self.num_heads = num_heads
+        self.n_heads = n_heads
         self.rotary = rotary
         self.pooling_types = pooling_types
 

@@ -157,23 +157,23 @@ class RotaryEmbedding(torch.nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, num_heads: int, rotary: bool = True):
+    def __init__(self, hidden_size: int, n_heads: int, rotary: bool = True):
         super().__init__()
-        self.d_model = d_model
-        self.num_heads = num_heads
-        self.d_head = self.d_model // self.num_heads
+        self.hidden_size = hidden_size
+        self.n_heads = n_heads
+        self.d_head = self.hidden_size // self.n_heads
         self.layernorm_qkv = nn.Sequential(
-            nn.LayerNorm(d_model), Linear(d_model, d_model * 3)
+            nn.LayerNorm(hidden_size), Linear(hidden_size, hidden_size * 3)
         )
-        self.out_proj = Linear(d_model, d_model)
-        self.q_ln = nn.LayerNorm(d_model, bias=False)
-        self.k_ln = nn.LayerNorm(d_model, bias=False)
-        self.reshaper = partial(rearrange, pattern="b s (h d) -> b h s d", h=num_heads)
-        self.rotary = RotaryEmbedding(d_model // num_heads) if rotary else None
+        self.out_proj = Linear(hidden_size, hidden_size)
+        self.q_ln = nn.LayerNorm(hidden_size, bias=False)
+        self.k_ln = nn.LayerNorm(hidden_size, bias=False)
+        self.reshaper = partial(rearrange, pattern="b s (h d) -> b h s d", h=n_heads)
+        self.rotary = RotaryEmbedding(hidden_size // n_heads) if rotary else None
 
     def _apply_rotary(self, q: torch.Tensor, k: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        q = q.unflatten(-1, (self.num_heads, self.d_head))
-        k = k.unflatten(-1, (self.num_heads, self.d_head))
+        q = q.unflatten(-1, (self.n_heads, self.d_head))
+        k = k.unflatten(-1, (self.n_heads, self.d_head))
         q, k = self.rotary(q, k)
         q = q.flatten(-2, -1)
         k = k.flatten(-2, -1)
@@ -182,14 +182,14 @@ class MultiHeadAttention(nn.Module):
     def forward(self, x: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         # attention mask already prepped for sdpa shape (bs, 1, seq_len, seq_len)
         qkv = self.layernorm_qkv(x) # (bs, seq_len, d_model * 3)
-        q, k, v = torch.chunk(qkv, 3, dim=-1) # (bs, seq_len, d_model)
+        q, k, v = torch.chunk(qkv, 3, dim=-1) # (bs, seq_len, hidden_size)
         q, k = self.q_ln(q).to(q.dtype), self.k_ln(k).to(q.dtype)
         if self.rotary:
             q, k = self._apply_rotary(q, k)
-        q, k, v = map(self.reshaper, (q, k, v)) # (bs, num_heads, seq_len, d_head)
-        a = F.scaled_dot_product_attention(q, k, v, attention_mask) # (bs, num_heads, seq_len, d_head)
-        a = rearrange(a, "b h s d -> b s (h d)") # (bs, seq_len, num_heads * d_head)
-        return self.out_proj(a) # (bs, seq_len, d_model)
+        q, k, v = map(self.reshaper, (q, k, v)) # (bs, n_heads, seq_len, d_head)
+        a = F.scaled_dot_product_attention(q, k, v, attention_mask) # (bs, n_heads, seq_len, d_head)
+        a = rearrange(a, "b h s d -> b s (h d)") # (bs, seq_len, n_heads * d_head)
+        return self.out_proj(a) # (bs, seq_len, hidden_size)
 
 
 class AttentionPooler(nn.Module):
@@ -198,31 +198,32 @@ class AttentionPooler(nn.Module):
     """
     def __init__(
             self,
-            d_model: int,
+            hidden_size: int,
             n_tokens: int = 1,
-            num_heads: int = 16,
+            n_heads: int = 16,
     ):
         super(AttentionPooler, self).__init__()
-        assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
-        self.d_head = d_model // num_heads
-        self.Q = nn.Parameter(torch.randn(1, n_tokens, d_model))
-        self.Wv = Linear(d_model, d_model)
-        self.Wk = Linear(d_model, d_model)
-        self.Wo = Linear(d_model, d_model)
-        self.reshaper = partial(rearrange, pattern="b s (h d) -> b h s d", h=num_heads)
+        assert hidden_size % n_heads == 0, "hidden_size must be divisible by n_heads"
+        self.d_head = hidden_size // n_heads
+        self.Q = nn.Parameter(torch.randn(1, n_tokens, hidden_size))
+        self.Wq = Linear(hidden_size, hidden_size)
+        self.Wv = Linear(hidden_size, hidden_size)
+        self.Wk = Linear(hidden_size, hidden_size)
+        self.Wo = Linear(hidden_size, hidden_size)
+        self.reshaper = partial(rearrange, pattern="b s (h d) -> b h s d", h=n_heads)
 
     def forward(
         self,
         x: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        q = self.Q.expand(x.size(0), -1, -1)  # (b, n_tokens, d)
+        q = self.Wq(self.Q).expand(x.size(0), -1, -1)  # (b, n_tokens, d)
         v = self.Wv(x)  # (b, L, d)
         k = self.Wk(x)  # (b, L, d)
-        q, k, v = map(self.reshaper, (q, k, v))  # (b, num_heads, n_tokens, d_head) (b, num_heads, L, d_head)
+        q, k, v = map(self.reshaper, (q, k, v))  # (b, n_heads, n_tokens, d_head) (b, n_heads, L, d_head)
         attn = F.scaled_dot_product_attention(
             q, k, v, attn_mask=attention_mask, is_causal=False
-        ) # (b, num_heads, n_tokens, d_head)
-        attn = rearrange(attn, "b h s d -> b s (h d)")  # (b, n_tokens, num_heads * d_head)
+        ) # (b, n_heads, n_tokens, d_head)
+        attn = rearrange(attn, "b h s d -> b s (h d)")  # (b, n_tokens, n_heads * d_head)
         return self.Wo(attn)  # (b, n_tokens, d_pooled)
-
+    

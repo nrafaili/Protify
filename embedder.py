@@ -184,7 +184,7 @@ class Embedder:
         pooler = Pooler(self.pooling_types) if not self.matrix_embed else None
 
         def _get_embeddings(residue_embeddings: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-            if self.matrix_embed:
+            if residue_embeddings.ndim == 2 or self.matrix_embed: # sometimes already vector emb
                 return residue_embeddings
             else:
                 return pooler(residue_embeddings, attention_mask)

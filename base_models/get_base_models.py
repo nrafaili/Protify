@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 currently_supported_models = [
@@ -17,7 +17,6 @@ currently_supported_models = [
     'ESMC-600'
 ]
 
-
 standard_benchmark = [
     'ESM2-8',
     'ESM2-35',
@@ -30,12 +29,22 @@ standard_benchmark = [
     'Random-Transformer',
 ]
 
+experimental_models = [
+    'camp_a',
+    'camp_b',
+    'camp_c',
+    'camp_d',
+    'camp_e',
+]
+
 
 @dataclass
 class BaseModelArguments:
     def __init__(self, model_names: list[str] = None, **kwargs):
-        if model_names is None:
+        if model_names[0] == None:
             self.model_names = standard_benchmark
+        elif 'exp' in model_names[0].lower():
+            self.model_names = experimental_models
         else:
             self.model_names = model_names
 
@@ -50,6 +59,9 @@ def get_base_model(model_name: str):
     elif 'esmc' in model_name.lower():
         from .esmc import build_esmc_model
         return build_esmc_model(model_name)
+    elif 'camp' in model_name.lower():
+        from .camp import build_camp_model
+        return build_camp_model(model_name)
     else:
         raise ValueError(f"Model {model_name} not supported")
 

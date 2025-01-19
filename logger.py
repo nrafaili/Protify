@@ -156,6 +156,33 @@ class MetricsLogger:
         self.logger.info(f"Storing metrics for {dataset}/{model}: {metrics_dict}")
         self.logger_data_tracking.setdefault(dataset, {})[model] = metrics_dict
 
+    def end_log(self):
+        # Get pip list using os.popen
+        pip_list = os.popen('pip list').read()
+        
+        # Try to get nvidia-smi output, handle case where it's not available
+        try:
+            nvidia_info = os.popen('nvidia-smi').read()
+        except:
+            nvidia_info = "nvidia-smi not available"
+        
+        # Get system info
+        import platform
+        system_info = {
+            'platform': platform.platform(),
+            'processor': platform.processor(),
+            'machine': platform.machine()
+        }
+        
+        # Get Python version
+        python_version = platform.python_version()
+        
+        # Log all information
+        self.logger.info(f"Pip list: {pip_list!r}")
+        self.logger.info(f"Nvidia-smi: {nvidia_info!r}")
+        self.logger.info(f"System info: {system_info!r}")
+        self.logger.info(f"Python version: {python_version!r}")
+
 
 class LogReplayer:
     def __init__(self, log_file_path):

@@ -15,5 +15,3 @@ def find_best_classifier(X_train, y_train, X_test, y_test):
     scores = classifier.fit(X_train, X_test, y_train, y_test)
     print(scores)
     return scores
-
-

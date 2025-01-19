@@ -7,8 +7,8 @@ from functools import partial
 Linear = partial(nn.Linear, bias=False)
 
 
-def swiglu_correction_fn(expansion_ratio: float, d_model: int) -> int:
-    return int(((expansion_ratio * d_model) + 255) // 256 * 256)
+def intermediate_correction_fn(expansion_ratio: float, hidden_size: int) -> int:
+    return int(((expansion_ratio * hidden_size) + 255) // 256 * 256)
 
 
 class SwiGLU(nn.Module):
@@ -20,13 +20,13 @@ class SwiGLU(nn.Module):
         return F.silu(x1) * x2
 
 
-def swiglu_ln_ffn(d_model: int, expansion_ratio: float, dropout: float = 0.1):
+def swiglu_ln_ffn(hidden_size: int, expansion_ratio: float, dropout: float = 0.1):
     return nn.Sequential(
-        nn.LayerNorm(d_model),
+        nn.LayerNorm(hidden_size),
         Linear(
-            d_model, swiglu_correction_fn(expansion_ratio, d_model) * 2
+            hidden_size, intermediate_correction_fn(expansion_ratio, hidden_size) * 2
         ),
         SwiGLU(),
         nn.Dropout(dropout),
-        Linear(swiglu_correction_fn(expansion_ratio, d_model), d_model),
+        Linear(intermediate_correction_fn(expansion_ratio, hidden_size), hidden_size),
     )
