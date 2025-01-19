@@ -225,7 +225,7 @@ def parse_arguments():
             settings = yaml.safe_load(file)
         return settings
     else:
-        return args 
+        return args
 
 
 if __name__ == "__main__":

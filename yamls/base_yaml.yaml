@@ -4,43 +4,31 @@ hf_token: null
 synthyra_api_key: null
 wandb_api_key: null
 
+
 # Paths
 yaml_path: null
 log_dir: logs
 results_dir: results
 data_paths:
-  - DeepLoc-2
+  - vector_benchmark
 model_save_dir: weights
 embedding_save_dir: embeddings
 download_dir: Synthyra/mean_pooled_embeddings
 replay_path: null
 
+
 # DataArguments:
-data_dirs:
-  # - EC
-  - DeepLoc-2
-  #- DeepLoc-10
-  #- enzyme-kcat
-  #- human-ppi
 delimiter: ','
 col_names:
   - seqs
   - labels
-max_length: 1024
+max_length: 2048
 trim: false
 
 
 # BaseModelArguments:
 model_names:
-  - ESM2-8
-  # - ESM2-35
-  # - ESM2-150
-  # - ESM2-650
-  # - ESM2-3B
-  # - ESMC-300
-  # - ESMC-600
-  # - Random
-  # - Random-Transformer
+  - standard
 
 
 # ProbeArguments:
@@ -69,12 +57,11 @@ embedding_pooling_types:
   - mean
   # - var
 save_embeddings: false
-embed_dtype: float16
+embed_dtype: float32
 sql: false
 
 
 # TrainerArguments:
-model_save_dir: 
 num_epochs: 200
 trainer_batch_size: 64
 gradient_accumulation_steps: 1

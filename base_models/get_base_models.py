@@ -30,18 +30,18 @@ standard_benchmark = [
 ]
 
 experimental_models = [
-    #'camp_a',
-    #'camp_b',
-    #'camp_c',
-    #'camp_d',
     'camp_e',
+    'camp_d',
+    'camp_c',
+    'camp_b',
+    'camp_a',
 ]
 
 
 @dataclass
 class BaseModelArguments:
     def __init__(self, model_names: list[str] = None, **kwargs):
-        if model_names[0] == None:
+        if model_names[0] == 'standard':
             self.model_names = standard_benchmark
         elif 'exp' in model_names[0].lower():
             self.model_names = experimental_models
