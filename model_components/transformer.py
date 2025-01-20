@@ -68,7 +68,6 @@ class TransformerConfig(PretrainedConfig):
         expansion_ratio: float = 8 / 3,
         dropout: float = 0.1,
         rotary: bool = True,
-        diff_attn: bool = False,
     ):
         self.hidden_size = hidden_size
         self.n_heads = n_heads
@@ -76,7 +75,6 @@ class TransformerConfig(PretrainedConfig):
         self.expansion_ratio = expansion_ratio
         self.dropout = dropout
         self.rotary = rotary
-        self.diff_attn = diff_attn
         self.vocab_size = vocab_size
 
 
