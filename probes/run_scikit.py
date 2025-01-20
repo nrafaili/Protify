@@ -6,39 +6,6 @@ from lazy_predict import LazyRegressor, LazyClassifier
 from ..metrics import get_dual_regression_scorer, get_dual_classification_scorer
 
 
-# Common hyperparameter distributions for different model types
-HYPERPARAMETER_DISTRIBUTIONS = {
-    "RandomForestRegressor": {
-        "n_estimators": [100, 200, 300, 400, 500],
-        "max_depth": [None, 5, 10, 15, 20, 25],
-        "min_samples_split": [2, 5, 10],
-        "min_samples_leaf": [1, 2, 4],
-        "max_features": ["sqrt", "log2", None],
-    },
-    "XGBRegressor": {
-        "n_estimators": [100, 200, 300, 400, 500],
-        "max_depth": [3, 4, 5, 6, 7, 8],
-        "learning_rate": [0.01, 0.05, 0.1, 0.15, 0.2],
-        "subsample": [0.6, 0.7, 0.8, 0.9, 1.0],
-        "colsample_bytree": [0.6, 0.7, 0.8, 0.9, 1.0],
-    },
-    "RandomForestClassifier": {
-        "n_estimators": [100, 200, 300, 400, 500],
-        "max_depth": [None, 5, 10, 15, 20, 25],
-        "min_samples_split": [2, 5, 10],
-        "min_samples_leaf": [1, 2, 4],
-        "max_features": ["sqrt", "log2", None],
-    },
-    "XGBClassifier": {
-        "n_estimators": [100, 200, 300, 400, 500],
-        "max_depth": [3, 4, 5, 6, 7, 8],
-        "learning_rate": [0.01, 0.05, 0.1, 0.15, 0.2],
-        "subsample": [0.6, 0.7, 0.8, 0.9, 1.0],
-        "colsample_bytree": [0.6, 0.7, 0.8, 0.9, 1.0],
-    },
-    # Add more model-specific hyperparameter distributions as needed
-}
-
 class ModelResults:
     def __init__(
         self,
