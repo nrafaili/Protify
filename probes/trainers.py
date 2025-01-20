@@ -169,7 +169,6 @@ def train_probe(
         compute_metrics=compute_metrics,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=trainer_args.patience)]
     )
-    ### TODO logging
     metrics = trainer.evaluate(test_dataset)
     print(f'Initial metrics: \n{metrics}\n')
 

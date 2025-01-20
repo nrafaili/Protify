@@ -59,7 +59,13 @@ class MainProcess(MetricsLogger):
     def run_probes(self):
         model_names = self.model_args.model_names
         probe_args = self.probe_args
+        
+        # Log the combinations we're going to process
+        total_combinations = len(model_names) * len(self.datasets)
+        self.logger.info(f"Processing {total_combinations} model/dataset combinations")
+        
         for model_name in model_names:
+            self.logger.info(f"Processing model: {model_name}")
             sql = self.embedding_args.sql
             max_length = self.data_args.max_length
             test_seq = self.all_seqs[0]
@@ -88,26 +94,33 @@ class MainProcess(MetricsLogger):
                 test_embedding = test_embedding.reshape(test_seq_len, -1)
             input_dim = test_embedding.shape[-1]
             probe_args.input_dim = input_dim
+            tokenizer = get_tokenizer(model_name)
 
             for data_name, dataset in self.datasets.items():
-                train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
-                probe_args.num_labels = num_labels
-                probe_args.task_type = label_type
-                self.trainer_args.task_type = label_type
-                tokenizer = get_tokenizer(model_name)
-                metrics = train_probe(
-                    self.trainer_args,
-                    self.embedding_args,
-                    probe_args,
-                    tokenizer,
-                    train_set,
-                    valid_set,
-                    test_set,
-                    model_name,
-                    emb_dict=emb_dict,
-                    ppi=ppi,
-                )
-                self.log_metrics(data_name, model_name, metrics)
+                self.logger.info(f"Processing dataset: {data_name}")
+                try:
+                    train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
+                    probe_args.num_labels = num_labels
+                    probe_args.task_type = label_type
+                    self.trainer_args.task_type = label_type
+                    self.logger.info(f'Training probe for {data_name} with {model_name}')
+                    metrics = train_probe(
+                        self.trainer_args,
+                        self.embedding_args,
+                        probe_args,
+                        tokenizer,
+                        train_set,
+                        valid_set,
+                        test_set,
+                        model_name,
+                        emb_dict=emb_dict,
+                        ppi=ppi,
+                    )
+                    self.log_metrics(data_name, model_name, metrics)
+                except Exception as e:
+                    self.logger.error(f"Error processing {model_name} on {data_name}: {str(e)}")
+                    # Log empty metrics to maintain the matrix structure
+                    self.log_metrics(data_name, model_name, {"error": str(e)})
 
     @log_method_calls
     def init_hybrid_probe(self):

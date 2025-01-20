@@ -125,14 +125,20 @@ class MetricsLogger:
                                 self.logger_data_tracking[ds][model] = {"_raw": cell_val}
 
     def write_results(self):
+        # Get all unique datasets and models
         datasets = sorted(self.logger_data_tracking.keys())
+        all_models = set()
+        for ds_data in self.logger_data_tracking.values():
+            all_models.update(ds_data.keys())
         
         # Calculate average eval_loss for each model
         model_scores = {}
-        for model in {m for ds in self.logger_data_tracking.values() for m in ds.keys()}:
+        for model in all_models:
             losses = []
             for ds in datasets:
-                if model in self.logger_data_tracking[ds] and 'eval_loss' in self.logger_data_tracking[ds][model]:
+                if (ds in self.logger_data_tracking and 
+                    model in self.logger_data_tracking[ds] and 
+                    'eval_loss' in self.logger_data_tracking[ds][model]):
                     losses.append(self.logger_data_tracking[ds][model]['eval_loss'])
             if losses:
                 model_scores[model] = sum(losses) / len(losses)
@@ -148,15 +154,32 @@ class MetricsLogger:
             for ds in datasets:
                 row = [ds]
                 for model in model_names:
-                    metrics = self.logger_data_tracking[ds].get(model, {})
+                    # Get metrics if they exist, otherwise empty dict
+                    metrics = self.logger_data_tracking.get(ds, {}).get(model, {})
                     row.append(json.dumps(metrics))
                 writer.writerow(row)
 
     def log_metrics(self, dataset, model, metrics_dict):
-        # remove keys with time or second in them
-        metrics_dict = {k: v for k, v in metrics_dict.items() if 'time' not in k.lower() and 'second' not in k.lower()}
-        self.logger.info(f"Storing metrics for {dataset}/{model}: {metrics_dict}")
-        self.logger_data_tracking.setdefault(dataset, {})[model] = metrics_dict
+        try:
+            # Remove time-related metrics
+            metrics_dict = {k: v for k, v in metrics_dict.items() 
+                           if 'time' not in k.lower() and 'second' not in k.lower()}
+            
+            # Log the metrics
+            self.logger.info(f"Storing metrics for {dataset}/{model}: {metrics_dict}")
+            
+            # Initialize nested dictionaries if they don't exist
+            if dataset not in self.logger_data_tracking:
+                self.logger_data_tracking[dataset] = {}
+            
+            # Store the metrics
+            self.logger_data_tracking[dataset][model] = metrics_dict
+            
+            # Write results after each update to ensure nothing is lost
+            self.write_results()
+            
+        except Exception as e:
+            self.logger.error(f"Error logging metrics for {dataset}/{model}: {str(e)}")
 
     def end_log(self):
         # Try multiple commands to get pip list
