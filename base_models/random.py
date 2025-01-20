@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Optional
 from transformers import EsmTokenizer, EsmConfig
-from .esm2 import FastEsmForEmbedding
+from ..model_components.transformer import TransformerForMaskedLM, TransformerConfig
 
 
 presets = {
@@ -25,13 +25,28 @@ class RandomModel(nn.Module):
         return torch.randn(input_ids.shape[0], self.hidden_size)
 
 
+class RandomTransformer(nn.Module):
+    def __init__(self, config: TransformerConfig):
+        super().__init__()
+        self.config = config
+        self.transformer = TransformerForMaskedLM(config)
+
+    def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        return self.transformer(input_ids, attention_mask).last_hidden_state
+
+
 def build_random_model(preset: str):
     tokenizer = EsmTokenizer.from_pretrained('facebook/esm2_t12_35M_UR50D')
     if preset == 'Random':
         model = RandomModel(EsmConfig.from_pretrained('facebook/esm2_t12_35M_UR50D'))
     else:
-        config = EsmConfig.from_pretrained(presets[preset])
-        model = FastEsmForEmbedding(config).eval()
+        esm_config = EsmConfig.from_pretrained(presets[preset])
+        config = TransformerConfig()
+        config.hidden_size = esm_config.hidden_size
+        config.n_heads = esm_config.num_attention_heads
+        config.n_layers = esm_config.num_hidden_layers
+        config.vocab_size = esm_config.vocab_size
+        model = RandomTransformer(config).eval()
     return model, tokenizer
 
 
