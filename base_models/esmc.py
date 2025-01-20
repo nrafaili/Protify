@@ -112,7 +112,7 @@ presets = {
 
 
 def build_esmc_model(preset: str):
-    model = ESMplusplusForEmbedding.from_pretrained(presets[preset]).eval()
+    model = ESMplusplusForEmbedding(presets[preset]).eval()
     tokenizer = model.esm.tokenizer
     return model, tokenizer
 
