@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Optional
 from transformers import EsmTokenizer, EsmConfig
-from ..model_components.transformer import TransformerForMaskedLM, TransformerConfig
+from model_components.transformer import TransformerForMaskedLM, TransformerConfig
 
 
 presets = {
