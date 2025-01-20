@@ -2,7 +2,7 @@ from typing import List
 from datasets import load_dataset
 from dataclasses import dataclass
 from .data_utils import process_datasets
-from .supported_datasets import supported_datasets, possible_with_vector_reps
+from .supported_datasets import supported_datasets, standard_data_benchmark
 
 
 @dataclass
@@ -23,8 +23,8 @@ class HFDataArguments:
             trim: bool = False,
             **kwargs):
         self.data_paths = []
-        if data_paths[0] == 'vector_benchmark':
-            data_paths = possible_with_vector_reps
+        if data_paths[0] == 'standard_benchmark':
+            data_paths = standard_data_benchmark
 
         for data_path in data_paths:
             if data_path in supported_datasets:

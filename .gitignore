@@ -1,11 +1,11 @@
 
 *.pyc
-*.safetensors
+*.pth
 *.pt
 *.json
-*.pth
 *.bin
 *.txt
 *.tsv
 !requirements.txt
 *.png
+*.safetensors

@@ -25,7 +25,6 @@ supported_datasets = {
     'fluorescence-prediction': 'GleghornLab/fluorescence_prediction',
 }
 
-
 possible_with_vector_reps = [
     'EC',
     'GO-CC',
@@ -49,6 +48,19 @@ possible_with_vector_reps = [
     'human-ppi',
 ]
 
+standard_data_benchmark = [
+    'EC',
+    'GO-CC',
+    'GO-BP',
+    'GO-MF',
+    'MB',
+    'DeepLoc-2',
+    'DeepLoc-10',
+    'enzyme-kcat',
+    'optimal-temperature',
+    'optimal-ph',
+    'fitness-prediction',
+]
 
 testing = [
     'EC', # multilabel

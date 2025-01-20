@@ -10,7 +10,7 @@ yaml_path: null
 log_dir: logs
 results_dir: results
 data_paths:
-  - vector_benchmark
+  - standard_benchmark
 model_save_dir: weights
 embedding_save_dir: embeddings
 download_dir: Synthyra/mean_pooled_embeddings

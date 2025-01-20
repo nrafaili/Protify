@@ -2,13 +2,13 @@ import os
 import numpy as np
 import umap
 import matplotlib.pyplot as plt
+import seaborn as sns
 from dataclasses import dataclass
 from sklearn.decomposition import PCA as SklearnPCA
 from sklearn.manifold import TSNE as SklearnTSNE
 from typing import Optional, Union, List
-from safetensors.torch import safe_open
 from matplotlib.colors import LinearSegmentedColormap
-import seaborn as sns
+from utils import torch_load
 
 
 @dataclass
@@ -25,7 +25,7 @@ class VisualizationArguments:
     fig_size: tuple = (10, 10)
     save_fig: bool = True
     fig_dir: str = "figures"
-    task_type: str = "singlelabel" # singlelabel, multilabel, regression
+    task_type: str = "singlelabel"  # singlelabel, multilabel, regression
 
 
 class DimensionalityReducer:
@@ -35,7 +35,7 @@ class DimensionalityReducer:
         self.embeddings = None
         self.labels = None
         
-    def load_embeddings(self, sequences: List[str], labels: Optional[List[Union[int, float]]] = None):
+    def load_embeddings(self, sequences: List[str], labels: Optional[List[Union[int, float, List[int]]]] = None):
         """Load embeddings from file"""
         if self.args.sql:
             import sqlite3
@@ -51,18 +51,22 @@ class DimensionalityReducer:
                     embeddings.append(embedding)
         else:
             save_path = os.path.join(self.args.embedding_save_dir,
-                                   f'{self.args.model_name}_{self.args.matrix_embed}.safetensors')
+                                   f'{self.args.model_name}_{self.args.matrix_embed}.pth')
             embeddings = []
-            with safe_open(save_path, framework="pt", device="cpu") as f:
-                for seq in sequences:
-                    embedding = f.get_tensor(seq).clone().numpy()
-                    if self.args.matrix_embed:
-                        # Take mean across sequence length for matrix embeddings
-                        embedding = embedding.mean(axis=0)
-                    embeddings.append(embedding)
+            emb_dict = torch_load(save_path)
+            for seq in sequences:
+                embedding = emb_dict[seq].numpy()
+                if self.args.matrix_embed:
+                    embedding = embedding.mean(axis=0)
+                embeddings.append(embedding)
+
                     
         self.embeddings = np.stack(embeddings)
-        self.labels = np.array(labels) if labels is not None else None
+        if labels is not None:
+            # Convert labels to a numpy array. For multi-label, this can be shape (num_samples, num_labels).
+            self.labels = np.array(labels)
+        else:
+            self.labels = None
         
     def fit_transform(self):
         """Implement in child class"""
@@ -77,49 +81,49 @@ class DimensionalityReducer:
         plt.figure(figsize=self.args.fig_size)
         
         if self.labels is None:
-            # No labels - use single color
+            # No labels - just a single color
             scatter = plt.scatter(reduced[:, 0], reduced[:, 1], alpha=0.6)
             
         elif self.args.task_type == "singlelabel":
             unique_labels = np.unique(self.labels)
+            # Handle binary or multiclass
             if len(unique_labels) == 2:  # Binary classification
                 colors = ['#ff7f0e', '#1f77b4']  # Orange and Blue
                 cmap = LinearSegmentedColormap.from_list('binary', colors)
                 scatter = plt.scatter(reduced[:, 0], reduced[:, 1], 
-                                   c=self.labels, cmap=cmap, alpha=0.6)
+                                      c=self.labels, cmap=cmap, alpha=0.6)
                 plt.colorbar(scatter, ticks=[0, 1])
-                
             else:  # Multiclass classification
-                # Use qualitative colormap for discrete classes
                 n_classes = len(unique_labels)
                 if n_classes <= 10:
                     cmap = 'tab10'
                 elif n_classes <= 20:
                     cmap = 'tab20'
                 else:
-                    # For many classes, create custom colormap
+                    # For many classes, create a custom colormap
                     colors = sns.color_palette('husl', n_colors=n_classes)
                     cmap = LinearSegmentedColormap.from_list('custom', colors)
                 
                 scatter = plt.scatter(reduced[:, 0], reduced[:, 1], 
-                                   c=self.labels, cmap=cmap, alpha=0.6)
+                                      c=self.labels, cmap=cmap, alpha=0.6)
                 plt.colorbar(scatter, ticks=unique_labels)
                 
         elif self.args.task_type == "multilabel":
-            # For multilabel, color by number of positive labels
+            # For multi-label, color by the total number of positive labels per sample.
+            # If labels are one-hot or multi-hot, this means summing along axis=1.
             label_counts = np.sum(self.labels, axis=1)
             viridis = plt.cm.viridis
             scatter = plt.scatter(reduced[:, 0], reduced[:, 1], 
-                               c=label_counts, cmap=viridis, alpha=0.6)
-            plt.colorbar(scatter, label='Number of labels')
+                                  c=label_counts, cmap=viridis, alpha=0.6)
+            plt.colorbar(scatter, label='Number of Labels')
             
         elif self.args.task_type == "regression":
-            # For regression, use sequential colormap
+            # For regression, use a sequential colormap
             vmin, vmax = np.percentile(self.labels, [2, 98])  # Robust scaling
             norm = plt.Normalize(vmin=vmin, vmax=vmax)
             scatter = plt.scatter(reduced[:, 0], reduced[:, 1], 
-                               c=self.labels, cmap='viridis', 
-                               norm=norm, alpha=0.6)
+                                  c=self.labels, cmap='viridis', 
+                                  norm=norm, alpha=0.6)
             plt.colorbar(scatter, label='Value')
         
         plt.title(f'{self.__class__.__name__} visualization of {self.args.model_name} embeddings')
@@ -129,7 +133,7 @@ class DimensionalityReducer:
         if save_name is not None and self.args.save_fig:
             os.makedirs(self.args.fig_dir, exist_ok=True)
             plt.savefig(os.path.join(self.args.fig_dir, save_name), 
-                       dpi=300, bbox_inches='tight')
+                        dpi=300, bbox_inches='tight')
         
         plt.close()
 
@@ -147,9 +151,9 @@ class TSNE(DimensionalityReducer):
     def __init__(self, args: VisualizationArguments):
         super().__init__(args)
         self.tsne = SklearnTSNE(
-            n_components=args.n_components,
-            perplexity=args.perplexity,
-            random_state=args.seed
+            n_components=self.args.n_components,
+            perplexity=self.args.perplexity,
+            random_state=self.args.seed
         )
         
     def fit_transform(self):
@@ -160,10 +164,10 @@ class UMAP(DimensionalityReducer):
     def __init__(self, args: VisualizationArguments):
         super().__init__(args)
         self.umap = umap.UMAP(
-            n_components=args.n_components,
-            n_neighbors=args.n_neighbors,
-            min_dist=args.min_dist,
-            random_state=args.seed
+            n_components=self.args.n_components,
+            n_neighbors=self.args.n_neighbors,
+            min_dist=self.args.min_dist,
+            random_state=self.args.seed
         )
         
     def fit_transform(self):
@@ -171,7 +175,7 @@ class UMAP(DimensionalityReducer):
 
 
 if __name__ == "__main__":
-    # Example usage
+    # Example usage (pseudo-code, adjust your import paths accordingly):
     from data.hf_data import HFDataArguments, get_hf_data
     
     # Get some example data
@@ -182,18 +186,18 @@ if __name__ == "__main__":
     dataset_name = list(datasets.keys())[0]
     train_set = datasets[dataset_name][0]
     sequences = train_set["seqs"]
-    labels = train_set["labels"]
+    labels = train_set["labels"]  # Could be single label, multi-label, etc.
     
-    # Set up visualization arguments
+    # If you know your dataset is multi-label, specify it here
     vis_args = VisualizationArguments(
         embedding_save_dir="embeddings",
         model_name="ESM2-8",
         matrix_embed=False,
-        sql=False
+        sql=False,
+        task_type="multilabel"  # Switch to 'multilabel'
     )
     
-    # Try each visualization technique
     for Reducer in [PCA, TSNE, UMAP]:
         reducer = Reducer(vis_args)
         reducer.load_embeddings(sequences, labels)
-        reducer.plot(f"{dataset_name}_{Reducer.__name__}.png") 
+        reducer.plot(f"{dataset_name}_{Reducer.__name__}.png")

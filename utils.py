@@ -1,4 +1,9 @@
 import os
+import torch
+from functools import partial
+
+
+torch_load = partial(torch.load, map_location='cpu', weights_only=True)
 
 
 def clear_screen():

@@ -10,6 +10,7 @@ from data.hf_data import HFDataArguments, get_hf_data
 from probes.trainers import TrainerArguments, train_probe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
+from utils import torch_load
 
 
 class MainProcess(MetricsLogger):
@@ -77,13 +78,9 @@ class MainProcess(MetricsLogger):
                     test_embedding = torch.tensor(np.frombuffer(test_embedding, dtype=np.float32).reshape(1, -1))
                 emb_dict = None
             else:
-                from safetensors.torch import safe_open
-                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{full}.safetensors')
-                emb_dict = {}
-                with safe_open(save_path, framework="pt", device="cpu") as f:
-                    for key in f.keys():
-                        emb_dict[key] = f.get_tensor(key).clone()
-                    test_embedding = emb_dict[test_seq].reshape(1, -1)
+                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{full}.pth')
+                emb_dict = torch_load(save_path)
+                test_embedding = emb_dict[test_seq].reshape(1, -1)
 
             if full:
                 test_embedding = test_embedding.reshape(test_seq_len, -1)
@@ -207,7 +204,7 @@ def parse_arguments():
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="Gradient accumulation steps.")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
     parser.add_argument("--weight_decay", type=float, default=0.00, help="Weight decay.")
-    parser.add_argument("--patience", type=int, default=3, help="Patience for early stopping.")
+    parser.add_argument("--patience", type=int, default=5, help="Patience for early stopping.")
     parser.add_argument("--seed", type=int, default=42, help="Seed for random number generation.")
 
     args = parser.parse_args()
@@ -251,3 +248,4 @@ if __name__ == "__main__":
         main.save_embeddings_to_disk()
         main.run_probes()
         main.write_results()
+    main.end_log()

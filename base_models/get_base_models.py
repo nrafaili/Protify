@@ -12,7 +12,6 @@ currently_supported_models = [
     'Random-ESM2-35', # same as random_weights
     'Random-ESM2-150',
     'Random-ESM2-650',
-    'Random-ESM2-3B',
     'ESMC-300',
     'ESMC-600'
 ]
@@ -22,7 +21,7 @@ standard_benchmark = [
     'ESM2-35',
     'ESM2-150',
     'ESM2-650',
-    'ESM2-3B',
+    'camp_e',
     'ESMC-300',
     'ESMC-600',
     'Random',
@@ -31,10 +30,10 @@ standard_benchmark = [
 
 experimental_models = [
     'camp_e',
-    #'camp_d',
-    #'camp_c',
-    #'camp_b',
-    #'camp_a',
+    'camp_d',
+    'camp_c',
+    'camp_b',
+    'camp_a',
 ]
 
 

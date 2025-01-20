@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from tkinter import ttk
 from base_models.get_base_models import BaseModelArguments, standard_benchmark
 from data.hf_data import HFDataArguments
-from data.supported_datasets import supported_datasets, possible_with_vector_reps
+from data.supported_datasets import supported_datasets, standard_data_benchmark
 from embedder import EmbeddingArguments
 from probes.get_probe import ProbeArguments
 from probes.trainers import TrainerArguments
@@ -250,7 +250,7 @@ class GUI(MainProcess):
         selected_datasets = [self.data_listbox.get(i) for i in selected_indices]
         
         if not selected_datasets:
-            selected_datasets = possible_with_vector_reps
+            selected_datasets = standard_data_benchmark
             
         data_paths = [supported_datasets[name] for name in selected_datasets]
         

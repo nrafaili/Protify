@@ -9,6 +9,8 @@ import random
 import string
 from pathlib import Path
 from types import SimpleNamespace
+import subprocess
+import sys
 
 
 def log_method_calls(func):
@@ -157,12 +159,28 @@ class MetricsLogger:
         self.logger_data_tracking.setdefault(dataset, {})[model] = metrics_dict
 
     def end_log(self):
-        # Get pip list using os.popen
-        pip_list = os.popen('pip list').read()
+        # Try multiple commands to get pip list
+        pip_commands = [
+            'python -m pip list',
+            'py -m pip list',
+            'pip list',
+            'pip3 list',
+            f'{sys.executable} -m pip list'  # Use current Python interpreter
+        ]
         
+        pip_list = "Could not retrieve pip list"
+        for cmd in pip_commands:
+            try:
+                process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                if process.returncode == 0 and process.stdout.strip():
+                    pip_list = process.stdout.strip()
+                    break
+            except Exception:
+                continue
+
         # Try to get nvidia-smi output, handle case where it's not available
         try:
-            nvidia_info = os.popen('nvidia-smi').read()
+            nvidia_info = os.popen('nvidia-smi').read().strip()
         except:
             nvidia_info = "nvidia-smi not available"
         
@@ -174,14 +192,24 @@ class MetricsLogger:
             'machine': platform.machine()
         }
         
-        # Get Python version
+        # Get Python version and executable path
         python_version = platform.python_version()
+        python_executable = sys.executable
         
-        # Log all information
-        self.logger.info(f"Pip list: {pip_list!r}")
-        self.logger.info(f"Nvidia-smi: {nvidia_info!r}")
-        self.logger.info(f"System info: {system_info!r}")
-        self.logger.info(f"Python version: {python_version!r}")
+        # Log all information with proper formatting
+        self.logger.info(self._section_break)
+        self.logger.info("System Information:")
+        self.logger.info(f"Python Version: {python_version}")
+        self.logger.info(f"Python Executable: {python_executable}")
+        for key, value in system_info.items():
+            self.logger.info(f"{key.title()}: {value}")
+        
+        self.logger.info("\nInstalled Packages:")
+        self.logger.info(pip_list)
+        
+        self.logger.info("\nGPU Information:")
+        self.logger.info(nvidia_info)
+        self.logger.info(self._section_break)
 
 
 class LogReplayer:

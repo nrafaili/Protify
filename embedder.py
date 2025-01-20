@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
 from dataclasses import dataclass, field
 from typing import Optional, Callable
+from utils import torch_load
 
 
 @dataclass
@@ -227,14 +228,11 @@ class Embedder:
             conn.close()
             return None
         
-        from safetensors.torch import save_file, safe_open
         embeddings_dict = {}
-        save_path = os.path.join(self.embedding_save_dir, f'{model_name}_{self.matrix_embed}.safetensors')
+        save_path = os.path.join(self.embedding_save_dir, f'{model_name}_{self.matrix_embed}.pth')
         if os.path.exists(save_path):
             print(f"Loading embeddings from {save_path}")
-            with safe_open(save_path, framework="pt", device="cpu") as f:
-                for key in f.keys():
-                    embeddings_dict[key] = f.get_tensor(key).clone()
+            embeddings_dict = torch_load(save_path)
             print(f"Loaded {len(embeddings_dict)} embeddings from {save_path}")
             print(len(embeddings_dict))
             print(len(self.all_seqs))
@@ -259,7 +257,7 @@ class Embedder:
         
         if self.save_embeddings:
             print(f"Saving embeddings to {save_path}")
-            save_file(embeddings_dict, save_path)
+            torch.save(embeddings_dict, save_path)
         return embeddings_dict
 
     def __call__(self, model_name: str, embedding_model: Optional[any] = None, tokenizer: Optional[any] = None):
@@ -330,10 +328,10 @@ if __name__ == '__main__':
     for model_name in model_args.model_names:
         model, tokenizer = get_base_model(model_name)
         _ = embedder(model_name, model, tokenizer)
-        save_path = os.path.join(embedder_args.embedding_save_dir, f'{model_name}.safetensors')
+        save_path = os.path.join(embedder_args.embedding_save_dir, f'{model_name}.pth')
         upload_file(
             path_or_fileobj=save_path,
-            path_in_repo=f'embeddings/{model_name}.safetensors',
+            path_in_repo=f'embeddings/{model_name}.pth',
             repo_id=embedder_args.download_dir,
             repo_type='dataset')
 
