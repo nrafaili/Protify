@@ -115,8 +115,8 @@ def process_datasets(hf_datasets: List[Dataset], data_names: List[str], max_leng
                     max_label = max(unique) # sometimes there are missing labels
                     full_list = np.arange(0, max_label+1)
                     num_labels = len(full_list)
+        datasets[data_name] = (train_set, valid_set, test_set, num_labels, label_type, ppi)
 
     all_seqs = list(all_seqs)
     all_seqs = sorted(all_seqs, key=len, reverse=True) # longest first
-    datasets[data_name] = (train_set, valid_set, test_set, num_labels, label_type, ppi)
     return datasets, all_seqs

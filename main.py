@@ -98,29 +98,26 @@ class MainProcess(MetricsLogger):
 
             for data_name, dataset in self.datasets.items():
                 self.logger.info(f"Processing dataset: {data_name}")
-                try:
-                    train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
-                    probe_args.num_labels = num_labels
-                    probe_args.task_type = label_type
-                    self.trainer_args.task_type = label_type
-                    self.logger.info(f'Training probe for {data_name} with {model_name}')
-                    metrics = train_probe(
-                        self.trainer_args,
-                        self.embedding_args,
-                        probe_args,
-                        tokenizer,
-                        train_set,
-                        valid_set,
-                        test_set,
-                        model_name,
-                        emb_dict=emb_dict,
-                        ppi=ppi,
-                    )
-                    self.log_metrics(data_name, model_name, metrics)
-                except Exception as e:
-                    self.logger.error(f"Error processing {model_name} on {data_name}: {str(e)}")
-                    # Log empty metrics to maintain the matrix structure
-                    self.log_metrics(data_name, model_name, {"error": str(e)})
+                print(len(self.datasets))
+                print(data_name)
+                train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
+                probe_args.num_labels = num_labels
+                probe_args.task_type = label_type
+                self.trainer_args.task_type = label_type
+                self.logger.info(f'Training probe for {data_name} with {model_name}')
+                metrics = train_probe(
+                    self.trainer_args,
+                    self.embedding_args,
+                    probe_args,
+                    tokenizer,
+                    train_set,
+                    valid_set,
+                    test_set,
+                    model_name,
+                    emb_dict=emb_dict,
+                    ppi=ppi,
+                )
+                self.log_metrics(data_name, model_name, metrics)
 
     @log_method_calls
     def init_hybrid_probe(self):

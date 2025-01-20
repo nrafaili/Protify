@@ -18,7 +18,10 @@ from scipy.stats import pearsonr, spearmanr
 from transformers import EvalPrediction
 
 
-### Scikit-learn
+def softmax(x: np.ndarray) -> np.ndarray:
+    return np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
+
+
 def get_pearson_scorer():
     def pearson_r(y_true, y_pred):
         return pearsonr(y_true, y_pred).correlation
@@ -120,7 +123,6 @@ def max_metrics(ss: torch.Tensor, labels: torch.Tensor, increment: float = 0.01)
     return f1s[max_index].item(), precs[max_index].item(), recalls[max_index].item(), cutoffs[max_index].item()
 
 
-### PyTorch / Transformers
 def compute_single_label_classification_metrics(p: EvalPrediction) -> dict[str, float]:
     """
     Compute comprehensive metrics for single-label classification tasks.
@@ -145,32 +147,31 @@ def compute_single_label_classification_metrics(p: EvalPrediction) -> dict[str, 
         - Uses weighted averaging for multi-class metrics
         - Handles AUC calculation for both binary and multi-class cases
     """
-    preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+    logits = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
     labels = p.label_ids[1] if isinstance(p.label_ids, tuple) else p.label_ids
 
-    if labels.shape == preds.shape:
-        y_pred = (preds > 0.5).astype(int).flatten()
-    else:
-        y_pred = preds.argmax(axis=-1).flatten()
-
+    y_pred = logits.argmax(axis=-1).flatten()
     y_true = labels.flatten()
 
+    # Create one-hot encoded version of labels
+    try:
+        # binary
+        auc = roc_auc_score(y_true, y_pred)
+    except:
+        # multi-class
+        n_classes = logits.shape[1]
+        y_true_onehot = np.eye(n_classes)[y_true]
+        auc = roc_auc_score(y_true_onehot, softmax(logits), multi_class='ovr', average='weighted')
+    
     cm = confusion_matrix(y_true, y_pred)
     print("\nConfusion Matrix:")
     print(cm)
 
-    f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)
-    precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)
-    recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)
+    f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
+    precision = precision_score(y_true, y_pred, average='macro', zero_division=0)
+    recall = recall_score(y_true, y_pred, average='macro', zero_division=0)
     accuracy = accuracy_score(y_true, y_pred)
     mcc = matthews_corrcoef(y_true, y_pred)
-    
-    # Calculate AUC for multi-class using one-vs-rest
-    try:
-        auc = roc_auc_score(y_true, preds, multi_class='ovr', average='weighted')
-    except ValueError:
-        # Fallback if AUC calculation fails (e.g. binary case)
-        auc = roc_auc_score(y_true, y_pred)
 
     return {
         'f1': round(f1, 5),
@@ -210,10 +211,10 @@ def compute_tokenwise_classification_metrics(p: EvalPrediction) -> dict[str, flo
     valid_indices = y_true != -100
     y_pred = y_pred[valid_indices]
     y_true = y_true[valid_indices]
-    f1 = f1_score(y_true, y_pred, average='weighted')
+    f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
+    prec = precision_score(y_true, y_pred, average='macro', zero_division=0)
+    rec = recall_score(y_true, y_pred, average='macro', zero_division=0)
     acc = accuracy_score(y_true, y_pred)
-    prec = precision_score(y_true, y_pred, average='weighted')
-    rec = recall_score(y_true, y_pred, average='weighted')
     mcc = matthews_corrcoef(y_true, y_pred)
     return {
         "f1": f1,
@@ -258,19 +259,23 @@ def compute_multi_label_classification_metrics(p: EvalPrediction) -> dict[str, f
     preds = torch.tensor(preds)
     y_true = torch.tensor(labels, dtype=torch.int)
 
-    probs = torch.nn.functional.softmax(preds, dim=-1)
+    probs = preds.softmax(dim=-1)
     y_pred = (probs > 0.5).int()
 
     f1, prec, recall, thres = max_metrics(probs, y_true)
     y_pred, y_true = y_pred.flatten().numpy(), y_true.flatten().numpy()
+    probs = probs.flatten().numpy()
+    
     accuracy = accuracy_score(y_pred, y_true)
     hamming = hamming_loss(y_pred, y_true)
-    
-    # Calculate MCC
     mcc = matthews_corrcoef(y_true, y_pred)
     
-    # Calculate AUC
-    auc = roc_auc_score(y_true, probs.flatten(), average='macro', multi_class='ovr')
+    # Calculate AUC for multilabel case
+    try:
+        auc = roc_auc_score(y_true, probs, average='macro')
+    except ValueError:
+        # Fallback in case of invalid predictions
+        auc = -100.0
 
     return {
         'accuracy': round(accuracy, 5),

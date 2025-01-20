@@ -22,6 +22,7 @@ standard_benchmark = [
     'ESM2-150',
     'ESM2-650',
     'camp_e',
+    'camp_b',
     'ESMC-300',
     'ESMC-600',
     'Random',
