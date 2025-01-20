@@ -45,6 +45,8 @@ class MainProcess(MetricsLogger):
 
     @log_method_calls
     def save_embeddings_to_disk(self):
+        ### TODO
+        ### May want to check embeddings before loading model
         self.embedding_args.save_embeddings = True
         embedder = Embedder(self.embedding_args, self.all_seqs)
         model_names = self.model_args.model_names
