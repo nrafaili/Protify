@@ -31,10 +31,10 @@ standard_benchmark = [
 
 experimental_models = [
     'camp_e',
-    'camp_d',
-    'camp_c',
-    'camp_b',
-    'camp_a',
+    #'camp_d',
+    #'camp_c',
+    #'camp_b',
+    #'camp_a',
 ]
 
 

@@ -8,3 +8,4 @@
 *.txt
 *.tsv
 !requirements.txt
+*.png

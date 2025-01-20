@@ -138,7 +138,7 @@ presets = {
     'camp_a': 'lhallee/camp_1_25',
     'camp_b': 'lhallee/camp_1_25_2_epoch',
     'camp_c': 'lhallee/camp_1_25_3_epoch',
-    'camp_d': 'lhallee/camp_1_25_3-5',
+    'camp_d': 'lhallee/camp_1_25_3-5_epoch',
     'camp_e': 'lhallee/camp_1_25_5_epoch',
 }
 
