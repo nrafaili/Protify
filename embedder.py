@@ -4,7 +4,7 @@ import warnings
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
 from dataclasses import dataclass, field
-from typing import Optional, Callable
+from typing import Optional, Callable, List
 from utils import torch_load
 
 
@@ -17,7 +17,7 @@ class EmbeddingArguments:
             download_embeddings: bool = False,
             download_dir: str = 'Synthyra/plm_embeddings',
             matrix_embed: bool = False,
-            pooling_types: list[str] = field(default_factory=lambda: ['mean']),
+            pooling_types: List[str] = field(default_factory=lambda: ['mean']),
             save_embeddings: bool = False,
             embed_dtype: torch.dtype = torch.float32,
             sql: bool = False,
@@ -37,7 +37,7 @@ class EmbeddingArguments:
 
 
 class Pooler:
-    def __init__(self, pooling_types: list[str]):
+    def __init__(self, pooling_types: List[str]):
         self.pooling_types = pooling_types
         self.pooling_options = {
             'mean': self.mean_pooling,
@@ -121,7 +121,7 @@ class Pooler:
 ### Dataset for Embedding
 class ProteinDataset(Dataset):
     """Simple dataset for protein sequences."""
-    def __init__(self, sequences: list[str]):
+    def __init__(self, sequences: List[str]):
         self.sequences = sequences
 
     def __len__(self) -> int:
@@ -131,15 +131,15 @@ class ProteinDataset(Dataset):
         return self.sequences[idx]
 
 
-def build_collator(tokenizer) -> Callable[[list[str]], tuple[torch.Tensor, torch.Tensor]]:
-    def _collate_fn(sequences: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
+def build_collator(tokenizer) -> Callable[[List[str]], tuple[torch.Tensor, torch.Tensor]]:
+    def _collate_fn(sequences: List[str]) -> tuple[torch.Tensor, torch.Tensor]:
         """Collate function for batching sequences."""
         return tokenizer(sequences, return_tensors="pt", padding='longest', pad_to_multiple_of=8)
     return _collate_fn
 
 
 class Embedder:
-    def __init__(self, args: EmbeddingArguments, all_seqs: list[str]):
+    def __init__(self, args: EmbeddingArguments, all_seqs: List[str]):
         self.args = args
         self.all_seqs = all_seqs
         self.batch_size = args.batch_size
