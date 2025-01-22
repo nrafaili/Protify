@@ -25,7 +25,7 @@ class ProbeArguments:
             classifier_dropout: float = 0.2,
             n_heads: int = 4,
             rotary: bool = True,
-            pooling_types: List[str] = field(default_factory=lambda: ['mean', 'cls']),
+            probe_pooling_types: List[str] = field(default_factory=lambda: ['mean', 'cls']),
             **kwargs,
             ### CrossConv
             # TODO
@@ -44,7 +44,7 @@ class ProbeArguments:
         self.classifier_dropout = classifier_dropout
         self.n_heads = n_heads
         self.rotary = rotary
-        self.pooling_types = pooling_types
+        self.pooling_types = probe_pooling_types
 
 
 def get_probe(args: ProbeArguments):

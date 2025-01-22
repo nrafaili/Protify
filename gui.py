@@ -297,8 +297,8 @@ class GUI(MainProcess):
 
         # pooling_types
         ttk.Label(self.embed_tab, text="Pooling Types (comma-separated):").grid(row=5, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["pooling_types"] = tk.StringVar(value="mean")
-        entry_pooling = ttk.Entry(self.embed_tab, textvariable=self.settings_vars["pooling_types"], width=20)
+        self.settings_vars["embedding_pooling_types"] = tk.StringVar(value="mean")
+        entry_pooling = ttk.Entry(self.embed_tab, textvariable=self.settings_vars["embedding_pooling_types"], width=20)
         entry_pooling.grid(row=5, column=1, padx=10, pady=5)
         ttk.Label(self.embed_tab, text="Options: mean, max, min, norm, prod, median, std, var, cls, parti").grid(row=6, column=0, columnspan=2, padx=10, pady=2, sticky="w")
 
@@ -333,7 +333,7 @@ class GUI(MainProcess):
             return
             
         # Gather settings
-        pooling_str = self.settings_vars["pooling_types"].get().strip()
+        pooling_str = self.settings_vars["embedding_pooling_types"].get().strip()
         pooling_list = [p.strip() for p in pooling_str.split(",") if p.strip()]
         dtype_str = self.settings_vars["embed_dtype"].get()
         dtype_val = self.dtype_map.get(dtype_str, torch.float32)
@@ -345,7 +345,7 @@ class GUI(MainProcess):
             self.full_args.num_workers = self.settings_vars["num_workers"].get()
             self.full_args.download_embeddings = self.settings_vars["download_embeddings"].get()
             self.full_args.matrix_embed = self.settings_vars["matrix_embed"].get()
-            self.full_args.pooling_types = pooling_list
+            self.full_args.embedding_pooling_types = pooling_list
             self.full_args.save_embeddings = True
             self.full_args.embed_dtype = dtype_val
             self.full_args.sql = self.settings_vars["sql"].get()
@@ -480,7 +480,7 @@ class GUI(MainProcess):
         print("=== Creating Probe ===")
         
         # Convert pooling types string to list
-        pooling_types = [p.strip() for p in self.settings_vars["probe_pooling_types"].get().split(",")]
+        probe_pooling_types = [p.strip() for p in self.settings_vars["probe_pooling_types"].get().split(",")]
         
         # Update full_args with probe settings
         self.full_args.probe_type = self.settings_vars["probe_type"].get()
@@ -494,7 +494,7 @@ class GUI(MainProcess):
         self.full_args.classifier_dropout = self.settings_vars["classifier_dropout"].get()
         self.full_args.n_heads = self.settings_vars["n_heads"].get()
         self.full_args.rotary = self.settings_vars["rotary"].get()
-        self.full_args.pooling_types = pooling_types
+        self.full_args.probe_pooling_types = probe_pooling_types
 
         # Create probe args from full args
         self.probe_args = ProbeArguments(**self.full_args.__dict__)

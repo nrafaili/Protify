@@ -9,3 +9,4 @@
 !requirements.txt
 *.png
 *.safetensors
+/weights/runs

@@ -94,8 +94,6 @@ class MainProcess(MetricsLogger):
 
             for data_name, dataset in self.datasets.items():
                 self.logger.info(f"Processing dataset: {data_name}")
-                print(len(self.datasets))
-                print(data_name)
                 train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
                 probe_args.num_labels = num_labels
                 probe_args.task_type = label_type
@@ -194,7 +192,7 @@ def parse_arguments():
     parser.add_argument("--n_heads", type=int, default=4, help="Number of heads in multi-head attention.")
     parser.add_argument("--rotary", action="store_false", default=True,
                         help="Disable rotary embeddings (default: enabled). Use --rotary to toggle off.")
-    parser.add_argument("--pooling_types", nargs="+", default=["cls"], help="Pooling types to use.")
+    parser.add_argument("--probe_pooling_types", nargs="+", default=["cls"], help="Pooling types to use.")
 
     # ----------------- EmbeddingArguments ----------------- #
     parser.add_argument("--embedding_batch_size", type=int, default=4, help="Batch size for embedding generation.")

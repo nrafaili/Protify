@@ -7,7 +7,7 @@ import networkx as nx
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
 from dataclasses import dataclass, field
-from typing import Optional, Callable, List, Dict
+from typing import Optional, Callable, List, Dict, Tuple
 from base_models.get_base_models import get_base_model
 from utils import torch_load
 
@@ -21,7 +21,7 @@ class EmbeddingArguments:
             download_embeddings: bool = False,
             download_dir: str = 'Synthyra/plm_embeddings',
             matrix_embed: bool = False,
-            pooling_types: List[str] = field(default_factory=lambda: ['mean']),
+            embedding_pooling_types: List[str] = field(default_factory=lambda: ['mean']),
             save_embeddings: bool = False,
             embed_dtype: torch.dtype = torch.float32,
             sql: bool = False,
@@ -33,7 +33,7 @@ class EmbeddingArguments:
         self.download_embeddings = download_embeddings
         self.download_dir = download_dir
         self.matrix_embed = matrix_embed
-        self.pooling_types = pooling_types
+        self.pooling_types = embedding_pooling_types
         self.save_embeddings = save_embeddings
         self.embed_dtype = embed_dtype
         self.sql = sql
@@ -122,21 +122,25 @@ class Pooler:
         return torch.cat(final_emb, dim=-1) # (b, n_pooling_types * d)
 
 
-def _get_importance_scores(self, att: torch.Tensor) -> Dict[int, float]: # (L, L)
+def _get_importance_scores(att: torch.Tensor) -> Dict[int, float]: # (L, L)
     G = nx.from_numpy_array(att.numpy(), create_using=nx.DiGraph)    
     page_rank = nx.pagerank(G, alpha=0.85, max_iter=100, weight='weight', personalization=None, nstart=None)
     total = sum(page_rank.values())
     return {k: v / total for k, v in page_rank.items()}
 
 
-def pool_parti(X, attentions, attention_mask):
+def pool_parti(X: torch.Tensor, attentions: Tuple[torch.Tensor], attention_mask: torch.Tensor) -> torch.Tensor:
+    # X: (bs, seq_len, d)
+    # attentions: num_layres of (bs, n_heads, seq_len, seq_len)
+    # attention_mask: (bs, seq_len)
     bs, seq_len, _ = X.shape
     X = X * attention_mask.unsqueeze(-1)
-    attentions = torch.cat(attentions).float() # (bs, n_layers, n_heads, seq_len, seq_len)
+    attentions = torch.stack(attentions, dim=1).float() # (bs, n_layers, n_heads, seq_len, seq_len)
     att_mask = attention_mask[:, None, None, None, :].expand(bs, 1, 1, seq_len, seq_len)
     attentions = attentions * att_mask
     attentions = attentions.max(dim=2).values # (bs, n_layers, seq_len, seq_len)
     attentions = attentions.max(dim=1).values # (bs, seq_len, seq_len)
+    X, attentions, attention_mask = X.cpu(), attentions.cpu(), attention_mask.cpu()
     pooled_reps = []
     for x, att, mask in zip(X, attentions, attention_mask):
         scores = _get_importance_scores(att)
@@ -236,6 +240,7 @@ class Embedder:
         torch.compile(model)
         device = self.device
         collate_fn = build_collator(tokenizer)
+        print('Pooling types: ', self.pooling_types)
         if self.pooling_types[0] == 'parti':
             pooler = pool_parti
         elif not self.matrix_embed:
