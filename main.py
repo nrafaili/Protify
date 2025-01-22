@@ -49,7 +49,7 @@ class MainProcess(MetricsLogger):
         embedder = Embedder(self.embedding_args, self.all_seqs)
         model_names = self.model_args.model_names
         for model_name in model_names:
-            _ = embedder(model_name) 
+            _ = embedder(model_name)
 
     @log_method_calls
     def run_probes(self):

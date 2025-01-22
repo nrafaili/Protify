@@ -300,6 +300,7 @@ class GUI(MainProcess):
         self.settings_vars["pooling_types"] = tk.StringVar(value="mean")
         entry_pooling = ttk.Entry(self.embed_tab, textvariable=self.settings_vars["pooling_types"], width=20)
         entry_pooling.grid(row=5, column=1, padx=10, pady=5)
+        ttk.Label(self.embed_tab, text="Options: mean, max, min, norm, prod, median, std, var, cls, parti").grid(row=6, column=0, columnspan=2, padx=10, pady=2, sticky="w")
 
         # embed_dtype
         ttk.Label(self.embed_tab, text="Embedding DType:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
@@ -469,6 +470,7 @@ class GUI(MainProcess):
         self.settings_vars["probe_pooling_types"] = tk.StringVar(value="mean, cls")
         entry_pooling = ttk.Entry(self.probe_tab, textvariable=self.settings_vars["probe_pooling_types"], width=20)
         entry_pooling.grid(row=11, column=1, padx=10, pady=5)
+        #ttk.Label(self.probe_tab, text="Options: mean, max, min, norm, prod, median, std, var, cls, parti").grid(row=12, column=0, columnspan=2, padx=10, pady=2, sticky="w")
 
         # Add a button to create the probe
         run_button = ttk.Button(self.probe_tab, text="Save Probe Arguments", command=self._create_probe_args)
