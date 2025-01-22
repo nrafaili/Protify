@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from types import SimpleNamespace
 from probes.get_probe import ProbeArguments
-from base_models.get_base_models import BaseModelArguments, get_base_model, get_tokenizer
+from base_models.get_base_models import BaseModelArguments, get_tokenizer
 from data.hf_data import HFDataArguments, get_hf_data
 from probes.trainers import TrainerArguments, train_probe
 from embedder import EmbeddingArguments, Embedder
@@ -45,15 +45,11 @@ class MainProcess(MetricsLogger):
 
     @log_method_calls
     def save_embeddings_to_disk(self):
-        ### TODO
-        ### May want to check embeddings before loading model
         self.embedding_args.save_embeddings = True
         embedder = Embedder(self.embedding_args, self.all_seqs)
         model_names = self.model_args.model_names
         for model_name in model_names:
-            print(f'Embedding sequences with {model_name}')
-            model, tokenizer = get_base_model(model_name)
-            _ = embedder(model_name, model, tokenizer) 
+            _ = embedder(model_name) 
 
     @log_method_calls
     def run_probes(self):

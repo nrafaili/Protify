@@ -1,11 +1,15 @@
 import os
 import torch
 import warnings
+import sqlite3
+import numpy as np
+import networkx as nx
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
 from dataclasses import dataclass, field
 from typing import Optional, Callable, List
-from utils import torch_load
+from .base_models.get_base_models import get_base_model
+from .utils import torch_load
 
 
 @dataclass
@@ -118,6 +122,30 @@ class Pooler:
         return torch.cat(final_emb, dim=-1) # (b, n_pooling_types * d)
 
 
+def _get_importance_scores(self, att: torch.Tensor) -> Dict[int, float]: # (L, L)
+    G = nx.from_numpy_array(att.numpy(), create_using=nx.DiGraph)    
+    page_rank = nx.pagerank(G, alpha=0.85, max_iter=100, weight='weight', personalization=None, nstart=None)
+    total = sum(page_rank.values())
+    return {k: v / total for k, v in page_rank.items()}
+
+
+def pool_parti(X, attentions, attention_mask):
+    bs, seq_len, _ = X.shape
+    X = X * attention_mask.unsqueeze(-1)
+    attentions = torch.cat(attentions).float() # (bs, n_layers, n_heads, seq_len, seq_len)
+    att_mask = attention_mask[:, None, None, None, :].expand(bs, 1, 1, seq_len, seq_len)
+    attentions = attentions * att_mask
+    attentions = attentions.max(dim=2).values # (bs, n_layers, seq_len, seq_len)
+    attentions = attentions.max(dim=1).values # (bs, seq_len, seq_len)
+    pooled_reps = []
+    for x, att, mask in zip(X, attentions, attention_mask):
+        scores = _get_importance_scores(att)
+        scores = torch.tensor(np.array(list(scores.values())))
+        pooled_rep = torch.sum(x * scores.unsqueeze(-1), dim=0) / mask.sum()
+        pooled_reps.append(pooled_rep)
+    return torch.stack(pooled_reps) # (bs, d)
+
+
 ### Dataset for Embedding
 class ProteinDataset(Dataset):
     """Simple dataset for protein sequences."""
@@ -173,25 +201,8 @@ class Embedder:
                 sequences.append(row[0])
         return set(sequences)
 
-    def _embed_sequences(self, model_name: str, embedding_model: any, tokenizer: any) -> Optional[dict[str, torch.Tensor]]:
-        os.makedirs(self.embedding_save_dir, exist_ok=True)
-        model = embedding_model.to(self.device).eval()
-        """
-        TODO
-        torch compile?
-        """
-        device = self.device
-        collate_fn = build_collator(tokenizer)
-        pooler = Pooler(self.pooling_types) if not self.matrix_embed else None
-
-        def _get_embeddings(residue_embeddings: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-            if residue_embeddings.ndim == 2 or self.matrix_embed: # sometimes already vector emb
-                return residue_embeddings
-            else:
-                return pooler(residue_embeddings, attention_mask)
-
+    def _read_embeddings_from_disk(self, model_name: str):
         if self.sql:
-            import sqlite3
             save_path = os.path.join(self.embedding_save_dir, f'{model_name}_{self.matrix_embed}.db')
             if os.path.exists(save_path):
                 conn = sqlite3.connect(save_path)
@@ -201,75 +212,109 @@ class Embedder:
                 print(f"Loaded {len(already_embedded)} already embedded sequences from {save_path}")
                 to_embed = [seq for seq in self.all_seqs if seq not in already_embedded]
                 print(f"Embedding {len(to_embed)} new sequences")
+                return to_embed, save_path
             else:
                 print(f"No embeddings found in {save_path}")
-                to_embed = self.all_seqs
+                return self.all_seqs, save_path
 
-            dataset = ProteinDataset(to_embed)
-            dataloader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=collate_fn, shuffle=False)
-            if len(to_embed) > 0:
-                with torch.no_grad():
-                    for i, batch in tqdm(enumerate(dataloader), total=len(dataloader), desc='Embedding batches'):
-                        seqs = to_embed[i * self.batch_size:(i + 1) * self.batch_size]
-                        input_ids, attention_mask = batch['input_ids'].to(device), batch['attention_mask'].to(device)
-                        residue_embeddings = model(input_ids, attention_mask)
-                        embeddings = _get_embeddings(residue_embeddings, attention_mask)
-
-                        for seq, emb, mask in zip(seqs, embeddings, attention_mask):
-                            if self.matrix_embed:
-                                emb = emb[mask.bool()]
-                            c.execute("INSERT OR REPLACE INTO embeddings VALUES (?, ?)", 
-                                    (seq, emb.cpu().numpy().tobytes()))
-                        
-                        if (i + 1) % 100 == 0:
-                            conn.commit()
-            
-                conn.commit()
-            conn.close()
-            return None
-        
-        embeddings_dict = {}
-        save_path = os.path.join(self.embedding_save_dir, f'{model_name}_{self.matrix_embed}.pth')
-        if os.path.exists(save_path):
-            print(f"Loading embeddings from {save_path}")
-            embeddings_dict = torch_load(save_path)
-            print(f"Loaded {len(embeddings_dict)} embeddings from {save_path}")
-            print(len(embeddings_dict))
-            print(len(self.all_seqs))
-            to_embed = [seq for seq in self.all_seqs if seq not in embeddings_dict]
-            print(f"Embedding {len(to_embed)} new sequences")
         else:
-            print(f"No embeddings found in {save_path}")
-            to_embed = self.all_seqs
+            embeddings_dict = {}
+            save_path = os.path.join(self.embedding_save_dir, f'{model_name}_{self.matrix_embed}.pth')
+            if os.path.exists(save_path):
+                print(f"Loading embeddings from {save_path}")
+                embeddings_dict = torch_load(save_path)
+                print(f"Loaded {len(embeddings_dict)} embeddings from {save_path}")
+                to_embed = [seq for seq in self.all_seqs if seq not in embeddings_dict]
+                return to_embed, save_path
+            else:
+                print(f"No embeddings found in {save_path}")
+                return self.all_seqs, save_path
+
+    def _embed_sequences(self, to_embed: List[str], save_path: str, embedding_model: any, tokenizer: any) -> Optional[dict[str, torch.Tensor]]:
+        os.makedirs(self.embedding_save_dir, exist_ok=True)
+        model = embedding_model.to(self.device).eval()
+        torch.compile(model)
+        device = self.device
+        collate_fn = build_collator(tokenizer)
+        if self.pooling_types[0] == 'parti':
+            pooler = pool_parti
+        elif not self.matrix_embed:
+            pooler = Pooler(self.pooling_types)
+        else:
+            pooler = None
+
+        def _get_embeddings(residue_embeddings: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+            if residue_embeddings.ndim == 2 or self.matrix_embed: # sometimes already vector emb
+                return residue_embeddings
+            else:
+                return pooler(residue_embeddings, attention_mask)
 
         dataset = ProteinDataset(to_embed)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=collate_fn, shuffle=False)
 
-        if len(to_embed) > 0:
-            with torch.no_grad():
-                for i, batch in tqdm(enumerate(dataloader), total=len(dataloader), desc='Embedding batches'):
-                    seqs = to_embed[i * self.batch_size:(i + 1) * self.batch_size]
-                    input_ids, attention_mask = batch['input_ids'].to(device), batch['attention_mask'].to(device)
-                    residue_embeddings = model(input_ids, attention_mask).to(self.embed_dtype)
-                    embeddings = _get_embeddings(residue_embeddings, attention_mask).cpu()
-                    for seq, emb in zip(seqs, embeddings):
-                        embeddings_dict[seq] = emb
+        if self.sql:
+            conn = sqlite3.connect(save_path)
+            c = conn.cursor()
+            c.execute('CREATE TABLE IF NOT EXISTS embeddings (sequence text PRIMARY KEY, embedding blob)')
+        else:
+            embeddings_dict = {}
+
+        with torch.no_grad():
+            for i, batch in tqdm(enumerate(dataloader), total=len(dataloader), desc='Embedding batches'):
+                seqs = to_embed[i * self.batch_size:(i + 1) * self.batch_size]
+                input_ids, attention_mask = batch['input_ids'].to(device), batch['attention_mask'].to(device)
+                if self.pooling_types[0] == 'parti':
+                    try:
+                        residue_embeddings, attentions = model(input_ids, attention_mask, output_attentions=True)
+                        embeddings = pool_parti(residue_embeddings, attentions, attention_mask)
+                    except Exception as e:
+                        print(f"Error in parti pooling: {e}")
+                        print(f"Defaulting to mean pooling")
+                        self.pooling_types = ['mean']
+                        pooler = Pooler(self.pooling_types)
+                        embeddings = pooler(residue_embeddings, attention_mask)
+                else:
+                    residue_embeddings = model(input_ids, attention_mask)
+                    embeddings = _get_embeddings(residue_embeddings, attention_mask)
+
+                for seq, emb, mask in zip(seqs, embeddings, attention_mask):
+                    if self.matrix_embed:
+                        emb = emb[mask.bool()]
+                    
+                    if self.sql:
+                        c.execute("INSERT OR REPLACE INTO embeddings VALUES (?, ?)", 
+                                (seq, emb.numpy().tobytes())) # only supports float32
+                    else:
+                        embeddings_dict[seq] = emb.to(self.embed_dtype)
+                
+                if (i + 1) % 100 == 0 and self.sql:
+                    conn.commit()
+
+        if self.sql:
+            conn.commit()
+            conn.close()
+            return None
         
         if self.save_embeddings:
             print(f"Saving embeddings to {save_path}")
             torch.save(embeddings_dict, save_path)
+            
         return embeddings_dict
 
-    def __call__(self, model_name: str, embedding_model: Optional[any] = None, tokenizer: Optional[any] = None):
+    def __call__(self, model_name: str):
         if self.download_embeddings:
             self._download_embeddings(model_name)
         else:
-            assert embedding_model is not None and tokenizer is not None, "embedding_model and tokenizer must be provided if you are embedding on device"
-
             if self.device == 'cpu':
                 warnings.warn("Downloading embeddings is recommended for CPU usage - Embedding on CPU will be extremely slow!")
-            embedding_dict = self._embed_sequences(model_name, embedding_model, tokenizer)
-            return embedding_dict
+            to_embed, save_path = self._read_embeddings_from_disk(model_name)
+            if len(to_embed) > 0:
+                print(f"Embedding {len(to_embed)} sequences with {model_name}")
+                model, tokenizer = get_base_model(model_name)
+                return self._embed_sequences(to_embed, save_path, model, tokenizer)
+            else:
+                print(f"No sequences to embed with {model_name}")
+                return None
 
 
 if __name__ == '__main__':
