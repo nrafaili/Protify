@@ -212,15 +212,8 @@ class GUI(MainProcess):
         self.run_in_background(background_login)
 
     def build_data_tab(self):
-        # Label + Listbox for dataset names
-        ttk.Label(self.data_tab, text="Dataset Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
-        self.data_listbox = tk.Listbox(self.data_tab, selectmode="extended", height=25, width=25)
-        for dataset_name in supported_datasets:
-            self.data_listbox.insert(tk.END, dataset_name)
-        self.data_listbox.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
-
         # Max length (Spinbox)
-        ttk.Label(self.data_tab, text="Max Sequence Length:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.data_tab, text="Max Sequence Length:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["max_length"] = tk.IntVar(value=1024)
         spin_max_length = ttk.Spinbox(
             self.data_tab,
@@ -228,16 +221,23 @@ class GUI(MainProcess):
             to=32768,
             textvariable=self.settings_vars["max_length"]
         )
-        spin_max_length.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+        spin_max_length.grid(row=0, column=1, padx=10, pady=5, sticky="w")
 
         # Trim (Checkbox)
-        ttk.Label(self.data_tab, text="Trim Sequences:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.data_tab, text="Trim Sequences:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["trim"] = tk.BooleanVar(value=False)
         check_trim = ttk.Checkbutton(
             self.data_tab,
             variable=self.settings_vars["trim"]
         )
-        check_trim.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+        check_trim.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+
+        # Label + Listbox for dataset names
+        ttk.Label(self.data_tab, text="Dataset Names:").grid(row=2, column=0, padx=10, pady=5, sticky="nw")
+        self.data_listbox = tk.Listbox(self.data_tab, selectmode="extended", height=25, width=25)
+        for dataset_name in supported_datasets:
+            self.data_listbox.insert(tk.END, dataset_name)
+        self.data_listbox.grid(row=2, column=1, padx=10, pady=5, sticky="nw")
 
         run_button = ttk.Button(self.data_tab, text="Get Data", command=self._get_data)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))

@@ -160,6 +160,7 @@ def train_probe(
         train=False
     )
     hf_trainer_args = trainer_args()
+    ### TODO add options for optimizers and schedulers
     trainer = Trainer(
         model=probe,
         args=hf_trainer_args,

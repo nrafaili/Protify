@@ -49,7 +49,7 @@ class TransformerForSequenceClassification(PreTrainedModel):
         self.input_dim = config.input_dim
         self.input_layer = nn.Linear(config.input_dim, config.hidden_dim)
         self.transformer = Transformer(
-            d_model=config.hidden_dim,
+            hidden_size=config.hidden_dim,
             n_heads=config.n_heads,
             n_layers=config.n_layers,
             expansion_ratio=8 / 3,
@@ -57,7 +57,7 @@ class TransformerForSequenceClassification(PreTrainedModel):
             rotary=config.rotary,
         )
 
-        proj_dim = intermediate_correction_fn(expansion_ratio=2, d_model=config.num_labels)
+        proj_dim = intermediate_correction_fn(expansion_ratio=2, hidden_size=config.num_labels)
         self.classifier = nn.Sequential(
             nn.LayerNorm(config.hidden_dim),
             nn.Linear(config.hidden_dim, config.classifier_dim),
@@ -104,7 +104,7 @@ class TransformerForTokenClassification(PreTrainedModel):
         self.input_dim = config.input_dim
         self.input_layer = nn.Linear(config.input_dim, config.hidden_dim)
         self.transformer = Transformer(
-            d_model=config.hidden_dim,
+            hidden_size=config.hidden_dim,
             n_heads=config.n_heads,
             n_layers=config.n_layers,
             expansion_ratio=8 / 3,
@@ -113,7 +113,7 @@ class TransformerForTokenClassification(PreTrainedModel):
             diff_attn=config.diff_attn
         )
 
-        proj_dim = intermediate_correction_fn(expansion_ratio=2, d_model=config.num_labels)
+        proj_dim = intermediate_correction_fn(expansion_ratio=2, hidden_size=config.num_labels)
         self.classifier = nn.Sequential(
             nn.LayerNorm(config.hidden_dim),
             nn.Linear(config.hidden_dim, config.classifier_dim),
