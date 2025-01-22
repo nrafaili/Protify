@@ -12,8 +12,12 @@ class FastEsmForEmbedding(nn.Module):
         super().__init__()
         self.esm = AutoModel.from_pretrained(model_path, trust_remote_code=True)
 
-    def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        return self.esm(input_ids, attention_mask=attention_mask).last_hidden_state
+    def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None, output_attentions: bool = False) -> torch.Tensor:
+        if output_attentions:
+            out = self.esm(input_ids, attention_mask=attention_mask, output_attentions=output_attentions)
+            return out.last_hidden_state, out.attentions
+        else:
+            return self.esm(input_ids, attention_mask=attention_mask).last_hidden_state
 
 
 presets = {
