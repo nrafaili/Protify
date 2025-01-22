@@ -46,9 +46,6 @@ class GUI(MainProcess):
         self.master.title("Settings GUI")
         self.master.geometry("600x800")
 
-        # Store all settings in the full_args namespace
-        self.full_args = self.full_args  # Reference from MainProcess parent
-
         icon = tk.PhotoImage(file="synthyra_logo.png")  
         # Set the window icon
         self.master.iconphoto(True, icon)
@@ -318,12 +315,6 @@ class GUI(MainProcess):
         check_sql = ttk.Checkbutton(self.embed_tab, variable=self.settings_vars["sql"])
         check_sql.grid(row=8, column=1, padx=10, pady=5, sticky="w")
 
-        # save_dir
-        ttk.Label(self.embed_tab, text="Save Dir:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["save_dir"] = tk.StringVar(value="embeddings")
-        entry_save_dir = ttk.Entry(self.embed_tab, textvariable=self.settings_vars["save_dir"], width=20)
-        entry_save_dir.grid(row=9, column=1, padx=10, pady=5)
-
         run_button = ttk.Button(self.embed_tab, text="Embed sequences to disk", command=self._get_embeddings)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
@@ -349,7 +340,6 @@ class GUI(MainProcess):
             self.full_args.save_embeddings = True
             self.full_args.embed_dtype = dtype_val
             self.full_args.sql = self.settings_vars["sql"].get()
-            self.full_args.save_dir = self.settings_vars["save_dir"].get()
             
             self.embedding_args = EmbeddingArguments(**self.full_args.__dict__)
             args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
