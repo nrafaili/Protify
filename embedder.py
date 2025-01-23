@@ -46,9 +46,7 @@ class Pooler:
         self.pooling_options = {
             'mean': self.mean_pooling,
             'max': self.max_pooling,
-            'min': self.min_pooling,
             'norm': self.norm_pooling,
-            'prod': self.prod_pooling,
             'median': self.median_pooling,
             'std': self.std_pooling,
             'var': self.var_pooling,
@@ -68,13 +66,6 @@ class Pooler:
         else:
             attention_mask = attention_mask.unsqueeze(-1)
             return (emb * attention_mask).max(dim=1).values
-    
-    def min_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.min(dim=1).values
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).min(dim=1).values
 
     def norm_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
         if attention_mask is None:
@@ -82,14 +73,6 @@ class Pooler:
         else:
             attention_mask = attention_mask.unsqueeze(-1)
             return (emb * attention_mask).norm(dim=1, p=2)
-
-    def prod_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        length = emb.shape[1]
-        if attention_mask is None:
-            return emb.prod(dim=1) / length
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return ((emb * attention_mask).prod(dim=1) / attention_mask.sum(dim=1)) / length
 
     def median_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
         if attention_mask is None:
@@ -216,10 +199,10 @@ class Embedder:
                 print(f"Loaded {len(already_embedded)} already embedded sequences from {save_path}")
                 to_embed = [seq for seq in self.all_seqs if seq not in already_embedded]
                 print(f"Embedding {len(to_embed)} new sequences")
-                return to_embed, save_path
+                return to_embed, save_path, {}
             else:
                 print(f"No embeddings found in {save_path}")
-                return self.all_seqs, save_path
+                return self.all_seqs, save_path, {}
 
         else:
             embeddings_dict = {}
@@ -229,12 +212,18 @@ class Embedder:
                 embeddings_dict = torch_load(save_path)
                 print(f"Loaded {len(embeddings_dict)} embeddings from {save_path}")
                 to_embed = [seq for seq in self.all_seqs if seq not in embeddings_dict]
-                return to_embed, save_path
+                return to_embed, save_path, embeddings_dict
             else:
                 print(f"No embeddings found in {save_path}")
-                return self.all_seqs, save_path
+                return self.all_seqs, save_path, {}
 
-    def _embed_sequences(self, to_embed: List[str], save_path: str, embedding_model: any, tokenizer: any) -> Optional[dict[str, torch.Tensor]]:
+    def _embed_sequences(
+            self,
+            to_embed: List[str],
+            save_path: str,
+            embedding_model: any,
+            tokenizer: any,
+            embeddings_dict: dict[str, torch.Tensor]) -> Optional[dict[str, torch.Tensor]]:
         os.makedirs(self.embedding_save_dir, exist_ok=True)
         model = embedding_model.to(self.device).eval()
         torch.compile(model)
@@ -261,8 +250,6 @@ class Embedder:
             conn = sqlite3.connect(save_path)
             c = conn.cursor()
             c.execute('CREATE TABLE IF NOT EXISTS embeddings (sequence text PRIMARY KEY, embedding blob)')
-        else:
-            embeddings_dict = {}
 
         with torch.no_grad():
             for i, batch in tqdm(enumerate(dataloader), total=len(dataloader), desc='Embedding batches'):
@@ -314,11 +301,11 @@ class Embedder:
         else:
             if self.device == 'cpu':
                 warnings.warn("Downloading embeddings is recommended for CPU usage - Embedding on CPU will be extremely slow!")
-            to_embed, save_path = self._read_embeddings_from_disk(model_name)
+            to_embed, save_path, embeddings_dict = self._read_embeddings_from_disk(model_name)
             if len(to_embed) > 0:
                 print(f"Embedding {len(to_embed)} sequences with {model_name}")
                 model, tokenizer = get_base_model(model_name)
-                return self._embed_sequences(to_embed, save_path, model, tokenizer)
+                return self._embed_sequences(to_embed, save_path, model, tokenizer, embeddings_dict)
             else:
                 print(f"No sequences to embed with {model_name}")
                 return None
