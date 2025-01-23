@@ -60,6 +60,7 @@ class TrainerArguments:
             save_strategy="epoch",
             eval_strategy="epoch",
             logging_steps=1000,
+            report_to='none',
             metric_for_best_model='spearman_rho' if self.task_type == 'regression' else 'mcc',
             greater_is_better=True,
             load_best_model_at_end=True,
