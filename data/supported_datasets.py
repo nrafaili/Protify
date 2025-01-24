@@ -23,6 +23,7 @@ supported_datasets = {
     'SecondaryStructure-3': 'GleghornLab/SS3',
     'SecondaryStructure-8': 'GleghornLab/SS8',
     'fluorescence-prediction': 'GleghornLab/fluorescence_prediction',
+    'plastic': 'GleghornLab/plastic_degradation_benchmark',
 }
 
 possible_with_vector_reps = [

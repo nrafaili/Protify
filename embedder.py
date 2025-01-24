@@ -257,21 +257,20 @@ class Embedder:
                 input_ids, attention_mask = batch['input_ids'].to(device), batch['attention_mask'].to(device)
                 if self.pooling_types[0] == 'parti':
                     try:
-                        ### TODO add output_attentions to embedding versions of the models
                         residue_embeddings, attentions = model(input_ids, attention_mask, output_attentions=True)
-                        embeddings = pooler(residue_embeddings, attentions, attention_mask)
+                        embeddings = pooler(residue_embeddings, attentions, attention_mask).cpu()
                     except Exception as e:
                         print(f"Error in parti pooling: {e}")
                         print(f"Defaulting to mean pooling")
                         self.pooling_types = ['mean']
                         pooler = Pooler(self.pooling_types)
                         residue_embeddings = model(input_ids, attention_mask)
-                        embeddings = pooler(residue_embeddings, attention_mask)
+                        embeddings = pooler(residue_embeddings, attention_mask).cpu()
                 else:
                     residue_embeddings = model(input_ids, attention_mask)
-                    embeddings = _get_embeddings(residue_embeddings, attention_mask)
+                    embeddings = _get_embeddings(residue_embeddings, attention_mask).cpu()
 
-                for seq, emb, mask in zip(seqs, embeddings, attention_mask):
+                for seq, emb, mask in zip(seqs, embeddings, attention_mask.cpu()):
                     if self.matrix_embed:
                         emb = emb[mask.bool()]
                     
