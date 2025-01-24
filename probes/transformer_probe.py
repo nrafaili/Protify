@@ -22,7 +22,8 @@ class TransformerProbeConfig(PretrainedConfig):
             n_heads: int = 4,
             task_type: str = 'singlelabel',
             rotary: bool = True,
-            pooling_types: List[str] = ['mean', 'cls'],
+            pre_ln: bool = True,
+            probe_pooling_types: List[str] = ['mean', 'cls'],
             **kwargs,
     ):
         self.input_dim = input_dim
@@ -35,7 +36,8 @@ class TransformerProbeConfig(PretrainedConfig):
         self.n_heads = n_heads
         self.n_layers = n_layers
         self.rotary = rotary
-        self.pooling_types = pooling_types
+        self.pre_ln = pre_ln
+        self.pooling_types = probe_pooling_types
 
 
 class TransformerForSequenceClassification(PreTrainedModel):
@@ -47,7 +49,15 @@ class TransformerForSequenceClassification(PreTrainedModel):
         self.loss_fct = get_loss_fct(config.task_type)
         self.num_labels = config.num_labels
         self.input_dim = config.input_dim
-        self.input_layer = nn.Linear(config.input_dim, config.hidden_dim)
+
+        if config.pre_ln:
+            self.input_layer = nn.Sequential(
+                nn.LayerNorm(config.input_dim),
+                nn.Linear(config.input_dim, config.hidden_dim)
+            )
+        else:
+            self.input_layer = nn.Linear(config.input_dim, config.hidden_dim)
+
         self.transformer = Transformer(
             hidden_size=config.hidden_dim,
             n_heads=config.n_heads,
@@ -57,17 +67,16 @@ class TransformerForSequenceClassification(PreTrainedModel):
             rotary=config.rotary,
         )
 
+        classifier_input_dim = config.hidden_dim * len(config.pooling_types)
         proj_dim = intermediate_correction_fn(expansion_ratio=2, hidden_size=config.num_labels)
         self.classifier = nn.Sequential(
-            nn.LayerNorm(config.hidden_dim),
-            nn.Linear(config.hidden_dim, config.classifier_dim),
+            nn.LayerNorm(classifier_input_dim),
+            nn.Linear(classifier_input_dim, config.classifier_dim),
             nn.ReLU(),
             nn.Dropout(config.transformer_dropout),
             nn.Linear(config.classifier_dim, proj_dim),
             nn.ReLU(),
             nn.Dropout(config.classifier_dropout),
-            nn.Linear(proj_dim, proj_dim),
-            nn.ReLU(),
             nn.Linear(proj_dim, config.num_labels)
         )
         self.pooler = Pooler(config.pooling_types)

@@ -67,7 +67,7 @@ class MainProcess(MetricsLogger):
             test_seq = self.all_seqs[0]
             full = self.embedding_args.matrix_embed
 
-            if len(test_seq) < max_length - 2:
+            if len(test_seq) > max_length - 2:
                 test_seq_len = max_length
             else:
                 test_seq_len = len(test_seq) + 2
