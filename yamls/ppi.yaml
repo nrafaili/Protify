@@ -52,7 +52,7 @@ pooling_types:
 embedding_batch_size: 8
 num_workers: 0
 download_embeddings: false
-matrix_embed: true
+matrix_embed: false
 embedding_pooling_types:
   - mean
   - var

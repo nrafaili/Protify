@@ -95,6 +95,8 @@ class MainProcess(MetricsLogger):
             for data_name, dataset in self.datasets.items():
                 self.logger.info(f"Processing dataset: {data_name}")
                 train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
+                if ppi:
+                    input_dim = 2 * input_dim
                 probe_args.num_labels = num_labels
                 probe_args.task_type = label_type
                 self.trainer_args.task_type = label_type
