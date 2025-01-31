@@ -24,6 +24,7 @@ supported_datasets = {
     'SecondaryStructure-8': 'GleghornLab/SS8',
     'fluorescence-prediction': 'GleghornLab/fluorescence_prediction',
     'plastic': 'GleghornLab/plastic_degradation_benchmark',
+    'gold-ppi': 'Synthyra/bernett_gold_ppi',
 }
 
 possible_with_vector_reps = [
