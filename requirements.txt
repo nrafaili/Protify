@@ -11,3 +11,5 @@ datasets
 einops
 numpy==1.26.1
 networkx>=3.4.2
+xgboost
+lightgbm

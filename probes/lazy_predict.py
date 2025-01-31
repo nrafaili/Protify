@@ -116,6 +116,8 @@ REGRESSORS = [
     if (issubclass(est[1], RegressorMixin) and (est[0] not in removed_regressors))
 ]
 
+ALL_MODELS = CLASSIFIERS + REGRESSORS
+
 """
 REGRESSORS = [
     'ExtraTreesRegressor',
@@ -182,8 +184,6 @@ categorical_transformer_high = Pipeline(
 
 
 # Helper function
-
-
 def get_card_split(df, cols, n=11):
     """
     Splits categorical columns into 2 lists based on cardinality (i.e # of unique values)
@@ -209,8 +209,6 @@ def get_card_split(df, cols, n=11):
 
 
 # Helper class for performing classification
-
-
 class LazyClassifier:
     """
     This module helps in fitting to all the classification algorithms that are available in Scikit-learn

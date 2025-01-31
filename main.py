@@ -52,7 +52,7 @@ class MainProcess(MetricsLogger):
             _ = embedder(model_name)
 
     @log_method_calls
-    def run_probes(self):
+    def run_nn_probe(self):
         model_names = self.model_args.model_names
         probe_args = self.probe_args
         
@@ -142,11 +142,7 @@ class MainProcess(MetricsLogger):
         pass
 
     @log_method_calls
-    def cross_validate_scikit_model(self):
-        pass
-
-    @log_method_calls
-    def scikit_workflow(self):
+    def run_scikit_model(self):
         production = False # TODO: make this a setting
         pass
 

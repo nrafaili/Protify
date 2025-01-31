@@ -2,8 +2,36 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import RandomizedSearchCV
 from typing import Dict, Any, Tuple
-from lazy_predict import LazyRegressor, LazyClassifier
+from sklearn.utils import all_estimators
+from lazy_predict import LazyRegressor, LazyClassifier, CLASSIFIERS, REGRESSORS
 from ..metrics import get_dual_regression_scorer, get_dual_classification_scorer
+from .scikit_hypers import HYPERPARAMETER_DISTRIBUTIONS
+
+
+class TuningArguments:
+    def __init__(
+            self,
+            n_iter: int = 100,
+            cv: int = 3,
+            random_state: int = 42,
+            **kwargs,
+    ):
+        self.n_iter = n_iter
+        self.cv = cv
+        self.random_state = random_state
+
+
+class SpecificModelArguments:
+    def __init__(
+        self,
+        model_name: str,
+        model_args: Dict[str, Any],
+        production: bool = False,
+        **kwargs,
+    ):
+        self.model_name = model_name
+        self.model_args = model_args
+        self.production = production
 
 
 class ModelResults:
@@ -28,6 +56,7 @@ class ModelResults:
             f"Final Scores: {self.final_scores}"
         )
 
+
 def _tune_hyperparameters(
     model_class: Any,
     model_name: str,
@@ -35,7 +64,7 @@ def _tune_hyperparameters(
     y_train: np.ndarray,
     custom_scorer: Any,
     n_iter: int = 100,
-    cv: int = 5,
+    cv: int = 3,
     random_state: int = 42
 ) -> Tuple[Any, Dict[str, Any]]:
     """
@@ -58,12 +87,13 @@ def _tune_hyperparameters(
     random_search.fit(X_train, y_train)
     return random_search.best_estimator_, random_search.best_params_
 
+
 def find_best_regressor(
+    tuning_args: TuningArguments,
     X_train: np.ndarray,
     y_train: np.ndarray,
     X_test: np.ndarray,
     y_test: np.ndarray,
-    n_iter: int = 100
 ) -> ModelResults:
     """
     Find the best regression model through lazy prediction and hyperparameter tuning.
@@ -80,7 +110,7 @@ def find_best_regressor(
     """
     # Initial lazy prediction
     regressor = LazyRegressor(
-        verbose=0,
+        verbose=4,
         ignore_warnings=True,
         custom_metric=get_dual_regression_scorer()
     )
@@ -97,7 +127,9 @@ def find_best_regressor(
         X_train,
         y_train,
         get_dual_regression_scorer(),
-        n_iter=n_iter
+        n_iter=tuning_args.n_iter,
+        cv=tuning_args.cv,
+        random_state=tuning_args.random_state
     )
     
     # Get final scores with tuned model
@@ -113,12 +145,13 @@ def find_best_regressor(
         best_model=best_model
     )
 
+
 def find_best_classifier(
+    tuning_args: TuningArguments,
     X_train: np.ndarray,
     y_train: np.ndarray,
     X_test: np.ndarray,
     y_test: np.ndarray,
-    n_iter: int = 100
 ) -> ModelResults:
     """
     Find the best classification model through lazy prediction and hyperparameter tuning.
@@ -135,7 +168,7 @@ def find_best_classifier(
     """
     # Initial lazy prediction
     classifier = LazyClassifier(
-        verbose=0,
+        verbose=4,
         ignore_warnings=True,
         custom_metric=get_dual_classification_scorer()
     )
@@ -152,7 +185,9 @@ def find_best_classifier(
         X_train,
         y_train,
         get_dual_classification_scorer(),
-        n_iter=n_iter
+        n_iter=tuning_args.n_iter,
+        cv=tuning_args.cv,
+        random_state=tuning_args.random_state
     )
     
     # Get final scores with tuned model
@@ -166,4 +201,40 @@ def find_best_classifier(
         best_params=best_params,
         final_scores=final_scores,
         best_model=best_model
+    )
+
+
+def run_specific_model(
+    model_args: SpecificModelArguments,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_valid: np.ndarray,
+    y_valid: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+) -> ModelResults:
+    if model_args.production:
+        X_train = np.concatenate([X_train, X_valid])
+        y_train = np.concatenate([y_train, y_valid])
+
+    model_name = model_args.model_name
+    if model_name in CLASSIFIERS:
+        scorer = get_dual_classification_scorer()
+    elif model_name in REGRESSORS:
+        scorer = get_dual_regression_scorer()
+    else:
+        raise ValueError(f"Model {model_name} not supported")
+
+    model_list = all_estimators() # tuples (name, class)
+    model_dict = {model[0]: model[1] for model in model_list}
+    model_class = model_dict[model_name]
+    cls = model_class(**model_args.model_args)
+    cls.fit(X_train, y_train)
+    final_scores = scorer(cls, X_test, y_test)
+    return ModelResults(
+        initial_scores=None,
+        best_model_name=model_name,
+        best_params=None,
+        final_scores=final_scores,
+        best_model=cls
     )
