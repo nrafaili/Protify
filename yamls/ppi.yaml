@@ -32,7 +32,7 @@ model_names:
 
 
 # ProbeArguments:
-probe_type: transformer  # valid options: linear, transformer, crossconv
+probe_type: linear  # valid options: linear, transformer, crossconv
 tokenwise: false
 hidden_dim: 8192
 dropout: !!float 0.2
