@@ -77,7 +77,7 @@ def pair_embeds_labels_collator_builder(full=False, **kwargs):
     def _collate_fn(batch):
         embeds_a = torch.stack([ex[0] for ex in batch])
         embeds_b = torch.stack([ex[1] for ex in batch]) 
-        labels = torch.stack([torch.tensor(ex[2]) for ex in batch])
+        labels = torch.stack([ex[2] for ex in batch])
         embeds = torch.cat([embeds_a, embeds_b], dim=-1)
         return {
             'embeddings': embeds,
@@ -198,7 +198,7 @@ class PairEmbedsLabelsDataset(TorchDataset):
         self.seqs_a = hf_dataset[col_a]
         self.seqs_b = hf_dataset[col_b]
         self.labels = hf_dataset[label_col]
-        self.input_dim = input_dim
+        self.input_dim = input_dim // 2 # already scaled if ppi
         self.task_type = task_type
         self.full = full
 
@@ -216,8 +216,8 @@ class PairEmbedsLabelsDataset(TorchDataset):
         
     def __getitem__(self, idx):
         seq_a, seq_b = self.seqs_a[idx], self.seqs_b[idx]
-        emb_a = torch.tensor(self.emb_dict.get(seq_a).reshape(-1, self.input_dim))
-        emb_b = torch.tensor(self.emb_dict.get(seq_b).reshape(-1, self.input_dim))
+        emb_a = self.emb_dict.get(seq_a).reshape(-1, self.input_dim)
+        emb_b = self.emb_dict.get(seq_b).reshape(-1, self.input_dim)
         
         # 50% chance to switch the order of a and b
         if random.random() < 0.5:

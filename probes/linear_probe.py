@@ -58,7 +58,8 @@ class LinearProbe(PreTrainedModel):
         self.layers = nn.Sequential(*layers)
 
     def forward(self, embeddings: torch.Tensor, labels: Optional[torch.Tensor] = None) -> SequenceClassifierOutput:
-        logits = self.layers(embeddings)
+        dtype = self.layers[0].weight.dtype
+        logits = self.layers(embeddings.to(dtype))
         loss = None
         if labels is not None:
             if self.task_type == 'regression':
