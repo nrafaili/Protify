@@ -3,7 +3,6 @@ import torch
 import warnings
 import sqlite3
 import numpy as np
-import networkx as nx
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
 from dataclasses import dataclass, field
@@ -105,32 +104,20 @@ class Pooler:
         return torch.cat(final_emb, dim=-1) # (b, n_pooling_types * d)
 
 
-def _get_importance_scores(att: torch.Tensor) -> Dict[int, float]: # (L, L)
-    G = nx.from_numpy_array(att.numpy(), create_using=nx.DiGraph)    
-    page_rank = nx.pagerank(G, alpha=0.85, max_iter=100, weight='weight', personalization=None, nstart=None)
-    total = sum(page_rank.values())
-    return {k: v / total for k, v in page_rank.items()}
-
-
 def pool_parti(X: torch.Tensor, attentions: Tuple[torch.Tensor], attention_mask: torch.Tensor) -> torch.Tensor:
     # X: (bs, seq_len, d)
     # attentions: num_layres of (bs, n_heads, seq_len, seq_len)
     # attention_mask: (bs, seq_len)
     bs, seq_len, _ = X.shape
-    X = X * attention_mask.unsqueeze(-1)
     attentions = torch.stack(attentions, dim=1).float() # (bs, n_layers, n_heads, seq_len, seq_len)
     att_mask = attention_mask[:, None, None, None, :].expand(bs, 1, 1, seq_len, seq_len)
     attentions = attentions * att_mask
-    attentions = attentions.max(dim=2).values # (bs, n_layers, seq_len, seq_len)
-    attentions = attentions.max(dim=1).values # (bs, seq_len, seq_len)
-    X, attentions, attention_mask = X.cpu(), attentions.cpu(), attention_mask.cpu()
-    pooled_reps = []
-    for x, att, mask in zip(X, attentions, attention_mask):
-        scores = _get_importance_scores(att)
-        scores = torch.tensor(np.array(list(scores.values())))
-        pooled_rep = torch.sum(x * scores.unsqueeze(-1), dim=0) / mask.sum()
-        pooled_reps.append(pooled_rep)
-    return torch.stack(pooled_reps) # (bs, d)
+    attentions = attentions.mean(dim=2) # (bs, n_layers, seq_len, seq_len)
+    attentions = attentions.mean(dim=1) # (bs, seq_len, seq_len)
+    attentions = attentions.mean(dim=-1) # (bs, seq_len)
+    X = X * attentions.unsqueeze(-1)
+    attention_mask = attention_mask.unsqueeze(-1)
+    return (X * attention_mask).sum(dim=1) / attention_mask.sum(dim=1) # (bs, d)
 
 
 ### Dataset for Embedding
