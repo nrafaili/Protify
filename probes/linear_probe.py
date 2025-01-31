@@ -62,7 +62,7 @@ class LinearProbe(PreTrainedModel):
         loss = None
         if labels is not None:
             if self.task_type == 'regression':
-                loss = self.loss_fct(logits.flatten(), labels.view(-1).float())
+                loss = self.loss_fct(logits.view(-1), labels.view(-1).float())
             elif self.task_type == 'multilabel':
                 loss = self.loss_fct(logits, labels.float())
             else:

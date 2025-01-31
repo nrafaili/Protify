@@ -52,7 +52,7 @@ class MainProcess(MetricsLogger):
             _ = embedder(model_name)
 
     @log_method_calls
-    def run_nn_probe(self):
+    def run_probes(self): # TODO refactor to run_nn_probe
         model_names = self.model_args.model_names
         probe_args = self.probe_args
         
