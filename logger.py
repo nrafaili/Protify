@@ -159,14 +159,17 @@ class MetricsLogger:
                     row.append(json.dumps(metrics))
                 writer.writerow(row)
 
-    def log_metrics(self, dataset, model, metrics_dict):
+    def log_metrics(self, dataset, model, metrics_dict, split_name=None):
         try:
             # Remove time-related metrics
             metrics_dict = {k: v for k, v in metrics_dict.items() 
                            if 'time' not in k.lower() and 'second' not in k.lower()}
             
             # Log the metrics
-            self.logger.info(f"Storing metrics for {dataset}/{model}: {metrics_dict}")
+            if split_name is not None:
+                self.logger.info(f"Storing metrics for {dataset}/{model} ({split_name}): {metrics_dict}")
+            else:
+                self.logger.info(f"Storing metrics for {dataset}/{model}: {metrics_dict}")
             
             # Initialize nested dictionaries if they don't exist
             if dataset not in self.logger_data_tracking:

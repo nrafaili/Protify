@@ -189,8 +189,11 @@ def train_probe(
 
     trainer.train()
 
-    metrics = trainer.evaluate(test_dataset)
-    print(f'Final metrics: \n{metrics}\n')
+    valid_metrics = trainer.evaluate(valid_dataset)
+    print(f'Final validation metrics: \n{valid_metrics}\n')
+
+    test_metrics = trainer.evaluate(test_dataset)
+    print(f'Final test metrics: \n{test_metrics}\n')
 
     if trainer_args.save:
         try:
@@ -200,4 +203,4 @@ def train_probe(
 
     trainer.accelerator.free_memory()
     torch.cuda.empty_cache()
-    return metrics
+    return valid_metrics, test_metrics

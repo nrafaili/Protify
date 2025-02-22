@@ -104,7 +104,7 @@ class MainProcess(MetricsLogger):
                 probe_args.task_type = label_type
                 self.trainer_args.task_type = label_type
                 self.logger.info(f'Training probe for {data_name} with {model_name}')
-                metrics = train_probe(
+                valid_metrics, test_metrics = train_probe(
                     self.trainer_args,
                     self.embedding_args,
                     probe_args,
@@ -116,7 +116,8 @@ class MainProcess(MetricsLogger):
                     emb_dict=emb_dict,
                     ppi=ppi,
                 )
-                self.log_metrics(data_name, model_name, metrics)
+                self.log_metrics(data_name, model_name, valid_metrics, split_name='valid')
+                self.log_metrics(data_name, model_name, test_metrics, split_name='test')
 
     @log_method_calls
     def init_hybrid_probe(self):
