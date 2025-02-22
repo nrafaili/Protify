@@ -25,7 +25,8 @@ supported_datasets = {
     'fluorescence-prediction': 'GleghornLab/fluorescence_prediction',
     'plastic': 'GleghornLab/plastic_degradation_benchmark',
     'gold-ppi': 'Synthyra/bernett_gold_ppi',
-    'pinder-ppi': 'Synthyra/PINDER_PPI'
+    'pinder-ppi': 'Synthyra/PINDER_PPI',
+    'pinder-ppi-no-org': 'Synthyra/PINDER_PPI_no_org',
 }
 
 possible_with_vector_reps = [
