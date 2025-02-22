@@ -164,7 +164,7 @@ def parse_arguments():
     parser.add_argument("--yaml_path", type=str, default=None, help="Path to the YAML file.")
     parser.add_argument("--log_dir", type=str, default="logs", help="Path to the log directory.")
     parser.add_argument("--results_dir", type=str, default="results", help="Path to the results directory.")
-    parser.add_argument("--data_paths", nargs="+", default=["DeepLoc-2"], help="List of data directories.")
+    parser.add_argument("--data_paths", nargs="+", default=["DeepLoc-2"], help="List of data directories.") # TODO rename to data_names
     parser.add_argument("--model_save_dir", default="weights", help="Directory to save models.")
     parser.add_argument("--embedding_save_dir", default="embeddings", help="Directory to save embeddings.")
     parser.add_argument("--download_dir", default="Synthyra/mean_pooled_embeddings", help="Directory to download embeddings to.")
