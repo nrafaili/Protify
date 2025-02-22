@@ -29,6 +29,7 @@ class TrainerArguments:
             read_scaler: int = 1000,
             save: bool = False,
             seed: int = 42,
+            train_data_size: int = 100,
             **kwargs
     ):
         self.model_save_dir = model_save_dir
@@ -42,8 +43,22 @@ class TrainerArguments:
         self.save = save
         self.read_scaler = read_scaler
         self.seed = seed
+        self.train_data_size = train_data_size
 
     def __call__(self):
+        if self.train_data_size > 50000:
+            eval_strats = {
+                'eval_strategy': 'steps',
+                'eval_steps': 5000,
+                'save_strategy': 'steps',
+                'save_steps': 5000,
+            }
+        else:
+            eval_strats = {
+                'eval_strategy': 'epoch',
+                'save_strategy': 'epoch',
+            }
+
         if '/' in self.model_save_dir:
             save_dir = self.model_save_dir.split('/')[-1]
         else:
@@ -57,12 +72,11 @@ class TrainerArguments:
             learning_rate=self.lr,
             weight_decay=self.weight_decay,
             save_total_limit=3,
-            save_strategy="epoch",
-            eval_strategy="epoch",
             logging_steps=1000,
             report_to='none',
             load_best_model_at_end=True,
             seed=self.seed,
+            **eval_strats
         )
 
 
@@ -158,6 +172,7 @@ def train_probe(
         full=full,
         train=False
     )
+    trainer_args.train_data_size = len(train_dataset)
     hf_trainer_args = trainer_args()
     ### TODO add options for optimizers and schedulers
     trainer = Trainer(
