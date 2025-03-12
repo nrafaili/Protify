@@ -13,7 +13,8 @@ currently_supported_models = [
     'Random-ESM2-150',
     'Random-ESM2-650',
     'ESMC-300',
-    'ESMC-600'
+    'ESMC-600',
+    'ESMV',
 ]
 
 standard_benchmark = [
@@ -59,6 +60,9 @@ def get_base_model(model_name: str):
     elif 'esmc' in model_name.lower():
         from .esmc import build_esmc_model
         return build_esmc_model(model_name)
+    elif 'esmv' in model_name.lower():
+        from .esmv import build_esmv_model
+        return build_esmv_model(model_name)
     elif 'camp' in model_name.lower():
         from .camp import build_camp_model
         return build_camp_model(model_name)

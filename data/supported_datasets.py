@@ -27,6 +27,7 @@ supported_datasets = {
     'gold-ppi': 'Synthyra/bernett_gold_ppi',
     'pinder-ppi': 'Synthyra/PINDER_PPI',
     'pinder-ppi-no-org': 'Synthyra/PINDER_PPI_no_org',
+    'pinder-v2': 'Synthyra/PINDER_PPI_version_2'
 }
 
 possible_with_vector_reps = [

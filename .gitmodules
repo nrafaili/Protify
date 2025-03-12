@@ -1,0 +1,3 @@
+[submodule "base_models/FastPLMs"]
+	path = base_models/FastPLMs
+	url = https://github.com/Synthyra/FastPLMs.git

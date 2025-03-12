@@ -4,13 +4,13 @@ We use the FastESM2 implementation of ESM2, which is exactly equivalent but uses
 import torch
 import torch.nn as nn
 from typing import Optional
-from transformers import AutoModel
+from .FastPLMs.modeling_fastesm import FastEsmModel
 
 
 class FastEsmForEmbedding(nn.Module):
     def __init__(self, model_path: str):
         super().__init__()
-        self.esm = AutoModel.from_pretrained(model_path, trust_remote_code=True)
+        self.esm = FastEsmModel.from_pretrained(model_path)
 
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None, output_attentions: bool = False) -> torch.Tensor:
         if output_attentions:
