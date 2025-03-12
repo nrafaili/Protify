@@ -6,17 +6,18 @@ import numpy as np
 from types import SimpleNamespace
 from probes.get_probe import ProbeArguments
 from base_models.get_base_models import BaseModelArguments, get_tokenizer
-from data.hf_data import HFDataArguments, get_hf_data
-from data.data_utils import get_embedding_dim_sql, get_embedding_dim_pth
+from data.data_mixin import DataMixin, DataArguments
 from probes.trainers import TrainerArguments, train_probe
+from probes.scikit_classes import ScikitArguments, ScikitProbe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
 from utils import torch_load
 
 
-class MainProcess(MetricsLogger):
+class MainProcess(MetricsLogger, DataMixin):
     def __init__(self, full_args, GUI=False):
-        super().__init__(full_args)
+        super(MainProcess, self).__init__(full_args)
+        super(DataMixin, self).__init__()
         self.full_args = full_args
         if not GUI:
             self.start_log_main()
@@ -33,53 +34,60 @@ class MainProcess(MetricsLogger):
     @log_method_calls
     def apply_current_settings(self):
         self.full_args.embed_dtype = self.dtype_map[self.full_args.embed_dtype]
-        self.data_args = HFDataArguments(**self.full_args.__dict__)
+        self.data_args = DataArguments(**self.full_args.__dict__)
         self.embedding_args = EmbeddingArguments(**self.full_args.__dict__)
         self.model_args = BaseModelArguments(**self.full_args.__dict__)
         self.probe_args = ProbeArguments(**self.full_args.__dict__)
         self.trainer_args = TrainerArguments(**self.full_args.__dict__)
         self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+        self.scikit_args = ScikitArguments(**self.full_args.__dict__)
+        self._sql = self.full_args.sql
+        self._full = self.full_args.matrix_embed
+        self._max_length = self.full_args.max_length
+        self._trim = self.full_args.trim
+        self._delimiter = self.full_args.delimiter
+        self._col_names = self.full_args.col_names
 
     @log_method_calls
     def get_datasets(self):
-        self.datasets, self.all_seqs = get_hf_data(self.data_args)
+        self.datasets, self.all_seqs = self.get_data()
 
     @log_method_calls
     def save_embeddings_to_disk(self):
         self.embedding_args.save_embeddings = True
         embedder = Embedder(self.embedding_args, self.all_seqs)
-        model_names = self.model_args.model_names
-        for model_name in model_names:
+        for model_name in self.model_args.model_names:
             _ = embedder(model_name)
 
     @log_method_calls
     def run_nn_probe(self):
-        model_names = self.model_args.model_names
+        """
+        TODO LoRA, Hybrid, and full finetuning should be wrapped in here
+        will require settings for full model batch size for full finetuning on its own and the full finetuning stage after the probe is trained for hybrid
+
+        """
         probe_args = self.probe_args
-        
+        test_seq = self.all_seqs[0]
+
         # Log the combinations we're going to process
-        total_combinations = len(model_names) * len(self.datasets)
+        total_combinations = len(self.model_args.model_names) * len(self.datasets)
         self.logger.info(f"Processing {total_combinations} model/dataset combinations")
         
         # for each model, gather the settings and embeddings
         # assumes save_embeddings_to_disk has already been called
-        for model_name in model_names:
+        for model_name in self.model_args.model_names:
             self.logger.info(f"Processing model: {model_name}")
-            sql = self.embedding_args.sql
-            max_length = self.data_args.max_length
-            test_seq = self.all_seqs[0]
-            full = self.embedding_args.matrix_embed
     
             # get embedding size
-            if sql:
+            if self._sql:
                 # for sql, the embeddings will be gathered in real time during training
-                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{full}.db')
-                input_dim = get_embedding_dim_sql(save_path, full, test_seq, max_length)
+                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{self._full}.db')
+                input_dim = self.get_embedding_dim_sql(save_path, test_seq)
             else:
                 # for pth, the embeddings are loaded entirely into RAM and accessed during training
-                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{full}.pth')
+                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{self._full}.pth')
                 emb_dict = torch_load(save_path)
-                input_dim = get_embedding_dim_pth(emb_dict, full, test_seq, max_length)
+                input_dim = self.get_embedding_dim_pth(emb_dict, test_seq)
 
             # get tokenizer
             tokenizer = get_tokenizer(model_name)
@@ -97,15 +105,17 @@ class MainProcess(MetricsLogger):
                 probe_args.task_type = label_type
                 self.trainer_args.task_type = label_type
                 self.logger.info(f'Training probe for {data_name} with {model_name}')
+                ### TODO eventually add options for optimizers and schedulers
+                ### TODO here is probably where we can differentiate between the different training schemes
                 valid_metrics, test_metrics = train_probe(
-                    self.trainer_args,
-                    self.embedding_args,
-                    probe_args,
-                    tokenizer,
-                    train_set,
-                    valid_set,
-                    test_set,
-                    model_name,
+                    trainer_args=self.trainer_args,
+                    embedding_args=self.embedding_args,
+                    probe_args=probe_args,
+                    tokenizer=tokenizer,
+                    train_dataset=train_set,
+                    valid_dataset=valid_set,
+                    test_dataset=test_set,
+                    model_name=model_name,
                     emb_dict=emb_dict,
                     ppi=ppi,
                 )
@@ -137,16 +147,29 @@ class MainProcess(MetricsLogger):
         pass
 
     @log_method_calls
-    def find_best_scikit_model(self):
-        pass
-
-    @log_method_calls
-    def run_scikit_model(self):
+    def run_scikit_scheme(self):
         production = False # TODO: make this a setting
+    
+        scikit_probe = ScikitProbe(self.scikit_args)
+        for model_name in self.model_args.model_names:
+            for data_name, dataset in self.datasets.items():
+                ### find best scikit model and parameters via cross validation and lazy predict
+                X_train, y_train, X_valid, y_valid, X_test, y_test, label_type = self.prepare_scikit_dataset(model_name, dataset)
+                if label_type == 'singlelabel':
+                    results = scikit_probe.find_best_classifier(X_train, y_train, X_valid, y_valid, X_test, y_test)
+                elif label_type == 'regression':
+                    results = scikit_probe.find_best_regressor(X_train, y_train, X_valid, y_valid, X_test, y_test)
+                else:
+                    raise ValueError(f'Label type {label_type} not supported')
+                ### train and evaluate best model
+                
+
+        ### if production, train on all data (train + valid + test) and save
+        ### else, just save the trained model and parameters
         pass
 
 
-def parse_arguments():
+def parse_arguments(): # TODO update yaml
     parser = argparse.ArgumentParser(description="Script with arguments mirroring the provided YAML settings.")
     # ----------------- ID ----------------- #
     parser.add_argument("--hf_username", default="Synthyra", help="Hugging Face username.")
@@ -190,6 +213,12 @@ def parse_arguments():
                         help="Disable rotary embeddings (default: enabled). Use --rotary to toggle off.")
     parser.add_argument("--probe_pooling_types", nargs="+", default=["cls"], help="Pooling types to use.")
     parser.add_argument("--save_model", action="store_true", default=False, help="Save trained model (default: False).")
+    parser.add_argument("--production_model", action="store_true", default=False, help="Production model (default: False).")
+
+    # ----------------- ScikitArguments ----------------- # # TODO add to GUI
+    parser.add_argument("--scikit_n_iter", type=int, default=10, help="Number of iterations for scikit model.")
+    parser.add_argument("--scikit_cv", type=int, default=3, help="Number of cross-validation folds for scikit model.")
+    parser.add_argument("--scikit_random_state", type=int, default=42, help="Random state for scikit model.")
 
     # ----------------- EmbeddingArguments ----------------- #
     parser.add_argument("--embedding_batch_size", type=int, default=4, help="Batch size for embedding generation.")

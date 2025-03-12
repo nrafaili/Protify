@@ -1,4 +1,5 @@
 torch>=2.5.1
+torchvision
 transformers>=4.47
 accelerate>=1.1.0
 tf-keras
