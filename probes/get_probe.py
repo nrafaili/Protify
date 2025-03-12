@@ -26,9 +26,16 @@ class ProbeArguments:
             n_heads: int = 4,
             rotary: bool = True,
             probe_pooling_types: List[str] = field(default_factory=lambda: ['mean', 'cls']),
-            **kwargs,
             ### CrossConv
             # TODO
+            ### LoRA
+            lora_r: int = 8,
+            lora_alpha: float = 32.0,
+            lora_dropout: float = 0.01,
+            ### Hybrid Probe
+            hybrid_probe: bool = False,
+            **kwargs,
+
     ):
         self.probe_type = probe_type
         self.tokenwise = tokenwise
@@ -45,6 +52,10 @@ class ProbeArguments:
         self.n_heads = n_heads
         self.rotary = rotary
         self.pooling_types = probe_pooling_types
+        self.hybrid_probe = hybrid_probe
+        self.lora_r = lora_r
+        self.lora_alpha = lora_alpha
+        self.lora_dropout = lora_dropout
 
 
 def get_probe(args: ProbeArguments):

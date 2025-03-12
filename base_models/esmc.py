@@ -12,7 +12,12 @@ class ESMplusplusForEmbedding(nn.Module):
         super().__init__()
         self.esm = ESMplusplusModel.from_pretrained(model_path)
 
-    def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None, output_attentions: bool = False) -> torch.Tensor:
+    def forward(
+            self,
+            input_ids: torch.Tensor,
+            attention_mask: Optional[torch.Tensor] = None,
+            output_attentions: Optional[bool] = None,
+    ) -> torch.Tensor:
         if output_attentions:
             out = self.esm(input_ids, attention_mask=attention_mask, output_attentions=output_attentions)
             return out.last_hidden_state, out.attentions

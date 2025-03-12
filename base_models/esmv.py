@@ -32,6 +32,13 @@ class ESMV(ESMplusplusModel):
         self.sequence_head = LMHead(config.hidden_size, self.vocab_size)
         self.ce_loss = nn.CrossEntropyLoss()
 
+    def get_cls_vecs(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        output = super().forward(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+        )
+        return self.cls_proj(output.last_hidden_state[:, 0, :])
+
     def forward(
         self,
         input_ids: Optional[torch.Tensor] = None,
@@ -88,12 +95,14 @@ class ESMVForEmbedding(nn.Module):
         super().__init__()
         self.esm = ESMV.from_pretrained(model_path)
 
-    def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None, output_attentions: bool = False) -> torch.Tensor:
-        if output_attentions:
-            out = self.esm(input_ids, attention_mask=attention_mask, output_attentions=output_attentions)
-            return out.last_hidden_state, out.attentions
-        else:
-            return self.esm(input_ids, attention_mask=attention_mask).last_hidden_state
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        output_attentions: Optional[bool] = None,
+    ) -> torch.Tensor:
+        return self.esm.get_cls_vecs(input_ids, attention_mask=attention_mask)
+
 
 presets = {
     'ESMV': 'Synthyra/ESMV',

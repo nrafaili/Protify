@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from tkinter import ttk
 from base_models.get_base_models import BaseModelArguments, standard_benchmark
 from data.hf_data import HFDataArguments
-from data.supported_datasets import supported_datasets, standard_data_benchmark
+from data.supported_datasets import supported_datasets, standard_data_benchmark, internal_synthyra_datasets
 from embedder import EmbeddingArguments
 from probes.get_probe import ProbeArguments
 from probes.trainers import TrainerArguments
@@ -233,7 +233,8 @@ class GUI(MainProcess):
         ttk.Label(self.data_tab, text="Dataset Names:").grid(row=2, column=0, padx=10, pady=5, sticky="nw")
         self.data_listbox = tk.Listbox(self.data_tab, selectmode="extended", height=25, width=25)
         for dataset_name in supported_datasets:
-            self.data_listbox.insert(tk.END, dataset_name)
+            if dataset_name not in internal_synthyra_datasets:
+                self.data_listbox.insert(tk.END, dataset_name)
         self.data_listbox.grid(row=2, column=1, padx=10, pady=5, sticky="nw")
 
         run_button = ttk.Button(self.data_tab, text="Get Data", command=self._get_data)
@@ -505,53 +506,71 @@ class GUI(MainProcess):
         check_lora = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["use_lora"])
         check_lora.grid(row=0, column=1, padx=10, pady=5, sticky="w")
 
+        # LoRA r
+        ttk.Label(self.trainer_tab, text="LoRA r:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["lora_r"] = tk.IntVar(value=8)
+        spin_lora_r = ttk.Spinbox(self.trainer_tab, from_=1, to=128, textvariable=self.settings_vars["lora_r"])
+        spin_lora_r.grid(row=1, column=1, padx=10, pady=5)
+
+        # LoRA alpha
+        ttk.Label(self.trainer_tab, text="LoRA alpha:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["lora_alpha"] = tk.DoubleVar(value=32.0)
+        spin_lora_alpha = ttk.Spinbox(self.trainer_tab, from_=1.0, to=128.0, increment=1.0, textvariable=self.settings_vars["lora_alpha"])
+        spin_lora_alpha.grid(row=2, column=1, padx=10, pady=5)
+
+        # LoRA dropout
+        ttk.Label(self.trainer_tab, text="LoRA dropout:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["lora_dropout"] = tk.DoubleVar(value=0.01)
+        spin_lora_dropout = ttk.Spinbox(self.trainer_tab, from_=0.0, to=0.5, increment=0.01, textvariable=self.settings_vars["lora_dropout"])
+        spin_lora_dropout.grid(row=3, column=1, padx=10, pady=5)
+
         # Hybrid Probe checkbox
-        ttk.Label(self.trainer_tab, text="Hybrid Probe:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Hybrid Probe:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["hybrid_probe"] = tk.BooleanVar(value=False)
         check_hybrid_probe = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["hybrid_probe"])
-        check_hybrid_probe.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+        check_hybrid_probe.grid(row=4, column=1, padx=10, pady=5, sticky="w")
 
         # Full finetuning checkbox
-        ttk.Label(self.trainer_tab, text="Full Finetuning:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Full Finetuning:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["full_finetuning"] = tk.BooleanVar(value=False)
         check_full_ft = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["full_finetuning"])
-        check_full_ft.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+        check_full_ft.grid(row=5, column=1, padx=10, pady=5, sticky="w")
 
         # num_epochs
-        ttk.Label(self.trainer_tab, text="Number of Epochs:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Number of Epochs:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["num_epochs"] = tk.IntVar(value=200)
         spin_num_epochs = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["num_epochs"])
-        spin_num_epochs.grid(row=3, column=1, padx=10, pady=5)
+        spin_num_epochs.grid(row=6, column=1, padx=10, pady=5)
 
         # trainer_batch_size
-        ttk.Label(self.trainer_tab, text="Trainer Batch Size:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Trainer Batch Size:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["trainer_batch_size"] = tk.IntVar(value=64)
         spin_trainer_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["trainer_batch_size"])
-        spin_trainer_batch_size.grid(row=4, column=1, padx=10, pady=5)
+        spin_trainer_batch_size.grid(row=7, column=1, padx=10, pady=5)
 
         # gradient_accumulation_steps
-        ttk.Label(self.trainer_tab, text="Gradient Accumulation Steps:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Gradient Accumulation Steps:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["gradient_accumulation_steps"] = tk.IntVar(value=1)
         spin_gradient_accumulation_steps = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["gradient_accumulation_steps"])
-        spin_gradient_accumulation_steps.grid(row=5, column=1, padx=10, pady=5)
+        spin_gradient_accumulation_steps.grid(row=8, column=1, padx=10, pady=5)
 
         # lr
-        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["lr"] = tk.DoubleVar(value=1e-4)
         spin_lr = ttk.Spinbox(self.trainer_tab, from_=1e-6, to=1e-2, increment=1e-5, textvariable=self.settings_vars["lr"])
-        spin_lr.grid(row=6, column=1, padx=10, pady=5)
+        spin_lr.grid(row=9, column=1, padx=10, pady=5)
 
         # weight_decay
-        ttk.Label(self.trainer_tab, text="Weight Decay:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Weight Decay:").grid(row=10, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["weight_decay"] = tk.DoubleVar(value=0.00)
         spin_weight_decay = ttk.Spinbox(self.trainer_tab, from_=0.0, to=1.0, increment=0.01, textvariable=self.settings_vars["weight_decay"])
-        spin_weight_decay.grid(row=7, column=1, padx=10, pady=5)
+        spin_weight_decay.grid(row=10, column=1, padx=10, pady=5)
 
         # patience
-        ttk.Label(self.trainer_tab, text="Patience:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Patience:").grid(row=11, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["patience"] = tk.IntVar(value=3)
         spin_patience = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["patience"])
-        spin_patience.grid(row=8, column=1, padx=10, pady=5)
+        spin_patience.grid(row=11, column=1, padx=10, pady=5)
 
         run_button = ttk.Button(self.trainer_tab, text="Run trainer", command=self._run_trainer)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))

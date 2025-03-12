@@ -30,6 +30,13 @@ supported_datasets = {
     'pinder-v2': 'Synthyra/PINDER_PPI_version_2'
 }
 
+internal_synthyra_datasets = {
+    'pinder-ppi': 'Synthyra/PINDER_PPI',
+    'pinder-ppi-no-org': 'Synthyra/PINDER_PPI_no_org',
+    'pinder-v2': 'Synthyra/PINDER_PPI_version_2',
+    'plastic': 'GleghornLab/plastic_degradation_benchmark',
+}
+
 possible_with_vector_reps = [
     'EC',
     'GO-CC',

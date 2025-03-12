@@ -60,7 +60,7 @@ class DimensionalityReducer:
                     embedding = embedding.mean(axis=0)
                 embeddings.append(embedding)
 
-                    
+        print(f"Loaded {len(embeddings)} embeddings")
         self.embeddings = np.stack(embeddings)
         if labels is not None:
             # Convert labels to a numpy array. For multi-label, this can be shape (num_samples, num_labels).
@@ -175,7 +175,7 @@ class UMAP(DimensionalityReducer):
 
 
 if __name__ == "__main__":
-    # Example usage (pseudo-code, adjust your import paths accordingly):
+    # py -m visualization.reduce_dim
     from data.hf_data import HFDataArguments, get_hf_data
     
     # Get some example data
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     # If you know your dataset is multi-label, specify it here
     vis_args = VisualizationArguments(
         embedding_save_dir="embeddings",
-        model_name="ESM2-8",
+        model_name="ESMV",
         matrix_embed=False,
         sql=False,
         task_type="multilabel"  # Switch to 'multilabel'
