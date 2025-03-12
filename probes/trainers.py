@@ -27,7 +27,7 @@ class TrainerArguments:
             task_type: str = 'regression',
             patience: int = 3,
             read_scaler: int = 1000,
-            save: bool = False,
+            save_model: bool = False,
             seed: int = 42,
             train_data_size: int = 100,
             **kwargs
@@ -40,7 +40,7 @@ class TrainerArguments:
         self.weight_decay = weight_decay
         self.task_type = task_type
         self.patience = patience
-        self.save = save
+        self.save = save_model
         self.read_scaler = read_scaler
         self.seed = seed
         self.train_data_size = train_data_size

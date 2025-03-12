@@ -77,7 +77,9 @@ class DimensionalityReducer:
         if self.embeddings is None:
             raise ValueError("No embeddings loaded. Call load_embeddings() first.")
             
+        print("Fitting and transforming")
         reduced = self.fit_transform()
+        print("Plotting")
         plt.figure(figsize=self.args.fig_size)
         
         if self.labels is None:
@@ -109,13 +111,37 @@ class DimensionalityReducer:
                 plt.colorbar(scatter, ticks=unique_labels)
                 
         elif self.args.task_type == "multilabel":
-            # For multi-label, color by the total number of positive labels per sample.
-            # If labels are one-hot or multi-hot, this means summing along axis=1.
+            # For multi-label, create spectrum from blue to red along the label axis
+            # where more blue if the labels are closer to index 0 and more red if the labels are closer to index -1
+            # If there are more than one postive (multi-hot), average their colors
+            label_colors = np.zeros(len(self.labels))
             label_counts = np.sum(self.labels, axis=1)
-            viridis = plt.cm.viridis
+            
+            # For samples with positive labels, calculate the weighted average position
+            for i, label_row in enumerate(self.labels):
+                if label_counts[i] > 0:
+                    # Calculate weighted position (0 = first label, 1 = last label)
+                    positive_indices = np.where(label_row == 1)[0]
+                    avg_position = np.mean(positive_indices) / (self.labels.shape[1] - 1)
+                    label_colors[i] = avg_position
+                    
+            # Create a blue to red colormap
+            blue_red_cmap = LinearSegmentedColormap.from_list('blue_red', ['blue', 'red'])
+            
+            # Plot with both color dimensions: count and position
             scatter = plt.scatter(reduced[:, 0], reduced[:, 1], 
-                                  c=label_counts, cmap=viridis, alpha=0.6)
-            plt.colorbar(scatter, label='Number of Labels')
+                                  c=label_colors, cmap=blue_red_cmap, 
+                                  s=30 + 20 * label_counts, alpha=0.6)
+            
+            # Add two colorbars
+            plt.colorbar(scatter, label='Label Position (blue=first, red=last)')
+            
+            # Add a size legend for count
+            handles, labels = [], []
+            for count in sorted(set(label_counts)):
+                handles.append(plt.scatter([], [], s=30 + 20 * count, color='gray'))
+                labels.append(f'{int(count)} labels')
+            plt.legend(handles, labels, title='Label Count', loc='upper right')
             
         elif self.args.task_type == "regression":
             # For regression, use a sequential colormap
@@ -134,7 +160,7 @@ class DimensionalityReducer:
             os.makedirs(self.args.fig_dir, exist_ok=True)
             plt.savefig(os.path.join(self.args.fig_dir, save_name), 
                         dpi=300, bbox_inches='tight')
-        
+        plt.show()
         plt.close()
 
 
@@ -194,10 +220,13 @@ if __name__ == "__main__":
         model_name="ESMV",
         matrix_embed=False,
         sql=False,
-        task_type="multilabel"  # Switch to 'multilabel'
+        task_type="multilabel",  # Switch to 'multilabel'
+        save_fig=True
     )
     
     for Reducer in [PCA, TSNE, UMAP]:
+        print(f"Running {Reducer.__name__}")
         reducer = Reducer(vis_args)
+        print("Loading embeddings")
         reducer.load_embeddings(sequences, labels)
         reducer.plot(f"{dataset_name}_{Reducer.__name__}.png")

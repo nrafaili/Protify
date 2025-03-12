@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from probes.get_probe import ProbeArguments
 from base_models.get_base_models import BaseModelArguments, get_tokenizer
 from data.hf_data import HFDataArguments, get_hf_data
+from data.data_utils import get_embedding_dim_sql, get_embedding_dim_pth
 from probes.trainers import TrainerArguments, train_probe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
@@ -52,7 +53,7 @@ class MainProcess(MetricsLogger):
             _ = embedder(model_name)
 
     @log_method_calls
-    def run_probes(self): # TODO refactor to run_nn_probe
+    def run_nn_probe(self):
         model_names = self.model_args.model_names
         probe_args = self.probe_args
         
@@ -60,41 +61,33 @@ class MainProcess(MetricsLogger):
         total_combinations = len(model_names) * len(self.datasets)
         self.logger.info(f"Processing {total_combinations} model/dataset combinations")
         
+        # for each model, gather the settings and embeddings
+        # assumes save_embeddings_to_disk has already been called
         for model_name in model_names:
             self.logger.info(f"Processing model: {model_name}")
             sql = self.embedding_args.sql
             max_length = self.data_args.max_length
             test_seq = self.all_seqs[0]
             full = self.embedding_args.matrix_embed
-
-            if len(test_seq) > max_length - 2:
-                test_seq_len = max_length
-            else:
-                test_seq_len = len(test_seq) + 2
     
+            # get embedding size
             if sql:
-                import sqlite3
+                # for sql, the embeddings will be gathered in real time during training
                 save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{full}.db')
-                with sqlite3.connect(save_path) as conn:
-                    c = conn.cursor()
-                    c.execute("SELECT embedding FROM embeddings WHERE sequence = ?", (test_seq,))
-                    test_embedding = c.fetchone()[0]
-                    test_embedding = torch.tensor(np.frombuffer(test_embedding, dtype=np.float32).reshape(1, -1))
-                emb_dict = None
+                input_dim = get_embedding_dim_sql(save_path, full, test_seq, max_length)
             else:
+                # for pth, the embeddings are loaded entirely into RAM and accessed during training
                 save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{full}.pth')
                 emb_dict = torch_load(save_path)
-                test_embedding = emb_dict[test_seq].reshape(1, -1)
+                input_dim = get_embedding_dim_pth(emb_dict, full, test_seq, max_length)
 
-            if full:
-                test_embedding = test_embedding.reshape(test_seq_len, -1)
-            input_dim = test_embedding.shape[-1]
+            # get tokenizer
             tokenizer = get_tokenizer(model_name)
 
+            # for each dataset, gather the settings and train the probe
             for data_name, dataset in self.datasets.items():
                 self.logger.info(f"Processing dataset: {data_name}")
                 train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
-                print(input_dim)
                 if ppi:
                     probe_args.input_dim = input_dim * 2
                 else:
@@ -170,6 +163,7 @@ def parse_arguments():
     parser.add_argument("--embedding_save_dir", default="embeddings", help="Directory to save embeddings.")
     parser.add_argument("--download_dir", default="Synthyra/mean_pooled_embeddings", help="Directory to download embeddings to.")
     parser.add_argument("--replay_path", type=str, default=None, help="Path to the replay file.")
+    parser.add_argument("--pretrained_probe_path", type=str, default=None) # TODO not used right now
 
     # ----------------- DataArguments ----------------- #
     parser.add_argument("--delimiter", default=",", help="Delimiter for data.")
@@ -195,6 +189,7 @@ def parse_arguments():
     parser.add_argument("--rotary", action="store_false", default=True,
                         help="Disable rotary embeddings (default: enabled). Use --rotary to toggle off.")
     parser.add_argument("--probe_pooling_types", nargs="+", default=["cls"], help="Pooling types to use.")
+    parser.add_argument("--save_model", action="store_true", default=False, help="Save trained model (default: False).")
 
     # ----------------- EmbeddingArguments ----------------- #
     parser.add_argument("--embedding_batch_size", type=int, default=4, help="Batch size for embedding generation.")
@@ -254,6 +249,6 @@ if __name__ == "__main__":
         main.get_datasets()
         print(len(main.all_seqs))
         main.save_embeddings_to_disk()
-        main.run_probes()
+        main.run_nn_probe()
         main.write_results()
     main.end_log()

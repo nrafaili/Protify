@@ -600,7 +600,7 @@ class GUI(MainProcess):
             elif self.settings_vars["hybrid_probe"].get():
                 pass
             else:
-                self.run_probes()
+                self.run_nn_probe()
                 
         self.run_in_background(background_run_trainer)
 
