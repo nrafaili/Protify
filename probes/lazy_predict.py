@@ -311,6 +311,7 @@ class LazyClassifier:
                 print("Invalid Classifier(s)")
 
         for name, model in tqdm(self.classifiers):
+            print(name)
             start = time.time()
             try:
                 if "random_state" in model().get_params().keys():
@@ -356,7 +357,7 @@ class LazyClassifier:
                                 "Balanced Accuracy": b_accuracy,
                                 "ROC AUC": roc_auc,
                                 "F1 Score": f1,
-                                self.custom_metric.__name__: custom_metric,
+                                "Custom Metric": custom_metric,
                                 "Time taken": time.time() - start,
                             }
                         )
@@ -396,7 +397,7 @@ class LazyClassifier:
                     "Balanced Accuracy": B_Accuracy,
                     "ROC AUC": ROC_AUC,
                     "F1 Score": F1,
-                    self.custom_metric.__name__: CUSTOM_METRIC,
+                    "Custom Metric": CUSTOM_METRIC,
                     "Time Taken": TIME,
                 }
             )

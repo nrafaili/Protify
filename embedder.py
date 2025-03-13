@@ -299,10 +299,11 @@ class Embedder:
 
 if __name__ == '__main__':
     ### Embed all supported datasets with all supported models
+    """
+    TODO fix this, needs to initialize main, as it now has DataMixin
     import argparse
     from huggingface_hub import upload_file, login
     from data.supported_datasets import supported_datasets, possible_with_vector_reps, testing
-    from data.hf_data import HFDataArguments, get_hf_data
     from base_models.get_base_models import BaseModelArguments, get_base_model
     os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1' # prevent cache warning on Windows machines
 
@@ -361,3 +362,4 @@ if __name__ == '__main__':
             repo_type='dataset')
 
     print('Done')
+    """

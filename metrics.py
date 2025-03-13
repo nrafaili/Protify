@@ -337,3 +337,8 @@ def compute_regression_metrics(p: EvalPrediction) -> dict[str, float]:
         'mae': round(mae, 5),
         'rmse': round(rmse, 5),
     }
+
+
+if __name__ == "__main__":
+    scorer = get_dual_classification_scorer()
+    print(scorer.__name__)

@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import RandomizedSearchCV
-from typing import Dict, Any, Tuple, Optional, Union, List
+from typing import Dict, Any, Tuple, Optional
 from sklearn.utils import all_estimators
-from lazy_predict import LazyRegressor, LazyClassifier, CLASSIFIERS, REGRESSORS
-from ..metrics import get_dual_regression_scorer, get_dual_classification_scorer
+from metrics import get_dual_regression_scorer, get_dual_classification_scorer
+from .lazy_predict import LazyRegressor, LazyClassifier, CLASSIFIERS, REGRESSORS
 from .scikit_hypers import HYPERPARAMETER_DISTRIBUTIONS
 
 
@@ -21,7 +21,7 @@ class ScikitArguments:
         # Specific model arguments (optional)
         model_name: Optional[str] = None,
         model_args: Optional[Dict[str, Any]] = None,
-        production: bool = False,
+        production_model: bool = False,
         **kwargs,
     ):
         # Tuning arguments
@@ -32,7 +32,7 @@ class ScikitArguments:
         # Specific model arguments
         self.model_name = model_name
         self.model_args = model_args if model_args is not None else {}
-        self.production = production
+        self.production_model = production_model
 
 
 class ModelResults:
@@ -113,6 +113,7 @@ class ScikitProbe:
             ModelResults object containing all results and the best model
         """
         # Initial lazy prediction
+        print(f"Initial lazy prediction started")
         regressor = LazyRegressor(
             verbose=4,
             ignore_warnings=True,
@@ -123,7 +124,11 @@ class ScikitProbe:
         # Get best model name and class
         best_model_name = initial_scores.index[0]
         best_model_class = regressor.models[best_model_name].named_steps['regressor'].__class__
-        
+        print(f"Best model name: {best_model_name}")
+        print(f"Best model class: {best_model_class}")
+        print(f"Initial scores: {initial_scores}")
+
+        print(f"Tuning hyperparameters")
         # Tune hyperparameters
         best_model, best_params = self._tune_hyperparameters(
             best_model_class,
@@ -136,7 +141,8 @@ class ScikitProbe:
         # Get final scores with tuned model
         best_model.fit(X_train, y_train)
         final_scores = get_dual_regression_scorer()(best_model, X_test, y_test)
-        
+        print(f"Final scores: {final_scores}")
+
         return ModelResults(
             initial_scores=initial_scores,
             best_model_name=best_model_name,
@@ -165,17 +171,22 @@ class ScikitProbe:
             ModelResults object containing all results and the best model
         """
         # Initial lazy prediction
+        print(f"Initial lazy prediction started")
         classifier = LazyClassifier(
             verbose=4,
             ignore_warnings=True,
             custom_metric=get_dual_classification_scorer()
         )
         initial_scores = classifier.fit(X_train, X_test, y_train, y_test)
-        
+        print(initial_scores)
         # Get best model name and class
         best_model_name = initial_scores.index[0]
         best_model_class = classifier.models[best_model_name].named_steps['classifier'].__class__
-        
+        print(f"Best model name: {best_model_name}")
+        print(f"Best model class: {best_model_class}")
+        print(f"Initial scores: {initial_scores}")
+
+        print(f"Tuning hyperparameters")
         # Tune hyperparameters
         best_model, best_params = self._tune_hyperparameters(
             best_model_class,
@@ -188,7 +199,8 @@ class ScikitProbe:
         # Get final scores with tuned model
         best_model.fit(X_train, y_train)
         final_scores = get_dual_classification_scorer()(best_model, X_test, y_test)
-        
+        print(f"Final scores: {final_scores}")
+
         return ModelResults(
             initial_scores=initial_scores,
             best_model_name=best_model_name,
@@ -197,7 +209,7 @@ class ScikitProbe:
             best_model=best_model
         )
 
-    def run_specific_model( # TODO verify this works correctly
+    def run_specific_model(
         self,
         X_train: np.ndarray,
         y_train: np.ndarray,
@@ -224,6 +236,7 @@ class ScikitProbe:
             ModelResults object containing results and the model
         """
         if self.args.production:
+            print(f"Running in production mode, train and validation are combined")
             X_train = np.concatenate([X_train, X_valid])
             y_train = np.concatenate([y_train, y_valid])
 

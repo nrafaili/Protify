@@ -46,15 +46,15 @@ class DataArguments:
         self.max_length = max_length
         self.trim = trim
 
-        if data_paths[0] == 'standard_benchmark':
-            data_paths = standard_data_benchmark
-
-        self.data_paths = []
-        for data_name in data_names:
-            if data_name in supported_datasets:
-                self.data_paths.append(supported_datasets[data_name])
-            else:
-                self.data_paths.append(data_name)
+        if data_names[0] == 'standard_benchmark':
+            self.data_paths = standard_data_benchmark
+        else:
+            self.data_paths = []
+            for data_name in data_names:
+                if data_name in supported_datasets:
+                    self.data_paths.append(supported_datasets[data_name])
+                else:
+                    self.data_paths.append(data_name)
         
         for dir in data_dirs:
             if os.path.exists(dir):
@@ -123,7 +123,7 @@ class DataMixin:
 
     def process_datasets(
             self,
-            hf_datasets: List[Dataset],
+            hf_datasets: List[Tuple[Dataset, Dataset, Dataset, bool]],
             data_names: List[str])-> Tuple[Dict[str, Tuple[Dataset, Dataset, Dataset, int, str, bool]], List[str]]:
         max_length = self._max_length
         datasets, all_seqs = {}, set()
@@ -221,7 +221,7 @@ class DataMixin:
         """
         datasets, data_names = [], []
 
-        for data_path in self.args.data_paths:
+        for data_path in self.data_args.data_paths:
             data_name = data_path.split('/')[-1]
             ppi = 'ppi' in data_name.lower()
             print(f'Loading {data_name}')
@@ -230,7 +230,7 @@ class DataMixin:
             datasets.append((train_set, valid_set, test_set, ppi))
             data_names.append(data_name)
 
-        for data_dir in self.args.data_dirs:
+        for data_dir in self.data_args.data_dirs:
             data_name = data_dir.split('/')[-2]
             ppi = 'ppi' in data_dir.lower()
             train_path = glob(os.path.join(data_dir, 'train.*'))[0]
@@ -251,7 +251,7 @@ class DataMixin:
             datasets.append((train_set, valid_set, test_set, ppi))
             data_names.append(data_name)
 
-        return self.process_datasets(datasets=datasets, data_names=data_names)
+        return self.process_datasets(hf_datasets=datasets, data_names=data_names)
 
     def get_embedding_dim_sql(self, save_path, test_seq):
         import sqlite3

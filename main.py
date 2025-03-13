@@ -2,7 +2,6 @@ import os
 import argparse
 import yaml
 import torch
-import numpy as np
 from types import SimpleNamespace
 from probes.get_probe import ProbeArguments
 from base_models.get_base_models import BaseModelArguments, get_tokenizer
@@ -147,21 +146,20 @@ class MainProcess(MetricsLogger, DataMixin):
         pass
 
     @log_method_calls
-    def run_scikit_scheme(self):
-        production = False # TODO: make this a setting
-    
+    def run_scikit_scheme(self):    
         scikit_probe = ScikitProbe(self.scikit_args)
         for model_name in self.model_args.model_names:
             for data_name, dataset in self.datasets.items():
                 ### find best scikit model and parameters via cross validation and lazy predict
                 X_train, y_train, X_valid, y_valid, X_test, y_test, label_type = self.prepare_scikit_dataset(model_name, dataset)
                 if label_type == 'singlelabel':
-                    results = scikit_probe.find_best_classifier(X_train, y_train, X_valid, y_valid, X_test, y_test)
+                    results = scikit_probe.find_best_classifier(X_train, y_train, X_valid, y_valid)
                 elif label_type == 'regression':
-                    results = scikit_probe.find_best_regressor(X_train, y_train, X_valid, y_valid, X_test, y_test)
+                    results = scikit_probe.find_best_regressor(X_train, y_train, X_valid, y_valid)
                 else:
                     raise ValueError(f'Label type {label_type} not supported')
                 ### train and evaluate best model
+                results = scikit_probe.run_specific_model(X_train, y_train, X_valid, y_valid, X_test, y_test, results)
                 
 
         ### if production, train on all data (train + valid + test) and save
@@ -181,7 +179,6 @@ def parse_arguments(): # TODO update yaml
     parser.add_argument("--yaml_path", type=str, default=None, help="Path to the YAML file.")
     parser.add_argument("--log_dir", type=str, default="logs", help="Path to the log directory.")
     parser.add_argument("--results_dir", type=str, default="results", help="Path to the results directory.")
-    parser.add_argument("--data_paths", nargs="+", default=["DeepLoc-2"], help="List of data directories.") # TODO rename to data_names
     parser.add_argument("--model_save_dir", default="weights", help="Directory to save models.")
     parser.add_argument("--embedding_save_dir", default="embeddings", help="Directory to save embeddings.")
     parser.add_argument("--download_dir", default="Synthyra/mean_pooled_embeddings", help="Directory to download embeddings to.")
@@ -193,6 +190,8 @@ def parse_arguments(): # TODO update yaml
     parser.add_argument("--col_names", nargs="+", default=["seqs", "labels"], help="Column names.")
     parser.add_argument("--max_length", type=int, default=1024, help="Maximum sequence length.")
     parser.add_argument("--trim", action="store_true", default=False, help="Whether to trim sequences (default: False).")
+    parser.add_argument("--data_names", nargs="+", default=["DeepLoc-2"], help="List of HF dataset names.") # TODO rename to data_names
+    parser.add_argument("--data_dirs", nargs="+", default=[], help="List of local data directories.")
 
     # ----------------- BaseModelArguments ----------------- #
     parser.add_argument("--model_names", nargs="+", default=["ESM2-8"], help="List of model names to use.")
@@ -219,6 +218,8 @@ def parse_arguments(): # TODO update yaml
     parser.add_argument("--scikit_n_iter", type=int, default=10, help="Number of iterations for scikit model.")
     parser.add_argument("--scikit_cv", type=int, default=3, help="Number of cross-validation folds for scikit model.")
     parser.add_argument("--scikit_random_state", type=int, default=42, help="Random state for scikit model.")
+    parser.add_argument("--scikit_model_name", type=str, default=None, help="Name of the scikit model to use.")
+    parser.add_argument("--use_scikit", action="store_true", default=False, help="Use scikit model (default: False).")
 
     # ----------------- EmbeddingArguments ----------------- #
     parser.add_argument("--embedding_batch_size", type=int, default=4, help="Batch size for embedding generation.")
@@ -278,6 +279,9 @@ if __name__ == "__main__":
         main.get_datasets()
         print(len(main.all_seqs))
         main.save_embeddings_to_disk()
-        main.run_nn_probe()
+        if main.full_args.use_scikit:
+            main.run_scikit_scheme()
+        else:
+            main.run_nn_probe()
         main.write_results()
     main.end_log()
