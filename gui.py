@@ -6,7 +6,6 @@ import traceback
 from types import SimpleNamespace
 from tkinter import ttk
 from base_models.get_base_models import BaseModelArguments, standard_benchmark
-from data.hf_data import HFDataArguments
 from data.supported_datasets import supported_datasets, standard_data_benchmark, internal_synthyra_datasets
 from embedder import EmbeddingArguments
 from probes.get_probe import ProbeArguments
