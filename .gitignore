@@ -10,3 +10,4 @@
 *.png
 *.safetensors
 /weights/runs
+.qodo
