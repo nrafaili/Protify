@@ -25,18 +25,11 @@ supported_datasets = {
     'fluorescence-prediction': 'GleghornLab/fluorescence_prediction',
     'plastic': 'GleghornLab/plastic_degradation_benchmark',
     'gold-ppi': 'Synthyra/bernett_gold_ppi',
-    'pinder-ppi': 'Synthyra/PINDER_PPI',
-    'pinder-ppi-no-org': 'Synthyra/PINDER_PPI_no_org',
-    'pinder-v2': 'Synthyra/PINDER_PPI_version_2',
-    'pinder-v4': 'Synthyra/PINDER_PPI_version_4',
+    'synthyra-ppi': 'Synthyra/ppi_set_v5',
 }
 
 internal_synthyra_datasets = {
-    'pinder-ppi': 'Synthyra/PINDER_PPI',
-    'pinder-ppi-no-org': 'Synthyra/PINDER_PPI_no_org',
-    'pinder-v2': 'Synthyra/PINDER_PPI_version_2',
-    'pinder-v4': 'Synthyra/PINDER_PPI_version_4',
-    'plastic': 'GleghornLab/plastic_degradation_benchmark',
+    'synthyra-ppi': 'Synthyra/ppi_set_v5',
 }
 
 possible_with_vector_reps = [
