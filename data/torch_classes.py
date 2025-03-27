@@ -393,3 +393,64 @@ class PairStringLabelDatasetFromHF(TorchDataset):
         if self.train and random.random() < 0.5:
             seq_a, seq_b = seq_b, seq_a
         return seq_a, seq_b, self.labels[idx]
+
+
+class OneHotCollator:
+    def __init__(self, alphabet="ACDEFGHIKLMNPQRSTVWY"):
+        # Add X for unknown amino acids, and special CLS and EOS tokens
+        alphabet = alphabet + "X"
+        alphabet = list(alphabet)
+        alphabet.append('cls')
+        alphabet.append('eos')
+        self.mapping = {token: idx for idx, token in enumerate(alphabet)}
+        
+    def __call__(self, batch):
+        seqs = [ex[0] for ex in batch]
+        labels = torch.stack([torch.tensor(ex[1]) for ex in batch])
+        
+        # Find the longest sequence in the batch (plus 2 for CLS and EOS)
+        max_len = max(len(seq) for seq in seqs) + 2
+        
+        # One-hot encode and pad each sequence
+        batch_size = len(seqs)
+        one_hot_tensors = []
+        attention_masks = []
+        
+        for seq in seqs:
+            seq = ['cls'] + list(seq) + ['eos']
+            # Create one-hot encoding for each sequence (including CLS and EOS)
+            seq_len = len(seq)
+            one_hot = torch.zeros(seq_len, len(self.alphabet))
+            
+            # Add sequence tokens in the middle
+            for pos, token in enumerate(seq):
+                if token in self.mapping:
+                    one_hot[pos, self.mapping[token]] = 1.0
+                else:
+                    # For non-canonical amino acids, use the X token
+                    one_hot[pos, self.mapping["X"]] = 1.0
+            
+            # Create attention mask (1 for actual tokens, 0 for padding)
+            attention_mask = torch.ones(seq_len)
+            
+            # Pad to the max length in this batch
+            padding_size = max_len - seq_len
+            if padding_size > 0:
+                padding = torch.zeros(padding_size, len(self.alphabet))
+                one_hot = torch.cat([one_hot, padding], dim=0)
+                # Add zeros to attention mask for padding
+                mask_padding = torch.zeros(padding_size)
+                attention_mask = torch.cat([attention_mask, mask_padding], dim=0)
+            
+            one_hot_tensors.append(one_hot)
+            attention_masks.append(attention_mask)
+        
+        # Stack all tensors in the batch
+        embeddings = torch.stack(one_hot_tensors)
+        attention_masks = torch.stack(attention_masks)
+        
+        return {
+            'embeddings': embeddings,
+            'attention_mask': attention_masks,
+            'labels': labels,
+        }
