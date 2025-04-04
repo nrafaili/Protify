@@ -47,7 +47,7 @@ class DataArguments:
         self.trim = trim
 
         if data_names[0] == 'standard_benchmark':
-            self.data_paths = standard_data_benchmark
+            self.data_paths = [supported_datasets[data_name] for data_name in standard_data_benchmark]
         else:
             self.data_paths = []
             for data_name in data_names:
