@@ -15,6 +15,8 @@ currently_supported_models = [
     'ESMC-300',
     'ESMC-600',
     'ESMV',
+    'ESM2-diff-150',
+    'ESM2-diffAV-150',
 ]
 
 standard_benchmark = [

@@ -31,6 +31,8 @@ presets = {
     'ESM2-150': 'Synthyra/ESM2-150M',
     'ESM2-650': 'Synthyra/ESM2-650M',
     'ESM2-3B': 'Synthyra/ESM2-3B',
+    'ESM2-diff-150': 'Synthyra/esm_diff_150',
+    'ESM2-diffAV-150': 'Synthyra/esm_diff_av_150_41000'
 }
 
 
