@@ -4,9 +4,35 @@ import torch
 import numpy as np
 import sqlite3
 import torch.nn.functional as F
+from typing import List, Tuple
 from tqdm.auto import tqdm
 from torch.utils.data import Dataset as TorchDataset
+from .utils import pad_and_concatenate_dimer
 # from torch.nn.utils.rnn import pad_sequence
+
+
+def _pad_matrix_embeds(embeds: List[torch.Tensor], max_len: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    # pad and concatenate, return padded embeds and mask
+    padded_embeds, attention_masks = [], []
+    for embed in embeds:
+        seq_len = embed.size(0)
+        padding_size = max_len - seq_len
+        
+        # Create attention mask (1 for real tokens, 0 for padding)
+        attention_mask = torch.ones(max_len, dtype=torch.long)
+        if padding_size > 0:
+            attention_mask[seq_len:] = 0
+            
+            # Pad along the sequence dimension (dim=0)
+            padding = torch.zeros((padding_size, embed.size(1)), dtype=embed.dtype)
+            padded_embed = torch.cat((embed, padding), dim=0)
+        else:
+            padded_embed = embed
+            
+        padded_embeds.append(padded_embed)
+        attention_masks.append(attention_mask)
+        
+    return torch.stack(padded_embeds), torch.stack(attention_masks)
 
 
 def string_labels_collator_builder(tokenizer, **kwargs):
@@ -26,25 +52,43 @@ def string_labels_collator_builder(tokenizer, **kwargs):
 
 def embeds_labels_collator_builder(full=False, task_type='tokenwise', **kwargs):
     def _collate_fn(batch):
-        embeds = torch.stack([ex[0] for ex in batch])
-        labels = torch.stack([ex[1] for ex in batch])
-        
-        if full and task_type == 'tokenwise':
-            padded_labels = []
-            max_len = max(label.size(0) for label in labels)
-            for label in labels:
-                padding_size = max_len - label.size(0)
-                if padding_size > 0:
-                    padding = torch.full((padding_size,), -100, dtype=label.dtype)
-                    padded_label = torch.cat((label.squeeze(-1), padding))
-                else:
-                    padded_label = label.squeeze(-1)
-                padded_labels.append(padded_label)
+        if full:
+            embeds = [ex[0] for ex in batch]
+            labels = [ex[1] for ex in batch]
+            
+            # Find max sequence length for padding
+            max_len = max(embed.size(0) for embed in embeds)
+            
+            embeds, attention_mask = _pad_matrix_embeds(embeds, max_len)
+            
+            # Pad labels
+            if task_type == 'tokenwise':
+                padded_labels = []
+                for label in labels:
+                    padding_size = max_len - label.size(0)
+                    if padding_size > 0:
+                        # Use -100 as padding value for labels (ignored by loss functions)
+                        padding = torch.full((padding_size,), -100, dtype=label.dtype)
+                        padded_label = torch.cat((label.squeeze(-1), padding))
+                    else:
+                        padded_label = label.squeeze(-1)
+                    padded_labels.append(padded_label)
+            
             labels = torch.stack(padded_labels)
-        return {
-            'embeddings': embeds,
-            'labels': labels
-        }
+            
+            return {
+                'embeddings': embeds,
+                'attention_mask': attention_mask,
+                'labels': labels,
+            }
+        else:
+            embeds = torch.stack([ex[0] for ex in batch])
+            labels = torch.stack([ex[1] for ex in batch])
+        
+            return {
+                'embeddings': embeds,
+                'labels': labels
+            }
     return _collate_fn
 
 
@@ -75,10 +119,27 @@ def pair_string_collator_builder(tokenizer, **kwargs):
 
 def pair_embeds_labels_collator_builder(full=False, **kwargs):
     def _collate_fn(batch):
-        embeds_a = torch.stack([ex[0] for ex in batch])
-        embeds_b = torch.stack([ex[1] for ex in batch]) 
-        labels = torch.stack([ex[2] for ex in batch])
-        embeds = torch.cat([embeds_a, embeds_b], dim=-1)
+        if full:
+            embeds_a = [ex[0] for ex in batch]
+            embeds_b = [ex[1] for ex in batch]
+            max_len_a = max(embed.size(0) for embed in embeds_a)
+            max_len_b = max(embed.size(0) for embed in embeds_b)
+            embeds_a, attention_mask_a = _pad_matrix_embeds(embeds_a, max_len_a)
+            embeds_b, attention_mask_b = _pad_matrix_embeds(embeds_b, max_len_b)
+            embeds, attention_mask = pad_and_concatenate_dimer(embeds_a, embeds_b, attention_mask_a, attention_mask_b)
+
+            labels = torch.stack([ex[2] for ex in batch])
+
+            return {
+                'embeddings': embeds,
+                'attention_mask': attention_mask,
+                'labels': labels
+            }
+        else:
+            embeds_a = torch.stack([ex[0] for ex in batch])
+            embeds_b = torch.stack([ex[1] for ex in batch]) 
+            labels = torch.stack([ex[2] for ex in batch])
+            embeds = torch.cat([embeds_a, embeds_b], dim=-1)
         return {
             'embeddings': embeds,
             'labels': labels
@@ -198,7 +259,7 @@ class PairEmbedsLabelsDataset(TorchDataset):
         self.seqs_a = hf_dataset[col_a]
         self.seqs_b = hf_dataset[col_b]
         self.labels = hf_dataset[label_col]
-        self.input_dim = input_dim // 2 # already scaled if ppi
+        self.input_dim = input_dim // 2 if not full else input_dim # already scaled if ppi
         self.task_type = task_type
         self.full = full
 

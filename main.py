@@ -95,7 +95,7 @@ class MainProcess(MetricsLogger, DataMixin):
             for data_name, dataset in self.datasets.items():
                 self.logger.info(f"Processing dataset: {data_name}")
                 train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
-                if ppi:
+                if ppi and not self._full:
                     probe_args.input_dim = input_dim * 2
                 else:
                     probe_args.input_dim = input_dim
@@ -189,7 +189,9 @@ def parse_arguments(): # TODO update yaml
     parser.add_argument("--delimiter", default=",", help="Delimiter for data.")
     parser.add_argument("--col_names", nargs="+", default=["seqs", "labels"], help="Column names.")
     parser.add_argument("--max_length", type=int, default=1024, help="Maximum sequence length.")
-    parser.add_argument("--trim", action="store_true", default=False, help="Whether to trim sequences (default: False).")
+    parser.add_argument("--trim", action="store_true", default=False,
+                        help="Whether to trim sequences (default: False). If False, sequences are removed from the dataset if they are longer than max length. If True, they are truncated to max length."
+                        )
     parser.add_argument("--data_names", nargs="+", default=["DeepLoc-2"], help="List of HF dataset names.") # TODO rename to data_names
     parser.add_argument("--data_dirs", nargs="+", default=[], help="List of local data directories.")
 

@@ -211,6 +211,11 @@ def compute_tokenwise_classification_metrics(p: EvalPrediction) -> dict[str, flo
     valid_indices = y_true != -100
     y_pred = y_pred[valid_indices]
     y_true = y_true[valid_indices]
+
+    cm = confusion_matrix(y_true, y_pred)
+    print("\nConfusion Matrix:")
+    print(cm)
+
     f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
     prec = precision_score(y_true, y_pred, average='macro', zero_division=0)
     rec = recall_score(y_true, y_pred, average='macro', zero_division=0)

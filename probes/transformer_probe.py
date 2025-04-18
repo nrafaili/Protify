@@ -94,6 +94,7 @@ class TransformerForSequenceClassification(PreTrainedModel):
                 loss = self.loss_fct(logits, labels.float())
             else:
                 loss = self.loss_fct(logits.view(-1, self.num_labels), labels.view(-1).long())
+        
         return SequenceClassifierOutput(
             loss=loss,
             logits=logits,
@@ -117,9 +118,8 @@ class TransformerForTokenClassification(PreTrainedModel):
             n_heads=config.n_heads,
             n_layers=config.n_layers,
             expansion_ratio=8 / 3,
-            dropout=config.dropout,
-            rotary=True,
-            diff_attn=config.diff_attn
+            dropout=config.transformer_dropout,
+            rotary=config.rotary,
         )
 
         proj_dim = intermediate_correction_fn(expansion_ratio=2, hidden_size=config.num_labels)

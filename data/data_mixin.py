@@ -121,6 +121,19 @@ class DataMixin:
         else:
             return seq_b, seq_a
 
+    def _truncate_pairs(self, ex):
+        # Truncate longest first, but if that makes it shorter than the other, truncate that one
+        seq_a, seq_b = ex['SeqA'], ex['SeqB']
+        trunc_a, trunc_b = seq_a, seq_b
+        while len(trunc_a) + len(trunc_b) > self._max_length:
+            if len(trunc_a) > len(trunc_b):
+                trunc_a = trunc_a[:-1]
+            else:
+                trunc_b = trunc_b[:-1]
+        ex['SeqA'] = trunc_a
+        ex['SeqB'] = trunc_b
+        return ex
+
     def process_datasets(
             self,
             hf_datasets: List[Tuple[Dataset, Dataset, Dataset, bool]],
@@ -147,9 +160,9 @@ class DataMixin:
 
             else: # truncate to max_length
                 if ppi:
-                    train_set = train_set.map(lambda x: {'SeqA': x['SeqA'][:max_length], 'SeqB': x['SeqB'][:max_length]})
-                    valid_set = valid_set.map(lambda x: {'SeqA': x['SeqA'][:max_length], 'SeqB': x['SeqB'][:max_length]})
-                    test_set = test_set.map(lambda x: {'SeqA': x['SeqA'][:max_length], 'SeqB': x['SeqB'][:max_length]})
+                    train_set = train_set.map(self._truncate_pairs)
+                    valid_set = valid_set.map(self._truncate_pairs)
+                    test_set = test_set.map(self._truncate_pairs)
                 else:
                     train_set = train_set.map(lambda x: {'seqs': x['seqs'][:max_length]})
                     valid_set = valid_set.map(lambda x: {'seqs': x['seqs'][:max_length]})
@@ -157,9 +170,12 @@ class DataMixin:
 
             # sanitize
             if ppi:
-                train_set = train_set.map(lambda x: {'SeqA': ''.join(aa for aa in x['SeqA'] if aa in AMINO_ACIDS), 'SeqB': ''.join(aa for aa in x['SeqB'] if aa in AMINO_ACIDS)})
-                valid_set = valid_set.map(lambda x: {'SeqA': ''.join(aa for aa in x['SeqA'] if aa in AMINO_ACIDS), 'SeqB': ''.join(aa for aa in x['SeqB'] if aa in AMINO_ACIDS)})
-                test_set = test_set.map(lambda x: {'SeqA': ''.join(aa for aa in x['SeqA'] if aa in AMINO_ACIDS), 'SeqB': ''.join(aa for aa in x['SeqB'] if aa in AMINO_ACIDS)})
+                train_set = train_set.map(lambda x: {'SeqA': ''.join(aa for aa in x['SeqA'] if aa in AMINO_ACIDS),
+                                                     'SeqB': ''.join(aa for aa in x['SeqB'] if aa in AMINO_ACIDS)})
+                valid_set = valid_set.map(lambda x: {'SeqA': ''.join(aa for aa in x['SeqA'] if aa in AMINO_ACIDS),
+                                                     'SeqB': ''.join(aa for aa in x['SeqB'] if aa in AMINO_ACIDS)})
+                test_set = test_set.map(lambda x: {'SeqA': ''.join(aa for aa in x['SeqA'] if aa in AMINO_ACIDS),
+                                                   'SeqB': ''.join(aa for aa in x['SeqB'] if aa in AMINO_ACIDS)})
                 all_seqs.update(train_set['SeqA'] + train_set['SeqB'])
                 all_seqs.update(valid_set['SeqA'] + valid_set['SeqB'])
                 all_seqs.update(test_set['SeqA'] + test_set['SeqB'])
@@ -255,10 +271,10 @@ class DataMixin:
 
     def get_embedding_dim_sql(self, save_path, test_seq):
         import sqlite3
-        if len(test_seq) > self._max_length - 2:
-            test_seq_len = self._max_length
+        if len(test_seq) > self._max_length:
+            test_seq_len = self._max_length + 2
         else:
-            test_seq_len = len(test_seq) + 2
+            test_seq_len = len(test_seq)
         
         with sqlite3.connect(save_path) as conn:
             c = conn.cursor()
@@ -271,14 +287,16 @@ class DataMixin:
         return embedding_dim
 
     def get_embedding_dim_pth(self, emb_dict, test_seq):
-        if len(test_seq) > self._max_length - 2:
-            test_seq_len = self._max_length
-        else:
+        if len(test_seq) >= self._max_length:
             test_seq_len = len(test_seq) + 2
+        else:
+            test_seq_len = len(test_seq)
 
-        test_embedding = emb_dict[test_seq].reshape(1, -1)
+        test_embedding = emb_dict[test_seq]
         if self._full:
             test_embedding = test_embedding.reshape(test_seq_len, -1)
+        else:
+            test_embedding = test_embedding.reshape(1, -1)
         embedding_dim = test_embedding.shape[-1]
         return embedding_dim
 
@@ -288,7 +306,6 @@ class DataMixin:
             train_seqs,
             valid_seqs,
             test_seqs,
-
         ):
         save_dir = self.embedding_args.embedding_save_dir
         train_array, valid_array, test_array = [], [], []
