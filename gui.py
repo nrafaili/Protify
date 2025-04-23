@@ -12,6 +12,8 @@ from probes.get_probe import ProbeArguments
 from probes.trainers import TrainerArguments
 from main import MainProcess
 from concurrent.futures import ThreadPoolExecutor
+from data.data_mixin import DataArguments
+from probes.scikit_classes import ScikitArguments
 
 
 class BackgroundTask:
@@ -193,6 +195,7 @@ class GUI(MainProcess):
             if synthyra_api_key:
                 print('Synthyra API not integrated yet')
             
+            self.full_args.hf_username = self.settings_vars["huggingface_username"].get()
             self.full_args.hf_token = hf_token
             self.full_args.synthyra_api_key = synthyra_api_key
             self.full_args.wandb_api_key = wandb_api_key
@@ -228,13 +231,25 @@ class GUI(MainProcess):
         )
         check_trim.grid(row=1, column=1, padx=10, pady=5, sticky="w")
 
+        # Delimiter for data files
+        ttk.Label(self.data_tab, text="Delimiter:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["delimiter"] = tk.StringVar(value=",")
+        entry_delimiter = ttk.Entry(self.data_tab, textvariable=self.settings_vars["delimiter"], width=5)
+        entry_delimiter.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+
+        # Column names for data files (comma-separated)
+        ttk.Label(self.data_tab, text="Column Names (comma-separated):").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["col_names"] = tk.StringVar(value="seqs,labels")
+        entry_col_names = ttk.Entry(self.data_tab, textvariable=self.settings_vars["col_names"], width=20)
+        entry_col_names.grid(row=3, column=1, padx=10, pady=5, sticky="w")
+
         # Label + Listbox for dataset names
-        ttk.Label(self.data_tab, text="Dataset Names:").grid(row=2, column=0, padx=10, pady=5, sticky="nw")
+        ttk.Label(self.data_tab, text="Dataset Names:").grid(row=4, column=0, padx=10, pady=5, sticky="nw")
         self.data_listbox = tk.Listbox(self.data_tab, selectmode="extended", height=25, width=25)
         for dataset_name in supported_datasets:
             if dataset_name not in internal_synthyra_datasets:
                 self.data_listbox.insert(tk.END, dataset_name)
-        self.data_listbox.grid(row=2, column=1, padx=10, pady=5, sticky="nw")
+        self.data_listbox.grid(row=4, column=1, padx=10, pady=5, sticky="nw")
 
         run_button = ttk.Button(self.data_tab, text="Get Data", command=self._get_data)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
@@ -249,16 +264,17 @@ class GUI(MainProcess):
         if not selected_datasets:
             selected_datasets = standard_data_benchmark
             
-        data_paths = [supported_datasets[name] for name in selected_datasets]
-        
         def background_get_data():
             # Update full_args with data settings
-            self.full_args.data_paths = data_paths
+            self.full_args.data_names = selected_datasets
+            self.full_args.data_dirs = []
             self.full_args.max_length = self.settings_vars["max_length"].get()
             self.full_args.trim = self.settings_vars["trim"].get()
+            self.full_args.delimiter = self.settings_vars["delimiter"].get()
+            self.full_args.col_names = self.settings_vars["col_names"].get().split(",")
             
             # Create data args and get datasets
-            self.data_args = HFDataArguments(**self.full_args.__dict__)
+            self.data_args = DataArguments(**self.full_args.__dict__)
             args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
             self.logger_args = SimpleNamespace(**args_dict)
             self._write_args()
@@ -332,8 +348,8 @@ class GUI(MainProcess):
         def background_get_embeddings():
             # Update full args
             self.full_args.all_seqs = self.all_seqs
-            self.full_args.batch_size = self.settings_vars["batch_size"].get()
-            self.full_args.num_workers = self.settings_vars["num_workers"].get()
+            self.full_args.embedding_batch_size = self.settings_vars["batch_size"].get()
+            self.full_args.embedding_num_workers = self.settings_vars["num_workers"].get()
             self.full_args.download_embeddings = self.settings_vars["download_embeddings"].get()
             self.full_args.matrix_embed = self.settings_vars["matrix_embed"].get()
             self.full_args.embedding_pooling_types = pooling_list
@@ -460,8 +476,21 @@ class GUI(MainProcess):
         self.settings_vars["probe_pooling_types"] = tk.StringVar(value="mean, cls")
         entry_pooling = ttk.Entry(self.probe_tab, textvariable=self.settings_vars["probe_pooling_types"], width=20)
         entry_pooling.grid(row=11, column=1, padx=10, pady=5)
-        #ttk.Label(self.probe_tab, text="Options: mean, max, min, norm, prod, median, std, var, cls, parti").grid(row=12, column=0, columnspan=2, padx=10, pady=2, sticky="w")
-
+        # Transformer Dropout
+        ttk.Label(self.probe_tab, text="Transformer Dropout:").grid(row=12, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["transformer_dropout"] = tk.DoubleVar(value=0.1)
+        spin_transformer_dropout = ttk.Spinbox(self.probe_tab, from_=0.0, to=1.0, increment=0.1, textvariable=self.settings_vars["transformer_dropout"])
+        spin_transformer_dropout.grid(row=12, column=1, padx=10, pady=5, sticky="w")
+        # Save Model
+        ttk.Label(self.probe_tab, text="Save Model:").grid(row=13, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["save_model"] = tk.BooleanVar(value=False)
+        check_save_model = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["save_model"])
+        check_save_model.grid(row=13, column=1, padx=10, pady=5, sticky="w")
+        # Production Model
+        ttk.Label(self.probe_tab, text="Production Model:").grid(row=14, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["production_model"] = tk.BooleanVar(value=False)
+        check_prod_model = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["production_model"])
+        check_prod_model.grid(row=14, column=1, padx=10, pady=5, sticky="w")
         # Add a button to create the probe
         run_button = ttk.Button(self.probe_tab, text="Save Probe Arguments", command=self._create_probe_args)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
@@ -480,11 +509,13 @@ class GUI(MainProcess):
         self.full_args.n_layers = self.settings_vars["n_layers"].get()
         self.full_args.pre_ln = self.settings_vars["pre_ln"].get()
         self.full_args.classifier_dim = self.settings_vars["classifier_dim"].get()
-        self.full_args.transformer_dropout = self.settings_vars["dropout"].get()
+        self.full_args.transformer_dropout = self.settings_vars["transformer_dropout"].get()
         self.full_args.classifier_dropout = self.settings_vars["classifier_dropout"].get()
         self.full_args.n_heads = self.settings_vars["n_heads"].get()
         self.full_args.rotary = self.settings_vars["rotary"].get()
         self.full_args.probe_pooling_types = probe_pooling_types
+        self.full_args.save_model = self.settings_vars["save_model"].get()
+        self.full_args.production_model = self.settings_vars["production_model"].get()
 
         # Create probe args from full args
         self.probe_args = ProbeArguments(**self.full_args.__dict__)
@@ -569,7 +600,43 @@ class GUI(MainProcess):
         ttk.Label(self.trainer_tab, text="Patience:").grid(row=11, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["patience"] = tk.IntVar(value=3)
         spin_patience = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["patience"])
-        spin_patience.grid(row=11, column=1, padx=10, pady=5)
+        spin_patience.grid(row=11, column=1, padx=10, pady=5, sticky="w")
+
+        # Random Seed
+        ttk.Label(self.trainer_tab, text="Random Seed:").grid(row=12, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["seed"] = tk.IntVar(value=42)
+        spin_seed = ttk.Spinbox(self.trainer_tab, from_=0, to=10000, textvariable=self.settings_vars["seed"])
+        spin_seed.grid(row=12, column=1, padx=10, pady=5, sticky="w")
+
+        # Use Scikit
+        ttk.Label(self.trainer_tab, text="Use Scikit:").grid(row=13, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["use_scikit"] = tk.BooleanVar(value=False)
+        check_scikit = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["use_scikit"])
+        check_scikit.grid(row=13, column=1, padx=10, pady=5, sticky="w")
+
+        # Scikit Iterations
+        ttk.Label(self.trainer_tab, text="Scikit Iterations:").grid(row=14, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["scikit_n_iter"] = tk.IntVar(value=10)
+        spin_scikit_n_iter = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["scikit_n_iter"])
+        spin_scikit_n_iter.grid(row=14, column=1, padx=10, pady=5, sticky="w")
+
+        # Scikit CV Folds
+        ttk.Label(self.trainer_tab, text="Scikit CV Folds:").grid(row=15, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["scikit_cv"] = tk.IntVar(value=3)
+        spin_scikit_cv = ttk.Spinbox(self.trainer_tab, from_=1, to=10, textvariable=self.settings_vars["scikit_cv"])
+        spin_scikit_cv.grid(row=15, column=1, padx=10, pady=5, sticky="w")
+
+        # Scikit Random State
+        ttk.Label(self.trainer_tab, text="Scikit Random State:").grid(row=16, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["scikit_random_state"] = tk.IntVar(value=42)
+        spin_scikit_rand = ttk.Spinbox(self.trainer_tab, from_=0, to=10000, textvariable=self.settings_vars["scikit_random_state"])
+        spin_scikit_rand.grid(row=16, column=1, padx=10, pady=5, sticky="w")
+
+        # Scikit Model Name
+        ttk.Label(self.trainer_tab, text="Scikit Model Name (optional):").grid(row=17, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["scikit_model_name"] = tk.StringVar(value="")
+        entry_scikit_name = ttk.Entry(self.trainer_tab, textvariable=self.settings_vars["scikit_model_name"], width=30)
+        entry_scikit_name.grid(row=17, column=1, padx=10, pady=5, sticky="w")
 
         run_button = ttk.Button(self.trainer_tab, text="Run trainer", command=self._run_trainer)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
@@ -579,28 +646,42 @@ class GUI(MainProcess):
         self.full_args.use_lora = self.settings_vars["use_lora"].get()
         self.full_args.hybrid_probe = self.settings_vars["hybrid_probe"].get()
         self.full_args.full_finetuning = self.settings_vars["full_finetuning"].get()
+        self.full_args.lora_r = self.settings_vars["lora_r"].get()
+        self.full_args.lora_alpha = self.settings_vars["lora_alpha"].get()
+        self.full_args.lora_dropout = self.settings_vars["lora_dropout"].get()
         self.full_args.num_epochs = self.settings_vars["num_epochs"].get()
         self.full_args.trainer_batch_size = self.settings_vars["trainer_batch_size"].get()
         self.full_args.gradient_accumulation_steps = self.settings_vars["gradient_accumulation_steps"].get()
         self.full_args.lr = self.settings_vars["lr"].get()
         self.full_args.weight_decay = self.settings_vars["weight_decay"].get()
         self.full_args.patience = self.settings_vars["patience"].get()
+        self.full_args.seed = self.settings_vars["seed"].get()
+        self.full_args.use_scikit = self.settings_vars["use_scikit"].get()
+        self.full_args.scikit_n_iter = self.settings_vars["scikit_n_iter"].get()
+        self.full_args.scikit_cv = self.settings_vars["scikit_cv"].get()
+        self.full_args.scikit_random_state = self.settings_vars["scikit_random_state"].get()
+        self.full_args.scikit_model_name = self.settings_vars["scikit_model_name"].get()
 
         def background_run_trainer():
             self.trainer_args = TrainerArguments(**self.full_args.__dict__)
+            self.scikit_args = ScikitArguments(**self.full_args.__dict__)
             args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
             self.logger_args = SimpleNamespace(**args_dict)
             self._write_args()
             
-            if self.settings_vars["use_lora"].get():
-                pass
-            elif self.settings_vars["full_finetuning"].get():
-                pass
-            elif self.settings_vars["hybrid_probe"].get():
-                pass
+            if self.full_args.use_scikit:
+                self.run_scikit_scheme()
+            elif self.full_args.use_lora:
+                self.init_lora_model()
+                self.run_lora_model()
+            elif self.full_args.full_finetuning:
+                self.get_full_finetuning_model()
+                self.run_full_finetuning_model()
+            elif self.full_args.hybrid_probe:
+                self.init_hybrid_probe()
             else:
                 self.run_nn_probe()
-                
+            
         self.run_in_background(background_run_trainer)
 
     def build_replay_tab(self):
