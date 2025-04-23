@@ -250,6 +250,7 @@ class ScikitProbe:
         Returns:
             ModelResults object containing results and the model
         """
+        print("Running specific model")
         if self.args.production_model:
             print(f"Running in production mode, train and validation are combined")
             X_train = np.concatenate([X_train, X_valid])
@@ -273,9 +274,12 @@ class ScikitProbe:
             
             # Create and train the model with the best parameters
             cls = model_class(**model_params)
+            print(f"Training model {cls}")
             cls.fit(X_train, y_train)
+            print(f"Model trained")
             final_scores = scorer(cls, X_test, y_test)
-            
+            print(f"Final scores: {final_scores}")
+
             return ModelResults(
                 initial_scores=None,
                 best_model_name=model_name,

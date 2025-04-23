@@ -197,6 +197,8 @@ def train_probe(
     test_metrics = trainer.evaluate(test_dataset)
     print(f'Final test metrics: \n{test_metrics}\n')
 
+    ### TODO PAUC plot
+
     if trainer_args.save:
         try:
             trainer.model.push_to_hub(trainer_args.model_save_dir, private=True)

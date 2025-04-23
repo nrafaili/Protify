@@ -272,11 +272,18 @@ class GUI(MainProcess):
             self.full_args.trim = self.settings_vars["trim"].get()
             self.full_args.delimiter = self.settings_vars["delimiter"].get()
             self.full_args.col_names = self.settings_vars["col_names"].get().split(",")
-            
+
+            # Update mixin attributes
+            self._max_length = self.full_args.max_length
+            self._trim = self.full_args.trim
+            self._delimiter = self.full_args.delimiter
+            self._col_names = self.full_args.col_names
+
             # Create data args and get datasets
             self.data_args = DataArguments(**self.full_args.__dict__)
             args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
             self.logger_args = SimpleNamespace(**args_dict)
+
             self._write_args()
             self.get_datasets()
             print("Data downloaded and stored")
@@ -356,6 +363,8 @@ class GUI(MainProcess):
             self.full_args.save_embeddings = True
             self.full_args.embed_dtype = dtype_val
             self.full_args.sql = self.settings_vars["sql"].get()
+            self._sql = self.full_args.sql
+            self._full = self.full_args.matrix_embed
             
             self.embedding_args = EmbeddingArguments(**self.full_args.__dict__)
             args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
