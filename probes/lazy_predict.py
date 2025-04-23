@@ -310,8 +310,9 @@ class LazyClassifier:
                 print(exception)
                 print("Invalid Classifier(s)")
 
-        for name, model in tqdm(self.classifiers):
-            print(name)
+        pbar = tqdm(self.classifiers)
+        for name, model in pbar:
+            pbar.set_description(f"Training {name}")
             start = time.time()
             try:
                 if "random_state" in model().get_params().keys():
@@ -345,9 +346,11 @@ class LazyClassifier:
                 ROC_AUC.append(roc_auc)
                 F1.append(f1)
                 TIME.append(time.time() - start)
+
                 if self.custom_metric is not None:
                     custom_metric = self.custom_metric(y_test, y_pred)
                     CUSTOM_METRIC.append(custom_metric)
+
                 if self.verbose > 0:
                     if self.custom_metric is not None:
                         print(
@@ -374,10 +377,15 @@ class LazyClassifier:
                         )
                 if self.predictions:
                     predictions[name] = y_pred
+
+
             except Exception as exception:
                 if self.ignore_warnings is False:
                     print(name + " model failed to execute")
                     print(exception)
+            pbar.update(1)
+        pbar.close()
+
         if self.custom_metric is None:
             scores = pd.DataFrame(
                 {
@@ -407,6 +415,7 @@ class LazyClassifier:
 
         if self.predictions:
             predictions_df = pd.DataFrame.from_dict(predictions)
+        
         return scores, predictions_df if self.predictions is True else scores
 
     def provide_models(self, X_train, X_test, y_train, y_test):
@@ -444,8 +453,6 @@ def adjusted_rsquared(r2, n, p):
 
 
 # Helper class for performing classification
-
-
 class LazyRegressor:
     """
     This module helps in fitting regression models that are available in Scikit-learn

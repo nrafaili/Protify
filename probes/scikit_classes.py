@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.model_selection import RandomizedSearchCV
 from typing import Dict, Any, Tuple, Optional
 from sklearn.utils import all_estimators
-from metrics import get_dual_regression_scorer, get_dual_classification_scorer
+from metrics import get_regression_scorer, get_classification_scorer, classification_scorer, regression_scorer
 from .lazy_predict import LazyRegressor, LazyClassifier, CLASSIFIERS, REGRESSORS
 from .scikit_hypers import HYPERPARAMETER_DISTRIBUTIONS
 
@@ -64,6 +64,7 @@ class ScikitProbe:
     """
     def __init__(self, args: ScikitArguments):
         self.args = args
+        self.n_jobs = 1
     
     def _tune_hyperparameters(
         self,
@@ -87,7 +88,7 @@ class ScikitProbe:
             scoring=custom_scorer,
             cv=self.args.cv,
             random_state=self.args.random_state,
-            n_jobs=-1
+            n_jobs=self.n_jobs
         )
         
         random_search.fit(X_train, y_train)
@@ -115,33 +116,37 @@ class ScikitProbe:
         # Initial lazy prediction
         print(f"Initial lazy prediction started")
         regressor = LazyRegressor(
-            verbose=4,
-            ignore_warnings=True,
-            custom_metric=get_dual_regression_scorer()
+            verbose=0,
+            ignore_warnings=False,
+            custom_metric=regression_scorer()
         )
         initial_scores = regressor.fit(X_train, X_test, y_train, y_test)
+        if isinstance(initial_scores, Tuple):
+            initial_scores = initial_scores[0]
         
         # Get best model name and class
         best_model_name = initial_scores.index[0]
         best_model_class = regressor.models[best_model_name].named_steps['regressor'].__class__
         print(f"Best model name: {best_model_name}")
         print(f"Best model class: {best_model_class}")
-        print(f"Initial scores: {initial_scores}")
+        print(f"Initial scores: \n{initial_scores}")
 
         print(f"Tuning hyperparameters")
         # Tune hyperparameters
+        scorer = get_regression_scorer()
         best_model, best_params = self._tune_hyperparameters(
             best_model_class,
             best_model_name,
             X_train,
             y_train,
-            get_dual_regression_scorer(),
+            scorer,
         )
         
         # Get final scores with tuned model
         best_model.fit(X_train, y_train)
-        final_scores = get_dual_regression_scorer()(best_model, X_test, y_test)
+        final_scores = scorer(best_model, X_test, y_test)
         print(f"Final scores: {final_scores}")
+        print(f"Best params: \n{best_params}")
 
         return ModelResults(
             initial_scores=initial_scores,
@@ -173,33 +178,37 @@ class ScikitProbe:
         # Initial lazy prediction
         print(f"Initial lazy prediction started")
         classifier = LazyClassifier(
-            verbose=4,
-            ignore_warnings=True,
-            custom_metric=get_dual_classification_scorer()
+            verbose=0,
+            ignore_warnings=False,
+            custom_metric=classification_scorer()
         )
         initial_scores = classifier.fit(X_train, X_test, y_train, y_test)
-        print(initial_scores)
+        if isinstance(initial_scores, Tuple):
+            initial_scores = initial_scores[0]
+
         # Get best model name and class
         best_model_name = initial_scores.index[0]
         best_model_class = classifier.models[best_model_name].named_steps['classifier'].__class__
         print(f"Best model name: {best_model_name}")
         print(f"Best model class: {best_model_class}")
-        print(f"Initial scores: {initial_scores}")
+        print(f"Initial scores: \n{initial_scores}")
 
         print(f"Tuning hyperparameters")
         # Tune hyperparameters
+        scorer = get_classification_scorer()
         best_model, best_params = self._tune_hyperparameters(
             best_model_class,
             best_model_name,
             X_train,
             y_train,
-            get_dual_classification_scorer(),
+            scorer,
         )
         
         # Get final scores with tuned model
         best_model.fit(X_train, y_train)
-        final_scores = get_dual_classification_scorer()(best_model, X_test, y_test)
+        final_scores = scorer(best_model, X_test, y_test)
         print(f"Final scores: {final_scores}")
+        print(f"Best params: \n{best_params}")
 
         return ModelResults(
             initial_scores=initial_scores,
@@ -235,7 +244,7 @@ class ScikitProbe:
         Returns:
             ModelResults object containing results and the model
         """
-        if self.args.production:
+        if self.args.production_model:
             print(f"Running in production mode, train and validation are combined")
             X_train = np.concatenate([X_train, X_valid])
             y_train = np.concatenate([y_train, y_valid])
@@ -247,9 +256,9 @@ class ScikitProbe:
             
             # Determine if it's a classifier or regressor
             if model_name in CLASSIFIERS:
-                scorer = get_dual_classification_scorer()
+                scorer = get_classification_scorer()
             elif model_name in REGRESSORS:
-                scorer = get_dual_regression_scorer()
+                scorer = get_regression_scorer()
             else:
                 raise ValueError(f"Model {model_name} not supported")
                 
@@ -275,9 +284,9 @@ class ScikitProbe:
         elif self.args.model_name is not None:
             model_name = self.args.model_name
             if model_name in CLASSIFIERS:
-                scorer = get_dual_classification_scorer()
+                scorer = get_classification_scorer()
             elif model_name in REGRESSORS:
-                scorer = get_dual_regression_scorer()
+                scorer = get_regression_scorer()
             else:
                 raise ValueError(f"Model {model_name} not supported")
 

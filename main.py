@@ -63,7 +63,6 @@ class MainProcess(MetricsLogger, DataMixin):
         """
         TODO LoRA, Hybrid, and full finetuning should be wrapped in here
         will require settings for full model batch size for full finetuning on its own and the full finetuning stage after the probe is trained for hybrid
-
         """
         probe_args = self.probe_args
         test_seq = self.all_seqs[0]
@@ -222,6 +221,7 @@ def parse_arguments(): # TODO update yaml
     parser.add_argument("--scikit_random_state", type=int, default=42, help="Random state for scikit model.")
     parser.add_argument("--scikit_model_name", type=str, default=None, help="Name of the scikit model to use.")
     parser.add_argument("--use_scikit", action="store_true", default=False, help="Use scikit model (default: False).")
+    parser.add_argument("--production_model", action="store_true", default=False, help="Production model (default: False).")
 
     # ----------------- EmbeddingArguments ----------------- #
     parser.add_argument("--embedding_batch_size", type=int, default=4, help="Batch size for embedding generation.")

@@ -3,9 +3,9 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pathlib import Path
 import math
 import seaborn as sns
+from pathlib import Path
 
 
 def radar_factory(num_vars):

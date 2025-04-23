@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 from sklearn.metrics import (
-    make_scorer,
     r2_score,
     mean_squared_error,
     mean_absolute_error,
@@ -13,6 +12,7 @@ from sklearn.metrics import (
     confusion_matrix,
     hamming_loss,
     accuracy_score,
+    make_scorer,
 )
 from scipy.stats import pearsonr, spearmanr
 from transformers import EvalPrediction
@@ -22,32 +22,24 @@ def softmax(x: np.ndarray) -> np.ndarray:
     return np.exp(x) / np.sum(np.exp(x), axis=-1, keepdims=True)
 
 
-def get_pearson_scorer():
-    def pearson_r(y_true, y_pred):
-        return pearsonr(y_true, y_pred).correlation
-    return make_scorer(pearson_r, greater_is_better=True)
-
-
-def get_spearman_scorer():
-    def spearman_r(y_true, y_pred):
-        return spearmanr(y_true, y_pred).correlation
-    return make_scorer(spearman_r, greater_is_better=True)
-
-
-def get_r2_scorer():
-    return make_scorer(r2_score, greater_is_better=True)
-
-
-def get_dual_regression_scorer():
+def regression_scorer():
     def dual_score(y_true, y_pred):
         return spearmanr(y_true, y_pred).correlation * r2_score(y_true, y_pred)
-    return make_scorer(dual_score, greater_is_better=True)
+    return dual_score
 
 
-def get_dual_classification_scorer():
-    def dual_score(y_true, y_pred):
-        return f1_score(y_true, y_pred) * matthews_corrcoef(y_true, y_pred)
-    return make_scorer(dual_score, greater_is_better=True)
+def classification_scorer():
+    def mcc_scorer(y_true, y_pred):
+        return matthews_corrcoef(y_true, y_pred)
+    return mcc_scorer
+
+
+def get_classification_scorer():
+    return make_scorer(classification_scorer(), greater_is_better=True)
+
+
+def get_regression_scorer():
+    return make_scorer(regression_scorer(), greater_is_better=True)
 
 
 def calculate_max_metrics(ss: torch.Tensor, labels: torch.Tensor, cutoff: float) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

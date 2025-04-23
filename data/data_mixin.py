@@ -111,9 +111,9 @@ class DataMixin:
 
     def _labels_to_numpy(self, labels):
         if isinstance(labels[0], list):
-            return np.array(labels)
+            return np.array(labels).flatten()
         else:
-            return np.array([labels])
+            return np.array([labels]).flatten()
 
     def _random_order(self, seq_a, seq_b):
         if random.random() < 0.5:
