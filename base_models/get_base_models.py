@@ -14,7 +14,6 @@ currently_supported_models = [
     'Random-ESM2-650',
     'ESMC-300',
     'ESMC-600',
-    'ESMV',
     'ESM2-diff-150',
     'ESM2-diffAV-150',
 ]
@@ -24,21 +23,13 @@ standard_benchmark = [
     'ESM2-35',
     'ESM2-150',
     'ESM2-650',
-    'camp_e',
-    'camp_b',
     'ESMC-300',
     'ESMC-600',
     'Random',
     'Random-Transformer',
 ]
 
-experimental_models = [
-    'camp_e',
-    'camp_d',
-    'camp_c',
-    'camp_b',
-    'camp_a',
-]
+experimental_models = []
 
 
 @dataclass
@@ -62,12 +53,17 @@ def get_base_model(model_name: str):
     elif 'esmc' in model_name.lower():
         from .esmc import build_esmc_model
         return build_esmc_model(model_name)
-    elif 'esmv' in model_name.lower():
-        from .esmv import build_esmv_model
-        return build_esmv_model(model_name)
-    elif 'camp' in model_name.lower():
-        from .camp import build_camp_model
-        return build_camp_model(model_name)
+    else:
+        raise ValueError(f"Model {model_name} not supported")
+
+
+def get_base_model_for_training(model_name: str, tokenwise: bool = False, num_labels: int = None):
+    if 'esm2' in model_name.lower():
+        from .esm2 import get_esm2_for_training
+        return get_esm2_for_training(model_name, tokenwise, num_labels)
+    elif 'esmc' in model_name.lower():
+        from .esmc import get_esmc_for_training
+        return get_esmc_for_training(model_name, tokenwise, num_labels)
     else:
         raise ValueError(f"Model {model_name} not supported")
 

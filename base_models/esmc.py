@@ -4,7 +4,7 @@ We use the ESM++ implementation of ESMC, which is exactly equivalent but offers 
 import torch
 import torch.nn as nn
 from typing import Optional
-from .FastPLMs.modeling_esm_plusplus import ESMplusplusModel
+from .FastPLMs.modeling_esm_plusplus import ESMplusplusModel, ESMplusplusForSequenceClassification, ESMplusplusForTokenClassification
 
 
 class ESMplusplusForEmbedding(nn.Module):
@@ -32,6 +32,16 @@ presets = {
 
 def build_esmc_model(preset: str):
     model = ESMplusplusForEmbedding(presets[preset]).eval()
+    tokenizer = model.esm.tokenizer
+    return model, tokenizer
+
+
+def get_esmc_for_training(preset: str, tokenwise: bool = False, num_labels: int = None):
+    model_path = presets[preset]
+    if tokenwise:
+        model = ESMplusplusForTokenClassification.from_pretrained(model_path, num_labels=num_labels).eval()
+    else:
+        model = ESMplusplusForSequenceClassification.from_pretrained(model_path, num_labels=num_labels).eval()
     tokenizer = model.esm.tokenizer
     return model, tokenizer
 

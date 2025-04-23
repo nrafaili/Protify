@@ -29,6 +29,7 @@ class ProbeArguments:
             ### CrossConv
             # TODO
             ### LoRA
+            lora: bool = False,
             lora_r: int = 8,
             lora_alpha: float = 32.0,
             lora_dropout: float = 0.01,
@@ -53,6 +54,7 @@ class ProbeArguments:
         self.rotary = rotary
         self.pooling_types = probe_pooling_types
         self.hybrid_probe = hybrid_probe
+        self.lora = lora
         self.lora_r = lora_r
         self.lora_alpha = lora_alpha
         self.lora_dropout = lora_dropout

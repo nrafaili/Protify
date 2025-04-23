@@ -3,8 +3,9 @@ import tkinter as tk
 import argparse
 import queue
 import traceback
+import webbrowser
 from types import SimpleNamespace
-from tkinter import ttk
+from tkinter import ttk, font, messagebox
 from base_models.get_base_models import BaseModelArguments, standard_benchmark
 from data.supported_datasets import supported_datasets, standard_data_benchmark, internal_synthyra_datasets
 from embedder import EmbeddingArguments
@@ -65,6 +66,7 @@ class GUI(MainProcess):
         self.model_tab = ttk.Frame(self.notebook)
         self.probe_tab = ttk.Frame(self.notebook)
         self.trainer_tab = ttk.Frame(self.notebook)
+        self.scikit_tab = ttk.Frame(self.notebook)
         self.replay_tab = ttk.Frame(self.notebook)
 
         # Add tabs to the notebook
@@ -74,6 +76,7 @@ class GUI(MainProcess):
         self.notebook.add(self.embed_tab, text="Embedding")
         self.notebook.add(self.probe_tab, text="Probe")
         self.notebook.add(self.trainer_tab, text="Trainer")
+        self.notebook.add(self.scikit_tab, text="Scikit")
         self.notebook.add(self.replay_tab, text="Replay")
 
         # Build these lines
@@ -91,6 +94,7 @@ class GUI(MainProcess):
         self.build_embed_tab()
         self.build_probe_tab()
         self.build_trainer_tab()
+        self.build_scikit_tab()
         self.build_replay_tab()
 
     def check_task_queue(self):
@@ -113,6 +117,10 @@ class GUI(MainProcess):
         self.task_queue.put(task)
         return task
 
+    def _open_url(self, url):
+        """Open a URL in the default web browser"""
+        webbrowser.open_new_tab(url)
+        
     def build_info_tab(self):
         # Create a frame for IDs
         id_frame = ttk.LabelFrame(self.info_tab, text="Identification")
@@ -123,24 +131,28 @@ class GUI(MainProcess):
         self.settings_vars["huggingface_username"] = tk.StringVar(value="Synthyra")
         entry_huggingface_username = ttk.Entry(id_frame, textvariable=self.settings_vars["huggingface_username"], width=30)
         entry_huggingface_username.grid(row=0, column=1, padx=10, pady=5)
+        self.add_help_button(id_frame, 0, 2, "Your Hugging Face username for model downloads and uploads.")
 
         # Huggingface token
         ttk.Label(id_frame, text="Huggingface Token:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["huggingface_token"] = tk.StringVar(value="")
         entry_huggingface_token = ttk.Entry(id_frame, textvariable=self.settings_vars["huggingface_token"], width=30)
         entry_huggingface_token.grid(row=1, column=1, padx=10, pady=5)
+        self.add_help_button(id_frame, 1, 2, "Your Hugging Face API token for accessing gated or private models.")
 
         # Wandb API key 
         ttk.Label(id_frame, text="Wandb API Key:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["wandb_api_key"] = tk.StringVar(value="")
         entry_wandb_api_key = ttk.Entry(id_frame, textvariable=self.settings_vars["wandb_api_key"], width=30)
         entry_wandb_api_key.grid(row=2, column=1, padx=10, pady=5)
+        self.add_help_button(id_frame, 2, 2, "Your Weights & Biases API key for experiment tracking.")
 
         # Synthyra API key
         ttk.Label(id_frame, text="Synthyra API Key:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["synthyra_api_key"] = tk.StringVar(value="")
         entry_synthyra_api_key = ttk.Entry(id_frame, textvariable=self.settings_vars["synthyra_api_key"], width=30)
         entry_synthyra_api_key.grid(row=3, column=1, padx=10, pady=5)
+        self.add_help_button(id_frame, 3, 2, "Your Synthyra API key for accessing premium features.")
 
         # Create a frame for paths
         paths_frame = ttk.LabelFrame(self.info_tab, text="Paths")
@@ -151,39 +163,79 @@ class GUI(MainProcess):
         self.settings_vars["log_dir"] = tk.StringVar(value="logs")
         entry_log_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["log_dir"], width=30)
         entry_log_dir.grid(row=0, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 0, 2, "Directory where log files will be stored.")
 
         # Results directory
         ttk.Label(paths_frame, text="Results Directory:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["results_dir"] = tk.StringVar(value="results")
         entry_results_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["results_dir"], width=30)
         entry_results_dir.grid(row=1, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 1, 2, "Directory where results data will be stored.")
 
         # Model save directory
         ttk.Label(paths_frame, text="Model Save Directory:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["model_save_dir"] = tk.StringVar(value="weights")
         entry_model_save = ttk.Entry(paths_frame, textvariable=self.settings_vars["model_save_dir"], width=30)
         entry_model_save.grid(row=2, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 2, 2, "Directory where trained models will be saved.")
 
         ttk.Label(paths_frame, text="Plots Directory:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["plots_dir"] = tk.StringVar(value="plots")
         entry_plots_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["plots_dir"], width=30)
         entry_plots_dir.grid(row=3, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 3, 2, "Directory where plots and visualizations will be saved.")
 
         # Embedding save directory
         ttk.Label(paths_frame, text="Embedding Save Directory:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["embedding_save_dir"] = tk.StringVar(value="embeddings")
         entry_embed_save = ttk.Entry(paths_frame, textvariable=self.settings_vars["embedding_save_dir"], width=30)
         entry_embed_save.grid(row=4, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 4, 2, "Directory where computed embeddings will be saved.")
 
         # Download directory
         ttk.Label(paths_frame, text="Download Directory:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["download_dir"] = tk.StringVar(value="Synthyra/mean_pooled_embeddings")
         entry_download = ttk.Entry(paths_frame, textvariable=self.settings_vars["download_dir"], width=30)
         entry_download.grid(row=5, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 5, 2, "HuggingFace repository path for downloading pre-computed embeddings.")
 
         # button to start logging
         start_logging_button = ttk.Button(self.info_tab, text="Start session", command=self._session_start)
         start_logging_button.pack(pady=10)
+        
+        # Add logo and website link at the bottom of the info tab
+        try:
+            original_logo = tk.PhotoImage(file="synthyra_logo.png")
+            # Make logo even smaller (subsample by factor of 3)
+            logo = original_logo.subsample(3, 3)
+            
+            # Create frame to hold logo and button side by side
+            bottom_frame = ttk.Frame(self.info_tab)
+            bottom_frame.pack(pady=(10, 20), fill="x")
+            
+            # Place logo on the left side
+            logo_label = ttk.Label(bottom_frame, image=logo, cursor="hand2")
+            logo_label.image = logo  # Keep a reference to prevent garbage collection
+            logo_label.pack(side=tk.LEFT, padx=(20, 10))
+            # Bind click event to the logo
+            logo_label.bind("<Button-1>", lambda e: self._open_url("https://synthyra.com"))
+            
+            # Add a "Visit Website" button on the right side
+            visit_btn = ttk.Button(
+                bottom_frame,
+                text="Visit Synthyra.com",
+                command=lambda: self._open_url("https://synthyra.com"),
+                style="Link.TButton"
+            )
+            
+            # Create a special style for the link button
+            style = ttk.Style()
+            style.configure("Link.TButton", font=("Helvetica", 12), foreground="blue")
+            
+            visit_btn.pack(side=tk.LEFT, padx=(10, 20), pady=10)
+            
+        except Exception as e:
+            print(f"Error setting up logo and link: {str(e)}")
 
     def _session_start(self):
         # Update session variables
@@ -227,6 +279,7 @@ class GUI(MainProcess):
             textvariable=self.settings_vars["max_length"]
         )
         spin_max_length.grid(row=0, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.data_tab, 0, 2, "Maximum length of sequences (in tokens) to process.")
 
         # Trim (Checkbox)
         ttk.Label(self.data_tab, text="Trim Sequences:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
@@ -236,18 +289,21 @@ class GUI(MainProcess):
             variable=self.settings_vars["trim"]
         )
         check_trim.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.data_tab, 1, 2, "Whether to trim sequences to the specified max length.")
 
         # Delimiter for data files
         ttk.Label(self.data_tab, text="Delimiter:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["delimiter"] = tk.StringVar(value=",")
         entry_delimiter = ttk.Entry(self.data_tab, textvariable=self.settings_vars["delimiter"], width=5)
         entry_delimiter.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.data_tab, 2, 2, "Character used to separate columns in CSV data files.")
 
         # Column names for data files (comma-separated)
         ttk.Label(self.data_tab, text="Column Names (comma-separated):").grid(row=3, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["col_names"] = tk.StringVar(value="seqs,labels")
         entry_col_names = ttk.Entry(self.data_tab, textvariable=self.settings_vars["col_names"], width=20)
         entry_col_names.grid(row=3, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.data_tab, 3, 2, "Names of columns in data files, separate with commas.")
 
         # Label + Listbox for dataset names
         ttk.Label(self.data_tab, text="Dataset Names:").grid(row=4, column=0, padx=10, pady=5, sticky="nw")
@@ -256,6 +312,7 @@ class GUI(MainProcess):
             if dataset_name not in internal_synthyra_datasets:
                 self.data_listbox.insert(tk.END, dataset_name)
         self.data_listbox.grid(row=4, column=1, padx=10, pady=5, sticky="nw")
+        self.add_help_button(self.data_tab, 4, 2, "Select datasets to use. Multiple datasets can be selected.")
 
         run_button = ttk.Button(self.data_tab, text="Get Data", command=self._get_data)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
@@ -302,30 +359,36 @@ class GUI(MainProcess):
         self.settings_vars["batch_size"] = tk.IntVar(value=4)
         spin_batch_size = ttk.Spinbox(self.embed_tab, from_=1, to=1024, textvariable=self.settings_vars["batch_size"])
         spin_batch_size.grid(row=1, column=1, padx=10, pady=5)
+        self.add_help_button(self.embed_tab, 1, 2, "Number of sequences to process at once during embedding.")
 
         # num_workers
         ttk.Label(self.embed_tab, text="Num Workers:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["num_workers"] = tk.IntVar(value=0)
         spin_num_workers = ttk.Spinbox(self.embed_tab, from_=0, to=64, textvariable=self.settings_vars["num_workers"])
         spin_num_workers.grid(row=2, column=1, padx=10, pady=5)
+        self.add_help_button(self.embed_tab, 2, 2, "Number of worker processes for data loading. 0 means main process only.")
 
         # download_embeddings
         ttk.Label(self.embed_tab, text="Download Embeddings:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["download_embeddings"] = tk.BooleanVar(value=False)
         check_download = ttk.Checkbutton(self.embed_tab, variable=self.settings_vars["download_embeddings"])
         check_download.grid(row=3, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.embed_tab, 3, 2, "Whether to download pre-computed embeddings from HuggingFace instead of computing them.")
 
         # matrix_embed
         ttk.Label(self.embed_tab, text="Matrix Embedding:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["matrix_embed"] = tk.BooleanVar(value=False)
         check_matrix = ttk.Checkbutton(self.embed_tab, variable=self.settings_vars["matrix_embed"])
         check_matrix.grid(row=4, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.embed_tab, 4, 2, "Whether to use matrix embedding (full embedding matrices) instead of pooled embeddings.")
 
         # pooling_types
         ttk.Label(self.embed_tab, text="Pooling Types (comma-separated):").grid(row=5, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["embedding_pooling_types"] = tk.StringVar(value="mean")
         entry_pooling = ttk.Entry(self.embed_tab, textvariable=self.settings_vars["embedding_pooling_types"], width=20)
         entry_pooling.grid(row=5, column=1, padx=10, pady=5)
+        self.add_help_button(self.embed_tab, 5, 2, "Types of pooling to apply to embeddings, separate with commas.")
+        
         ttk.Label(self.embed_tab, text="Options: mean, max, min, norm, prod, median, std, var, cls, parti").grid(row=6, column=0, columnspan=2, padx=10, pady=2, sticky="w")
 
         # embed_dtype
@@ -337,12 +400,14 @@ class GUI(MainProcess):
             values=["float32", "float16", "bfloat16", "float8_e4m3fn", "float8_e5m2"]
         )
         combo_dtype.grid(row=7, column=1, padx=10, pady=5)
+        self.add_help_button(self.embed_tab, 7, 2, "Data type to use for storing embeddings (affects precision and size).")
 
         # sql
         ttk.Label(self.embed_tab, text="Use SQL:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["sql"] = tk.BooleanVar(value=False)
         check_sql = ttk.Checkbutton(self.embed_tab, variable=self.settings_vars["sql"])
         check_sql.grid(row=8, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.embed_tab, 8, 2, "Whether to use SQL database for storing embeddings instead of files.")
 
         run_button = ttk.Button(self.embed_tab, text="Embed sequences to disk", command=self._get_embeddings)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
@@ -390,6 +455,7 @@ class GUI(MainProcess):
         for model_name in standard_benchmark + ['experimental']:
             self.model_listbox.insert(tk.END, model_name)
         self.model_listbox.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
+        self.add_help_button(self.model_tab, 0, 2, "Select the language models to use for embedding. Multiple models can be selected.")
 
         run_button = ttk.Button(self.model_tab, text="Select Models", command=self._select_models)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
@@ -428,36 +494,42 @@ class GUI(MainProcess):
             values=["linear", "transformer", "crossconv"]
         )
         combo_probe.grid(row=0, column=1, padx=10, pady=5)
+        self.add_help_button(self.probe_tab, 0, 2, "Type of probe architecture to use (linear, transformer, or crossconv).")
 
         # Tokenwise
         ttk.Label(self.probe_tab, text="Tokenwise:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["tokenwise"] = tk.BooleanVar(value=False)
         check_tokenwise = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["tokenwise"])
         check_tokenwise.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.probe_tab, 1, 2, "Whether to use token-wise prediction (operate on each token) instead of sequence-level.")
 
         # Pre Layer Norm
         ttk.Label(self.probe_tab, text="Pre Layer Norm:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["pre_ln"] = tk.BooleanVar(value=True)
         check_pre_ln = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["pre_ln"])
         check_pre_ln.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.probe_tab, 2, 2, "Whether to use pre-layer normalization in transformer architecture.")
 
         # Number of Layers
         ttk.Label(self.probe_tab, text="Number of Layers:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["n_layers"] = tk.IntVar(value=1)
         spin_n_layers = ttk.Spinbox(self.probe_tab, from_=1, to=100, textvariable=self.settings_vars["n_layers"])
         spin_n_layers.grid(row=3, column=1, padx=10, pady=5)
+        self.add_help_button(self.probe_tab, 3, 2, "Number of layers in the probe architecture.")
 
         # Hidden Dimension
         ttk.Label(self.probe_tab, text="Hidden Dimension:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["hidden_dim"] = tk.IntVar(value=8192)
         spin_hidden_dim = ttk.Spinbox(self.probe_tab, from_=1, to=10000, textvariable=self.settings_vars["hidden_dim"])
         spin_hidden_dim.grid(row=4, column=1, padx=10, pady=5)
+        self.add_help_button(self.probe_tab, 4, 2, "Size of hidden dimension in the probe model.")
 
         # Dropout
         ttk.Label(self.probe_tab, text="Dropout:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["dropout"] = tk.DoubleVar(value=0.2)
         spin_dropout = ttk.Spinbox(self.probe_tab, from_=0.0, to=1.0, increment=0.1, textvariable=self.settings_vars["dropout"])
         spin_dropout.grid(row=5, column=1, padx=10, pady=5)
+        self.add_help_button(self.probe_tab, 5, 2, "Dropout probability for regularization (0.0-1.0).")
 
         # Transformer Probe Settings
         ttk.Label(self.probe_tab, text="=== Transformer Probe Settings ===").grid(row=6, column=0, columnspan=2, pady=10)
@@ -467,49 +539,263 @@ class GUI(MainProcess):
         self.settings_vars["classifier_dim"] = tk.IntVar(value=4096)
         spin_classifier_dim = ttk.Spinbox(self.probe_tab, from_=1, to=10000, textvariable=self.settings_vars["classifier_dim"])
         spin_classifier_dim.grid(row=7, column=1, padx=10, pady=5)
+        self.add_help_button(self.probe_tab, 7, 2, "Dimension of the classifier/feedforward layer in transformer probe.")
 
         # Classifier Dropout
         ttk.Label(self.probe_tab, text="Classifier Dropout:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["classifier_dropout"] = tk.DoubleVar(value=0.2)
         spin_class_dropout = ttk.Spinbox(self.probe_tab, from_=0.0, to=1.0, increment=0.1, textvariable=self.settings_vars["classifier_dropout"])
         spin_class_dropout.grid(row=8, column=1, padx=10, pady=5)
+        self.add_help_button(self.probe_tab, 8, 2, "Dropout probability in the classifier layer (0.0-1.0).")
 
         # Number of Heads
         ttk.Label(self.probe_tab, text="Number of Heads:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["n_heads"] = tk.IntVar(value=4)
         spin_n_heads = ttk.Spinbox(self.probe_tab, from_=1, to=32, textvariable=self.settings_vars["n_heads"])
         spin_n_heads.grid(row=9, column=1, padx=10, pady=5)
+        self.add_help_button(self.probe_tab, 9, 2, "Number of attention heads in transformer probe.")
 
         # Rotary
         ttk.Label(self.probe_tab, text="Rotary:").grid(row=10, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["rotary"] = tk.BooleanVar(value=True)
         check_rotary = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["rotary"])
         check_rotary.grid(row=10, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.probe_tab, 10, 2, "Whether to use rotary position embeddings in transformer.")
 
         # Pooling Types
         ttk.Label(self.probe_tab, text="Pooling Types (comma-separated):").grid(row=11, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["probe_pooling_types"] = tk.StringVar(value="mean, cls")
         entry_pooling = ttk.Entry(self.probe_tab, textvariable=self.settings_vars["probe_pooling_types"], width=20)
         entry_pooling.grid(row=11, column=1, padx=10, pady=5)
+        self.add_help_button(self.probe_tab, 11, 2, "Types of pooling to use in the probe model, separate with commas.")
+        
         # Transformer Dropout
         ttk.Label(self.probe_tab, text="Transformer Dropout:").grid(row=12, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["transformer_dropout"] = tk.DoubleVar(value=0.1)
         spin_transformer_dropout = ttk.Spinbox(self.probe_tab, from_=0.0, to=1.0, increment=0.1, textvariable=self.settings_vars["transformer_dropout"])
         spin_transformer_dropout.grid(row=12, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.probe_tab, 12, 2, "Dropout probability in the transformer layers (0.0-1.0).")
+        
         # Save Model
         ttk.Label(self.probe_tab, text="Save Model:").grid(row=13, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["save_model"] = tk.BooleanVar(value=False)
         check_save_model = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["save_model"])
         check_save_model.grid(row=13, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.probe_tab, 13, 2, "Whether to save the trained probe model to disk.")
+        
         # Production Model
         ttk.Label(self.probe_tab, text="Production Model:").grid(row=14, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["production_model"] = tk.BooleanVar(value=False)
         check_prod_model = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["production_model"])
         check_prod_model.grid(row=14, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.probe_tab, 14, 2, "Whether to prepare the model for production deployment.")
+
+        # LoRA Settings Section
+        ttk.Label(self.probe_tab, text="=== LoRA Settings ===").grid(row=15, column=0, columnspan=2, pady=10)
+        
+        # Lora checkbox
+        ttk.Label(self.probe_tab, text="Use LoRA:").grid(row=16, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["use_lora"] = tk.BooleanVar(value=False)
+        check_lora = ttk.Checkbutton(self.probe_tab, variable=self.settings_vars["use_lora"])
+        check_lora.grid(row=16, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.probe_tab, 16, 2, "Whether to use Low-Rank Adaptation (LoRA) for fine-tuning.")
+
+        # LoRA r
+        ttk.Label(self.probe_tab, text="LoRA r:").grid(row=17, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["lora_r"] = tk.IntVar(value=8)
+        spin_lora_r = ttk.Spinbox(self.probe_tab, from_=1, to=128, textvariable=self.settings_vars["lora_r"])
+        spin_lora_r.grid(row=17, column=1, padx=10, pady=5)
+        self.add_help_button(self.probe_tab, 17, 2, "Rank parameter r for LoRA (lower = more efficient, higher = more expressive).")
+
+        # LoRA alpha
+        ttk.Label(self.probe_tab, text="LoRA alpha:").grid(row=18, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["lora_alpha"] = tk.DoubleVar(value=32.0)
+        spin_lora_alpha = ttk.Spinbox(self.probe_tab, from_=1.0, to=128.0, increment=1.0, textvariable=self.settings_vars["lora_alpha"])
+        spin_lora_alpha.grid(row=18, column=1, padx=10, pady=5)
+        self.add_help_button(self.probe_tab, 18, 2, "Alpha parameter for LoRA, controls update scale.")
+
+        # LoRA dropout
+        ttk.Label(self.probe_tab, text="LoRA dropout:").grid(row=19, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["lora_dropout"] = tk.DoubleVar(value=0.01)
+        spin_lora_dropout = ttk.Spinbox(self.probe_tab, from_=0.0, to=0.5, increment=0.01, textvariable=self.settings_vars["lora_dropout"])
+        spin_lora_dropout.grid(row=19, column=1, padx=10, pady=5)
+        self.add_help_button(self.probe_tab, 19, 2, "Dropout probability for LoRA layers (0.0-0.5).")
+        
         # Add a button to create the probe
         run_button = ttk.Button(self.probe_tab, text="Save Probe Arguments", command=self._create_probe_args)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
+    def build_trainer_tab(self):
+        # Hybrid Probe checkbox
+        ttk.Label(self.trainer_tab, text="Hybrid Probe:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["hybrid_probe"] = tk.BooleanVar(value=False)
+        check_hybrid_probe = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["hybrid_probe"])
+        check_hybrid_probe.grid(row=0, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.trainer_tab, 0, 2, "Whether to use hybrid probe (combines neural and linear probes).")
+
+        # Full finetuning checkbox
+        ttk.Label(self.trainer_tab, text="Full Finetuning:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["full_finetuning"] = tk.BooleanVar(value=False)
+        check_full_ft = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["full_finetuning"])
+        check_full_ft.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.trainer_tab, 1, 2, "Whether to perform full finetuning of the entire model.")
+
+        # num_epochs
+        ttk.Label(self.trainer_tab, text="Number of Epochs:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["num_epochs"] = tk.IntVar(value=200)
+        spin_num_epochs = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["num_epochs"])
+        spin_num_epochs.grid(row=2, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 2, 2, "Number of training epochs (complete passes through the dataset).")
+
+        # trainer_batch_size
+        ttk.Label(self.trainer_tab, text="Trainer Batch Size:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["trainer_batch_size"] = tk.IntVar(value=64)
+        spin_trainer_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["trainer_batch_size"])
+        spin_trainer_batch_size.grid(row=3, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 3, 2, "Number of samples per batch during training.")
+
+        # gradient_accumulation_steps
+        ttk.Label(self.trainer_tab, text="Gradient Accumulation Steps:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["gradient_accumulation_steps"] = tk.IntVar(value=1)
+        spin_gradient_accumulation_steps = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["gradient_accumulation_steps"])
+        spin_gradient_accumulation_steps.grid(row=4, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 4, 2, "Number of batches to accumulate gradients before updating weights.")
+
+        # lr
+        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["lr"] = tk.DoubleVar(value=1e-4)
+        spin_lr = ttk.Spinbox(self.trainer_tab, from_=1e-6, to=1e-2, increment=1e-5, textvariable=self.settings_vars["lr"])
+        spin_lr.grid(row=5, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 5, 2, "Learning rate for optimizer. Controls step size during training.")
+
+        # weight_decay
+        ttk.Label(self.trainer_tab, text="Weight Decay:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["weight_decay"] = tk.DoubleVar(value=0.00)
+        spin_weight_decay = ttk.Spinbox(self.trainer_tab, from_=0.0, to=1.0, increment=0.01, textvariable=self.settings_vars["weight_decay"])
+        spin_weight_decay.grid(row=6, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 6, 2, "L2 regularization factor to prevent overfitting (0.0-1.0).")
+
+        # patience
+        ttk.Label(self.trainer_tab, text="Patience:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["patience"] = tk.IntVar(value=3)
+        spin_patience = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["patience"])
+        spin_patience.grid(row=7, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.trainer_tab, 7, 2, "Number of epochs with no improvement after which training will stop.")
+
+        # Random Seed
+        ttk.Label(self.trainer_tab, text="Random Seed:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["seed"] = tk.IntVar(value=42)
+        spin_seed = ttk.Spinbox(self.trainer_tab, from_=0, to=10000, textvariable=self.settings_vars["seed"])
+        spin_seed.grid(row=8, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.trainer_tab, 8, 2, "Random seed for reproducibility of experiments.")
+
+        run_button = ttk.Button(self.trainer_tab, text="Run trainer", command=self._run_trainer)
+        run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
+
+    def build_scikit_tab(self):
+        # Create a frame for scikit settings
+        scikit_frame = ttk.LabelFrame(self.scikit_tab, text="Scikit-Learn Settings")
+        scikit_frame.pack(fill="x", padx=10, pady=5)
+        
+        # Use Scikit
+        ttk.Label(scikit_frame, text="Use Scikit:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["use_scikit"] = tk.BooleanVar(value=False)
+        check_scikit = ttk.Checkbutton(scikit_frame, variable=self.settings_vars["use_scikit"])
+        check_scikit.grid(row=0, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(scikit_frame, 0, 2, "Whether to use scikit-learn models instead of neural networks.")
+
+        # Scikit Iterations
+        ttk.Label(scikit_frame, text="Scikit Iterations:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["scikit_n_iter"] = tk.IntVar(value=10)
+        spin_scikit_n_iter = ttk.Spinbox(scikit_frame, from_=1, to=1000, textvariable=self.settings_vars["scikit_n_iter"])
+        spin_scikit_n_iter.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(scikit_frame, 1, 2, "Number of iterations for iterative scikit-learn models.")
+
+        # Scikit CV Folds
+        ttk.Label(scikit_frame, text="Scikit CV Folds:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["scikit_cv"] = tk.IntVar(value=3)
+        spin_scikit_cv = ttk.Spinbox(scikit_frame, from_=1, to=10, textvariable=self.settings_vars["scikit_cv"])
+        spin_scikit_cv.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(scikit_frame, 2, 2, "Number of cross-validation folds for model evaluation.")
+
+        # Scikit Random State
+        ttk.Label(scikit_frame, text="Scikit Random State:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["scikit_random_state"] = tk.IntVar(value=42)
+        spin_scikit_rand = ttk.Spinbox(scikit_frame, from_=0, to=10000, textvariable=self.settings_vars["scikit_random_state"])
+        spin_scikit_rand.grid(row=3, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(scikit_frame, 3, 2, "Random seed for scikit-learn models to ensure reproducibility.")
+
+        # Scikit Model Name
+        ttk.Label(scikit_frame, text="Scikit Model Name (optional):").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["scikit_model_name"] = tk.StringVar(value="")
+        entry_scikit_name = ttk.Entry(scikit_frame, textvariable=self.settings_vars["scikit_model_name"], width=30)
+        entry_scikit_name.grid(row=4, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(scikit_frame, 4, 2, "Optional name for the scikit-learn model. Leave blank to use default.")
+        
+        # Number of Jobs/Processors
+        ttk.Label(scikit_frame, text="Number of Jobs:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["n_jobs"] = tk.IntVar(value=1)
+        spin_n_jobs = ttk.Spinbox(scikit_frame, from_=1, to=32, textvariable=self.settings_vars["n_jobs"])
+        spin_n_jobs.grid(row=5, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(scikit_frame, 5, 2, "Number of CPU cores to use for parallel processing. Use -1 for all cores.")
+
+        run_button = ttk.Button(self.scikit_tab, text="Run Scikit Models", command=self._run_scikit)
+        run_button.pack(pady=(20, 10))
+
+    def _run_scikit(self):
+        # Gather settings for scikit
+        self.full_args.use_scikit = self.settings_vars["use_scikit"].get()
+        self.full_args.scikit_n_iter = self.settings_vars["scikit_n_iter"].get()
+        self.full_args.scikit_cv = self.settings_vars["scikit_cv"].get()
+        self.full_args.scikit_random_state = self.settings_vars["scikit_random_state"].get()
+        self.full_args.scikit_model_name = self.settings_vars["scikit_model_name"].get()
+        self.full_args.n_jobs = self.settings_vars["n_jobs"].get()
+
+        def background_run_scikit():
+            self.scikit_args = ScikitArguments(**self.full_args.__dict__)
+            args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
+            self.logger_args = SimpleNamespace(**args_dict)
+            self._write_args()
+            
+            self.run_scikit_scheme()
+            
+        self.run_in_background(background_run_scikit)
+
+    def _run_trainer(self):
+        # Gather settings
+        self.full_args.use_lora = self.settings_vars["use_lora"].get()
+        self.full_args.hybrid_probe = self.settings_vars["hybrid_probe"].get()
+        self.full_args.full_finetuning = self.settings_vars["full_finetuning"].get()
+        self.full_args.lora_r = self.settings_vars["lora_r"].get()
+        self.full_args.lora_alpha = self.settings_vars["lora_alpha"].get()
+        self.full_args.lora_dropout = self.settings_vars["lora_dropout"].get()
+        self.full_args.num_epochs = self.settings_vars["num_epochs"].get()
+        self.full_args.trainer_batch_size = self.settings_vars["trainer_batch_size"].get()
+        self.full_args.gradient_accumulation_steps = self.settings_vars["gradient_accumulation_steps"].get()
+        self.full_args.lr = self.settings_vars["lr"].get()
+        self.full_args.weight_decay = self.settings_vars["weight_decay"].get()
+        self.full_args.patience = self.settings_vars["patience"].get()
+        self.full_args.seed = self.settings_vars["seed"].get()
+
+        def background_run_trainer():
+            self.trainer_args = TrainerArguments(**self.full_args.__dict__)
+            args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
+            self.logger_args = SimpleNamespace(**args_dict)
+            self._write_args()
+            
+            if self.full_args.use_lora:
+                self.init_lora_model()
+                self.run_lora_model()
+            elif self.full_args.full_finetuning:
+                self.get_full_finetuning_model()
+                self.run_full_finetuning_model()
+            elif self.full_args.hybrid_probe:
+                self.init_hybrid_probe()
+            else:
+                self.run_nn_probe()
+            
+        self.run_in_background(background_run_trainer)
+        
     def _create_probe_args(self):
         print("=== Creating Probe ===")
         
@@ -531,6 +817,10 @@ class GUI(MainProcess):
         self.full_args.probe_pooling_types = probe_pooling_types
         self.full_args.save_model = self.settings_vars["save_model"].get()
         self.full_args.production_model = self.settings_vars["production_model"].get()
+        self.full_args.use_lora = self.settings_vars["use_lora"].get()
+        self.full_args.lora_r = self.settings_vars["lora_r"].get()
+        self.full_args.lora_alpha = self.settings_vars["lora_alpha"].get()
+        self.full_args.lora_dropout = self.settings_vars["lora_dropout"].get()
 
         # Create probe args from full args
         self.probe_args = ProbeArguments(**self.full_args.__dict__)
@@ -544,161 +834,6 @@ class GUI(MainProcess):
         self.logger_args = SimpleNamespace(**args_dict)
         self._write_args()
 
-    def build_trainer_tab(self):
-        # Lora checkbox
-        ttk.Label(self.trainer_tab, text="Use LoRA:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["use_lora"] = tk.BooleanVar(value=False)
-        check_lora = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["use_lora"])
-        check_lora.grid(row=0, column=1, padx=10, pady=5, sticky="w")
-
-        # LoRA r
-        ttk.Label(self.trainer_tab, text="LoRA r:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["lora_r"] = tk.IntVar(value=8)
-        spin_lora_r = ttk.Spinbox(self.trainer_tab, from_=1, to=128, textvariable=self.settings_vars["lora_r"])
-        spin_lora_r.grid(row=1, column=1, padx=10, pady=5)
-
-        # LoRA alpha
-        ttk.Label(self.trainer_tab, text="LoRA alpha:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["lora_alpha"] = tk.DoubleVar(value=32.0)
-        spin_lora_alpha = ttk.Spinbox(self.trainer_tab, from_=1.0, to=128.0, increment=1.0, textvariable=self.settings_vars["lora_alpha"])
-        spin_lora_alpha.grid(row=2, column=1, padx=10, pady=5)
-
-        # LoRA dropout
-        ttk.Label(self.trainer_tab, text="LoRA dropout:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["lora_dropout"] = tk.DoubleVar(value=0.01)
-        spin_lora_dropout = ttk.Spinbox(self.trainer_tab, from_=0.0, to=0.5, increment=0.01, textvariable=self.settings_vars["lora_dropout"])
-        spin_lora_dropout.grid(row=3, column=1, padx=10, pady=5)
-
-        # Hybrid Probe checkbox
-        ttk.Label(self.trainer_tab, text="Hybrid Probe:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["hybrid_probe"] = tk.BooleanVar(value=False)
-        check_hybrid_probe = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["hybrid_probe"])
-        check_hybrid_probe.grid(row=4, column=1, padx=10, pady=5, sticky="w")
-
-        # Full finetuning checkbox
-        ttk.Label(self.trainer_tab, text="Full Finetuning:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["full_finetuning"] = tk.BooleanVar(value=False)
-        check_full_ft = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["full_finetuning"])
-        check_full_ft.grid(row=5, column=1, padx=10, pady=5, sticky="w")
-
-        # num_epochs
-        ttk.Label(self.trainer_tab, text="Number of Epochs:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["num_epochs"] = tk.IntVar(value=200)
-        spin_num_epochs = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["num_epochs"])
-        spin_num_epochs.grid(row=6, column=1, padx=10, pady=5)
-
-        # trainer_batch_size
-        ttk.Label(self.trainer_tab, text="Trainer Batch Size:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["trainer_batch_size"] = tk.IntVar(value=64)
-        spin_trainer_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["trainer_batch_size"])
-        spin_trainer_batch_size.grid(row=7, column=1, padx=10, pady=5)
-
-        # gradient_accumulation_steps
-        ttk.Label(self.trainer_tab, text="Gradient Accumulation Steps:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["gradient_accumulation_steps"] = tk.IntVar(value=1)
-        spin_gradient_accumulation_steps = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["gradient_accumulation_steps"])
-        spin_gradient_accumulation_steps.grid(row=8, column=1, padx=10, pady=5)
-
-        # lr
-        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["lr"] = tk.DoubleVar(value=1e-4)
-        spin_lr = ttk.Spinbox(self.trainer_tab, from_=1e-6, to=1e-2, increment=1e-5, textvariable=self.settings_vars["lr"])
-        spin_lr.grid(row=9, column=1, padx=10, pady=5)
-
-        # weight_decay
-        ttk.Label(self.trainer_tab, text="Weight Decay:").grid(row=10, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["weight_decay"] = tk.DoubleVar(value=0.00)
-        spin_weight_decay = ttk.Spinbox(self.trainer_tab, from_=0.0, to=1.0, increment=0.01, textvariable=self.settings_vars["weight_decay"])
-        spin_weight_decay.grid(row=10, column=1, padx=10, pady=5)
-
-        # patience
-        ttk.Label(self.trainer_tab, text="Patience:").grid(row=11, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["patience"] = tk.IntVar(value=3)
-        spin_patience = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["patience"])
-        spin_patience.grid(row=11, column=1, padx=10, pady=5, sticky="w")
-
-        # Random Seed
-        ttk.Label(self.trainer_tab, text="Random Seed:").grid(row=12, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["seed"] = tk.IntVar(value=42)
-        spin_seed = ttk.Spinbox(self.trainer_tab, from_=0, to=10000, textvariable=self.settings_vars["seed"])
-        spin_seed.grid(row=12, column=1, padx=10, pady=5, sticky="w")
-
-        # Use Scikit
-        ttk.Label(self.trainer_tab, text="Use Scikit:").grid(row=13, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["use_scikit"] = tk.BooleanVar(value=False)
-        check_scikit = ttk.Checkbutton(self.trainer_tab, variable=self.settings_vars["use_scikit"])
-        check_scikit.grid(row=13, column=1, padx=10, pady=5, sticky="w")
-
-        # Scikit Iterations
-        ttk.Label(self.trainer_tab, text="Scikit Iterations:").grid(row=14, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["scikit_n_iter"] = tk.IntVar(value=10)
-        spin_scikit_n_iter = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["scikit_n_iter"])
-        spin_scikit_n_iter.grid(row=14, column=1, padx=10, pady=5, sticky="w")
-
-        # Scikit CV Folds
-        ttk.Label(self.trainer_tab, text="Scikit CV Folds:").grid(row=15, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["scikit_cv"] = tk.IntVar(value=3)
-        spin_scikit_cv = ttk.Spinbox(self.trainer_tab, from_=1, to=10, textvariable=self.settings_vars["scikit_cv"])
-        spin_scikit_cv.grid(row=15, column=1, padx=10, pady=5, sticky="w")
-
-        # Scikit Random State
-        ttk.Label(self.trainer_tab, text="Scikit Random State:").grid(row=16, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["scikit_random_state"] = tk.IntVar(value=42)
-        spin_scikit_rand = ttk.Spinbox(self.trainer_tab, from_=0, to=10000, textvariable=self.settings_vars["scikit_random_state"])
-        spin_scikit_rand.grid(row=16, column=1, padx=10, pady=5, sticky="w")
-
-        # Scikit Model Name
-        ttk.Label(self.trainer_tab, text="Scikit Model Name (optional):").grid(row=17, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["scikit_model_name"] = tk.StringVar(value="")
-        entry_scikit_name = ttk.Entry(self.trainer_tab, textvariable=self.settings_vars["scikit_model_name"], width=30)
-        entry_scikit_name.grid(row=17, column=1, padx=10, pady=5, sticky="w")
-
-        run_button = ttk.Button(self.trainer_tab, text="Run trainer", command=self._run_trainer)
-        run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
-
-    def _run_trainer(self):
-        # Gather settings
-        self.full_args.use_lora = self.settings_vars["use_lora"].get()
-        self.full_args.hybrid_probe = self.settings_vars["hybrid_probe"].get()
-        self.full_args.full_finetuning = self.settings_vars["full_finetuning"].get()
-        self.full_args.lora_r = self.settings_vars["lora_r"].get()
-        self.full_args.lora_alpha = self.settings_vars["lora_alpha"].get()
-        self.full_args.lora_dropout = self.settings_vars["lora_dropout"].get()
-        self.full_args.num_epochs = self.settings_vars["num_epochs"].get()
-        self.full_args.trainer_batch_size = self.settings_vars["trainer_batch_size"].get()
-        self.full_args.gradient_accumulation_steps = self.settings_vars["gradient_accumulation_steps"].get()
-        self.full_args.lr = self.settings_vars["lr"].get()
-        self.full_args.weight_decay = self.settings_vars["weight_decay"].get()
-        self.full_args.patience = self.settings_vars["patience"].get()
-        self.full_args.seed = self.settings_vars["seed"].get()
-        self.full_args.use_scikit = self.settings_vars["use_scikit"].get()
-        self.full_args.scikit_n_iter = self.settings_vars["scikit_n_iter"].get()
-        self.full_args.scikit_cv = self.settings_vars["scikit_cv"].get()
-        self.full_args.scikit_random_state = self.settings_vars["scikit_random_state"].get()
-        self.full_args.scikit_model_name = self.settings_vars["scikit_model_name"].get()
-
-        def background_run_trainer():
-            self.trainer_args = TrainerArguments(**self.full_args.__dict__)
-            self.scikit_args = ScikitArguments(**self.full_args.__dict__)
-            args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
-            self.logger_args = SimpleNamespace(**args_dict)
-            self._write_args()
-            
-            if self.full_args.use_scikit:
-                self.run_scikit_scheme()
-            elif self.full_args.use_lora:
-                self.init_lora_model()
-                self.run_lora_model()
-            elif self.full_args.full_finetuning:
-                self.get_full_finetuning_model()
-                self.run_full_finetuning_model()
-            elif self.full_args.hybrid_probe:
-                self.init_hybrid_probe()
-            else:
-                self.run_nn_probe()
-            
-        self.run_in_background(background_run_trainer)
-
     def build_replay_tab(self):
         # Create a frame for replay settings
         replay_frame = ttk.LabelFrame(self.replay_tab, text="Log Replay Settings")
@@ -709,6 +844,7 @@ class GUI(MainProcess):
         self.settings_vars["replay_path"] = tk.StringVar(value="")
         entry_replay = ttk.Entry(replay_frame, textvariable=self.settings_vars["replay_path"], width=40)
         entry_replay.grid(row=0, column=1, padx=10, pady=5)
+        self.add_help_button(replay_frame, 0, 2, "Path to the log file to replay. Use Browse button to select a file.")
 
         # Browse button for selecting log file
         browse_button = ttk.Button(replay_frame, text="Browse", command=self._browse_replay_log)
@@ -745,6 +881,13 @@ class GUI(MainProcess):
         
         print(f"Loaded settings from {replay_path}")
         replayer.run_replay(self)
+
+    def add_help_button(self, parent, row, column, help_text):
+        """Add a small help button that displays information when clicked"""
+        help_button = ttk.Button(parent, text="?", width=2, 
+                                command=lambda: messagebox.showinfo("Help", help_text))
+        help_button.grid(row=row, column=column, padx=(0,5), pady=5)
+        return help_button
 
 
 def main():

@@ -1,7 +1,6 @@
 import torch
 import os
 import numpy as np
-from torchinfo import summary
 from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
 from dataclasses import dataclass
 from data.torch_classes import (
@@ -12,7 +11,7 @@ from data.torch_classes import (
     EmbedsLabelsDataset,
     PairEmbedsLabelsDataset
 )
-from probes.get_probe import get_probe
+
 from visualization.ci_plots import regression_ci_plot, classification_ci_plot
 
 
@@ -86,24 +85,23 @@ class TrainerArguments:
         )
 
 
-def train_probe(
+def train_model(
         trainer_args,
         embedding_args,
-        probe_args,
+        model,
+        model_name,
+        data_name,
+        input_dim,
+        task_type,
         tokenizer,
         train_dataset,
         valid_dataset,
         test_dataset,
-        model_name,
-        data_name,
         emb_dict=None,
         ppi=False,
         log_id=None,
     ):
-    probe = get_probe(probe_args)
-    summary(probe)
-    input_dim = probe_args.input_dim
-    task_type = probe_args.task_type
+
     batch_size = trainer_args.batch_size
     read_scaler = trainer_args.read_scaler
     full = embedding_args.matrix_embed
@@ -128,7 +126,8 @@ def train_probe(
 
     """
     For collator need to pass tokenizer, full, task_type
-    For dataset need to pass hf_dataset, col_a, col_b, label_col, input_dim, task_type, db_path, emb_dict, batch_size, read_scaler, full, train
+    For dataset need to pass
+    hf_dataset, col_a, col_b, label_col, input_dim, task_type, db_path, emb_dict, batch_size, read_scaler, full, train
     """
     if task_type == 'singlelabel':
         from metrics import compute_single_label_classification_metrics
@@ -146,7 +145,7 @@ def train_probe(
         raise ValueError(f'Task type {task_type} not supported')
 
 
-    data_collator = collate_builder(tokenizer=tokenizer, full=full, task_type=probe_args.task_type)
+    data_collator = collate_builder(tokenizer=tokenizer, full=full, task_type=task_type)
     train_dataset = DatasetClass(
         hf_dataset=train_dataset,
         input_dim=input_dim,
@@ -184,7 +183,7 @@ def train_probe(
     hf_trainer_args = trainer_args()
     ### TODO add options for optimizers and schedulers
     trainer = Trainer(
-        model=probe,
+        model=model,
         args=hf_trainer_args,
         train_dataset=train_dataset,
         eval_dataset=valid_dataset,
@@ -229,6 +228,7 @@ def train_probe(
         except Exception as e:
             print(f'Error saving model: {e}')
 
+    model = trainer.model.cpu()
     trainer.accelerator.free_memory()
     torch.cuda.empty_cache()
-    return valid_metrics, test_metrics
+    return model, valid_metrics, test_metrics

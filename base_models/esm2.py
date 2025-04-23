@@ -4,7 +4,7 @@ We use the FastESM2 implementation of ESM2, which is exactly equivalent but uses
 import torch
 import torch.nn as nn
 from typing import Optional
-from .FastPLMs.modeling_fastesm import FastEsmModel
+from .FastPLMs.modeling_fastesm import FastEsmModel, FastEsmForSequenceClassification, FastEsmForTokenClassification
 
 
 class FastEsmForEmbedding(nn.Module):
@@ -38,6 +38,16 @@ presets = {
 
 def build_esm2_model(preset: str):
     model = FastEsmForEmbedding(presets[preset]).eval()
+    tokenizer = model.esm.tokenizer
+    return model, tokenizer
+
+
+def get_esm2_for_training(preset: str, tokenwise: bool = False, num_labels: int = None):
+    model_path = presets[preset]
+    if tokenwise:
+        model = FastEsmForTokenClassification.from_pretrained(model_path, num_labels=num_labels).eval()
+    else:
+        model = FastEsmForSequenceClassification.from_pretrained(model_path, num_labels=num_labels).eval()
     tokenizer = model.esm.tokenizer
     return model, tokenizer
 
