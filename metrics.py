@@ -337,5 +337,5 @@ def compute_regression_metrics(p: EvalPrediction) -> dict[str, float]:
 
 
 if __name__ == "__main__":
-    scorer = get_dual_classification_scorer()
+    scorer = get_classification_scorer()
     print(scorer.__name__)

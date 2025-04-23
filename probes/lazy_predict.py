@@ -76,11 +76,13 @@ removed_regressors = [
     "LassoLarsIC"
 ]
 
+# Tuple of (name, class)
 CLASSIFIERS = [
     est
     for est in all_estimators()
     if (issubclass(est[1], ClassifierMixin) and (est[0] not in removed_classifiers))
 ]
+CLASSIFIER_DICT = {model[0]: model[1] for model in CLASSIFIERS}
 
 """
 CLASSIFIERS = [
@@ -115,8 +117,10 @@ REGRESSORS = [
     for est in all_estimators()
     if (issubclass(est[1], RegressorMixin) and (est[0] not in removed_regressors))
 ]
+REGRESSOR_DICT = {model[0]: model[1] for model in REGRESSORS}
 
 ALL_MODELS = CLASSIFIERS + REGRESSORS
+ALL_MODEL_DICT = {model[0]: model[1] for model in ALL_MODELS}
 
 """
 REGRESSORS = [

@@ -221,7 +221,6 @@ def parse_arguments(): # TODO update yaml
     parser.add_argument("--scikit_random_state", type=int, default=42, help="Random state for scikit model.")
     parser.add_argument("--scikit_model_name", type=str, default=None, help="Name of the scikit model to use.")
     parser.add_argument("--use_scikit", action="store_true", default=False, help="Use scikit model (default: False).")
-    parser.add_argument("--production_model", action="store_true", default=False, help="Production model (default: False).")
 
     # ----------------- EmbeddingArguments ----------------- #
     parser.add_argument("--embedding_batch_size", type=int, default=4, help="Batch size for embedding generation.")

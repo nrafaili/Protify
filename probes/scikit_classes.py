@@ -4,7 +4,13 @@ from sklearn.model_selection import RandomizedSearchCV
 from typing import Dict, Any, Tuple, Optional
 from sklearn.utils import all_estimators
 from metrics import get_regression_scorer, get_classification_scorer, classification_scorer, regression_scorer
-from .lazy_predict import LazyRegressor, LazyClassifier, CLASSIFIERS, REGRESSORS
+from .lazy_predict import (
+    LazyRegressor,
+    LazyClassifier,
+    CLASSIFIER_DICT,
+    REGRESSOR_DICT,
+    ALL_MODEL_DICT
+)
 from .scikit_hypers import HYPERPARAMETER_DISTRIBUTIONS
 
 
@@ -255,17 +261,15 @@ class ScikitProbe:
             model_params = model_results.best_params if model_results.best_params is not None else {}
             
             # Determine if it's a classifier or regressor
-            if model_name in CLASSIFIERS:
+            if model_name in CLASSIFIER_DICT:
                 scorer = get_classification_scorer()
-            elif model_name in REGRESSORS:
+            elif model_name in REGRESSOR_DICT:
                 scorer = get_regression_scorer()
             else:
                 raise ValueError(f"Model {model_name} not supported")
                 
             # Get the model class
-            model_list = all_estimators()  # tuples (name, class)
-            model_dict = {model[0]: model[1] for model in model_list}
-            model_class = model_dict[model_name]
+            model_class = ALL_MODEL_DICT[model_name]
             
             # Create and train the model with the best parameters
             cls = model_class(**model_params)
@@ -283,16 +287,14 @@ class ScikitProbe:
         # Original functionality when no model_results is provided
         elif self.args.model_name is not None:
             model_name = self.args.model_name
-            if model_name in CLASSIFIERS:
+            if model_name in CLASSIFIER_DICT:
                 scorer = get_classification_scorer()
-            elif model_name in REGRESSORS:
+            elif model_name in REGRESSOR_DICT:
                 scorer = get_regression_scorer()
             else:
                 raise ValueError(f"Model {model_name} not supported")
 
-            model_list = all_estimators()  # tuples (name, class)
-            model_dict = {model[0]: model[1] for model in model_list}
-            model_class = model_dict[model_name]
+            model_class = ALL_MODEL_DICT[model_name]
             cls = model_class(**self.args.model_args)
             cls.fit(X_train, y_train)
             final_scores = scorer(cls, X_test, y_test)
