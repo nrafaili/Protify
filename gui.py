@@ -164,17 +164,22 @@ class GUI(MainProcess):
         entry_model_save = ttk.Entry(paths_frame, textvariable=self.settings_vars["model_save_dir"], width=30)
         entry_model_save.grid(row=2, column=1, padx=10, pady=5)
 
+        ttk.Label(paths_frame, text="Plots Directory:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["plots_dir"] = tk.StringVar(value="plots")
+        entry_plots_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["plots_dir"], width=30)
+        entry_plots_dir.grid(row=3, column=1, padx=10, pady=5)
+
         # Embedding save directory
-        ttk.Label(paths_frame, text="Embedding Save Directory:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Embedding Save Directory:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["embedding_save_dir"] = tk.StringVar(value="embeddings")
         entry_embed_save = ttk.Entry(paths_frame, textvariable=self.settings_vars["embedding_save_dir"], width=30)
-        entry_embed_save.grid(row=3, column=1, padx=10, pady=5)
+        entry_embed_save.grid(row=4, column=1, padx=10, pady=5)
 
         # Download directory
-        ttk.Label(paths_frame, text="Download Directory:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Download Directory:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["download_dir"] = tk.StringVar(value="Synthyra/mean_pooled_embeddings")
         entry_download = ttk.Entry(paths_frame, textvariable=self.settings_vars["download_dir"], width=30)
-        entry_download.grid(row=4, column=1, padx=10, pady=5)
+        entry_download.grid(row=5, column=1, padx=10, pady=5)
 
         # button to start logging
         start_logging_button = ttk.Button(self.info_tab, text="Start session", command=self._session_start)
@@ -202,6 +207,7 @@ class GUI(MainProcess):
             self.full_args.log_dir = self.settings_vars["log_dir"].get()
             self.full_args.results_dir = self.settings_vars["results_dir"].get()
             self.full_args.model_save_dir = self.settings_vars["model_save_dir"].get()
+            self.full_args.plots_dir = self.settings_vars["plots_dir"].get()
             self.full_args.embedding_save_dir = self.settings_vars["embedding_save_dir"].get()
             self.full_args.download_dir = self.settings_vars["download_dir"].get()
             self.full_args.replay_path = None

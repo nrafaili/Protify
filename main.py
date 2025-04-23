@@ -114,8 +114,10 @@ class MainProcess(MetricsLogger, DataMixin):
                     valid_dataset=valid_set,
                     test_dataset=test_set,
                     model_name=model_name,
+                    data_name=data_name,
                     emb_dict=emb_dict,
                     ppi=ppi,
+                    log_id=self.random_id,
                 )
                 self.log_metrics(data_name, model_name, valid_metrics, split_name='valid')
                 self.log_metrics(data_name, model_name, test_metrics, split_name='test')
@@ -181,6 +183,7 @@ def parse_arguments(): # TODO update yaml
     parser.add_argument("--model_save_dir", default="weights", help="Directory to save models.")
     parser.add_argument("--embedding_save_dir", default="embeddings", help="Directory to save embeddings.")
     parser.add_argument("--download_dir", default="Synthyra/mean_pooled_embeddings", help="Directory to download embeddings to.")
+    parser.add_argument("--plots_dir", default="plots", help="Directory to save plots.")
     parser.add_argument("--replay_path", type=str, default=None, help="Path to the replay file.")
     parser.add_argument("--pretrained_probe_path", type=str, default=None) # TODO not used right now
 

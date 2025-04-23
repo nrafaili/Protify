@@ -1,5 +1,6 @@
 import torch
 import os
+import numpy as np
 from torchinfo import summary
 from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from data.torch_classes import (
     PairEmbedsLabelsDataset
 )
 from probes.get_probe import get_probe
+from visualization.ci_plots import regression_ci_plot, classification_ci_plot
 
 
 @dataclass
@@ -30,6 +32,7 @@ class TrainerArguments:
             save_model: bool = False,
             seed: int = 42,
             train_data_size: int = 100,
+            plots_dir: str = None,
             **kwargs
     ):
         self.model_save_dir = model_save_dir
@@ -44,6 +47,7 @@ class TrainerArguments:
         self.read_scaler = read_scaler
         self.seed = seed
         self.train_data_size = train_data_size
+        self.plots_dir = plots_dir
 
     def __call__(self):
         if self.train_data_size > 50000:
@@ -91,8 +95,10 @@ def train_probe(
         valid_dataset,
         test_dataset,
         model_name,
+        data_name,
         emb_dict=None,
         ppi=False,
+        log_id=None,
     ):
     probe = get_probe(probe_args)
     summary(probe)
@@ -194,10 +200,28 @@ def train_probe(
     valid_metrics = trainer.evaluate(valid_dataset)
     print(f'Final validation metrics: \n{valid_metrics}\n')
 
-    test_metrics = trainer.evaluate(test_dataset)
+    y_pred, y_true, test_metrics = trainer.predict(test_dataset)
+    print(f'y_pred: {y_pred.shape}')
+    print(f'y_true: {y_true.shape}')
     print(f'Final test metrics: \n{test_metrics}\n')
 
     ### TODO PAUC plot
+    if task_type == 'regression':
+        regression_ci_plot(y_true, y_pred, trainer_args.plots_dir, data_name, model_name, log_id)
+    elif task_type != 'multilabel':
+        _, num_classes = y_pred.shape
+        y_pred = np.exp(y_pred) / np.sum(np.exp(y_pred), axis=-1, keepdims=True)
+        for class_idx in range(num_classes):
+            y_pred_class = y_pred[:, class_idx]
+            y_true_class = (y_true == class_idx).astype(int)
+            classification_ci_plot(y_true_class, y_pred_class, trainer_args.plots_dir, data_name, model_name, log_id, class_idx)
+    else:
+        _, _, num_classes = y_pred.shape
+        y_pred = np.exp(y_pred) / np.sum(np.exp(y_pred), axis=-1, keepdims=True)
+        for class_idx in range(num_classes):
+            y_pred_class = y_pred[:, :, class_idx].flatten()
+            y_true_class = (y_true == class_idx).astype(int).flatten()
+            classification_ci_plot(y_true_class, y_pred_class, trainer_args.plots_dir, data_name, model_name, log_id, class_idx)
 
     if trainer_args.save:
         try:

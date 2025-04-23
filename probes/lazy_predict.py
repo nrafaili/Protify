@@ -385,7 +385,7 @@ class LazyClassifier:
 
             except Exception as exception:
                 if self.ignore_warnings is False:
-                    print(name + " model failed to execute")
+                    print(f'\n{name} model failed to execute')
                     print(exception)
             pbar.update(1)
         pbar.close()
@@ -558,7 +558,9 @@ class LazyRegressor:
                 print(exception)
                 print("Invalid Regressor(s)")
 
-        for name, model in tqdm(self.regressors):
+        pbar = tqdm(self.regressors)
+        for name, model in pbar:
+            pbar.set_description(f"Training {name}")
             start = time.time()
             try:
                 if "random_state" in model().get_params().keys():
@@ -608,10 +610,14 @@ class LazyRegressor:
                     print(scores_verbose)
                 if self.predictions:
                     predictions[name] = y_pred
+
             except Exception as exception:
                 if self.ignore_warnings is False:
-                    print(name + " model failed to execute")
+                    print(f'\n{name} model failed to execute')
                     print(exception)
+
+            pbar.update(1)
+        pbar.close()
 
         scores = {
             "Model": names,

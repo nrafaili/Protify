@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import RandomizedSearchCV
 from typing import Dict, Any, Tuple, Optional
-from sklearn.utils import all_estimators
 from metrics import get_regression_scorer, get_classification_scorer, classification_scorer, regression_scorer
 from .lazy_predict import (
     LazyRegressor,

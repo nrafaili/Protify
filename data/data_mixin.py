@@ -351,7 +351,9 @@ class DataMixin:
             test_array = np.mean(test_array, axis=1)
 
         print('Numpy dataset shapes')
-        print(train_array.shape, valid_array.shape, test_array.shape)
+        print(f'Train: {train_array.shape}')
+        print(f'Valid: {valid_array.shape}')
+        print(f'Test: {test_array.shape}')
         return train_array, valid_array, test_array
 
     def build_pair_vector_numpy_dataset_from_embeddings(
@@ -419,7 +421,9 @@ class DataMixin:
             test_array = np.mean(test_array, axis=1)
 
         print('Numpy dataset shapes')
-        print(train_array.shape, valid_array.shape, test_array.shape)
+        print(f'Train: {train_array.shape}')
+        print(f'Valid: {valid_array.shape}')
+        print(f'Test: {test_array.shape}')
         return train_array, valid_array, test_array
 
     def prepare_scikit_dataset(self, model_name, dataset):
@@ -448,5 +452,7 @@ class DataMixin:
         y_test = self._labels_to_numpy(test_set['labels'])
 
         print('Numpy dataset shapes with labels')
-        print(X_train.shape, y_train.shape, X_valid.shape, y_valid.shape, X_test.shape, y_test.shape)
+        print(f'Train: {X_train.shape}, {y_train.shape}')
+        print(f'Valid: {X_valid.shape}, {y_valid.shape}')
+        print(f'Test: {X_test.shape}, {y_test.shape}')
         return X_train, y_train, X_valid, y_valid, X_test, y_test, label_type

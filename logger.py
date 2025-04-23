@@ -7,10 +7,10 @@ import datetime
 import ast
 import random
 import string
-from pathlib import Path
-from types import SimpleNamespace
 import subprocess
 import sys
+from pathlib import Path
+from types import SimpleNamespace
 
 
 def log_method_calls(func):
@@ -44,7 +44,7 @@ class MetricsLogger:
         # Generate random ID with date and 4-letter code
         random_letters = ''.join(random.choices(string.ascii_uppercase, k=4))
         date_str = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')
-        self.random_id = f"{random_letters}_{date_str}"
+        self.random_id = f"{date_str}_{random_letters}"
         
         if args.replay_path is not None:
             self.random_id = 'replay_' + args.replay_path.split('/')[-1].split('.')[0]
