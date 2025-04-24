@@ -1,4 +1,3 @@
-
 *.pyc
 *.pth
 *.pt
@@ -11,3 +10,4 @@
 *.safetensors
 /weights/runs
 .qodo
+!images/*.png
