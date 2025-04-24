@@ -43,8 +43,6 @@ class DataArguments:
         self.col_names = col_names
         self.max_length = max_length
         self.trim = trim
-        self.max_length = max_length
-        self.trim = trim
 
         if data_names[0] == 'standard_benchmark':
             self.data_paths = [supported_datasets[data_name] for data_name in standard_data_benchmark]

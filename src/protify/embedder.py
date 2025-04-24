@@ -299,12 +299,12 @@ class Embedder:
 
 if __name__ == '__main__':
     ### Embed all supported datasets with all supported models
-    """
-    TODO fix this, needs to initialize main, as it now has DataMixin
     import argparse
     from huggingface_hub import upload_file, login
-    from data.supported_datasets import supported_datasets, possible_with_vector_reps, testing
+    from data.supported_datasets import possible_with_vector_reps
+    from data.data_mixin import DataArguments, DataMixin
     from base_models.get_base_models import BaseModelArguments, get_base_model
+
     os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1' # prevent cache warning on Windows machines
 
     parser = argparse.ArgumentParser()
@@ -329,10 +329,13 @@ if __name__ == '__main__':
     else:
         raise ValueError(f"Invalid embedding dtype: {args.embed_dtype}")
 
-    # Get data
-    data_paths = [supported_datasets[dataset] for dataset in possible_with_vector_reps]
-    data_args = HFDataArguments(data_paths=data_paths, max_length=2048, trim=False)
-    all_seqs = get_hf_data(data_args)[1]
+    # Get data    
+    data_args = DataArguments(
+        data_names=possible_with_vector_reps,
+        max_length=2048,
+        trim=False
+    )
+    all_seqs = DataMixin(data_args).get_data()[1]
 
     # Set up embedder
     embedder_args = EmbeddingArguments(
@@ -350,7 +353,7 @@ if __name__ == '__main__':
     embedder = Embedder(embedder_args)
     
     # Embed for each model
-    model_args = BaseModelArguments()
+    model_args = BaseModelArguments(model_names='standard')
     for model_name in model_args.model_names:
         model, tokenizer = get_base_model(model_name)
         _ = embedder(model_name, model, tokenizer)
@@ -362,4 +365,3 @@ if __name__ == '__main__':
             repo_type='dataset')
 
     print('Done')
-    """

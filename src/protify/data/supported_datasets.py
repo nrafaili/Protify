@@ -53,6 +53,7 @@ possible_with_vector_reps = [
     'cloning-clf',
     'stability-prediction',
     'human-ppi',
+    'gold-ppi',
 ]
 
 standard_data_benchmark = [
