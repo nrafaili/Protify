@@ -1,13 +1,5 @@
 <a id="readme-top"></a>
 
-<!-- PROJECT SHIELDS -->
-<!--
-*** I'm using markdown "reference style" links for readability.
-*** Reference links are enclosed in brackets [ ] instead of parentheses ( ).
-*** See the bottom of this document for the declaration of the reference variables
-*** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
-*** https://www.markdownguide.org/basic-syntax/#reference-style-links
--->
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
@@ -70,28 +62,36 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-Protify is an open source effort to simplify and democratize workflows for chemical language models, where deep learning models can be trained to predict chemical properties at the click of a button. Need to benchmark 10 different protein language models against 15 diverse datasets, and want publication ready figures when the models are done? With Protify you can do this without writing any code. Looking to build more custom pipelines and ready to write some code yourself? That is also easy with the Protify ecosystem. No GPU? No problem. Synthyra offers precomputed embeddings for many popular datasets, and Protify can download them for analysis with scikit-learn on your laptop. Soon, the Synthyra API will be integrated, offering low cost solutions for GPU training. Our colab notebook is also an affordable way to dive into GPU reliant analysis. 
+Protify is an open source platform designed to simplify and democratize workflows for chemical language models. With Protify, deep learning models can be trained to predict chemical properties at the click of a button, without requiring extensive coding knowledge or computational resources.
 
-Protify is a new project in beta. Bear with us as we get the features and documentation on par with our ambitions. 
+### Why Protify?
 
-### Current Key features
-- Run experiments with an easy to use GUI, CLI, or prepared yaml files
-- Offers fast and efficient embeddings from ESM2 and ESMC from [FastPLMs](https://github.com/Synthyra/FastPLMs)
-  - More protein, smiles, selfies, codon, and nucleotide language models to come
-- Probe base models with efficient MLPs for sequence-wise tasks, or use transformer probes for token-wise tasks
-  - Full model fine tuning, hybrid probing, and Lora coming soon
-- Find the best scikit-learn model for your model / dataset with LazyPredict, and then use our automatic hyperparameter search to improve the model further
-  - GPU enhancement here in the future
-- Every session gets an informative log that is completely reproducible. Simple pass the log file as the `replay_path` and have your entire session repeat infront of your eyes
-- Publication ready figures including cross model and dataset comparisons with radar and bar plots. Embedding analysis with PCA, tSNE, and UMAP. Confidence interval integration with custom CI regression plots, and utilizing [pAUC](https://github.com/srijitseal/pauc) for statistically sound classification CI plots
-- 25 protein datasets offered by default, utilize your own local or private datasets with ease
- - More protein, smiles, selfies, codon, and nucleotide property datasets to come
-- Supports protein-protein interaction datasets
- - Protein small molecule to come
+- **Benchmark multiple models efficiently**: Need to evaluate 10 different protein language models against 15 diverse datasets with publication-ready figures? Protify makes this possible without writing a single line of code.
+- **Flexible for all skill levels**: Build custom pipelines with code or use our no-code interface depending on your needs and expertise.
+- **Accessible computing**: No GPU? No problem. Synthyra offers precomputed embeddings for many popular datasets, which Protify can download for analysis with scikit-learn on your laptop.
+- **Cost-effective solutions**: The upcoming Synthyra API integration will offer affordable GPU training options, while our Colab notebook provides an accessible entry point for GPU-reliant analysis.
 
+Protify is currently in beta. We're actively working to enhance features and documentation to meet our ambitious goals.
 
-### Want to support Protify?
-Share online everywhere and anywhere! Contribute or suggest features with our [bounty program](https://gleghornlab.notion.site/1de62a314a2e808bb6fdc1e714725900?v=1de62a314a2e80389ed7000c97c1a709&pvs=4) (mentioned below).
+### Current Key Features
+
+- **Multiple interfaces**: Run experiments via an intuitive GUI, CLI, or prepared YAML files
+- **Efficient embeddings**: Leverage fast and efficient embeddings from ESM2 and ESMC via [FastPLMs](https://github.com/Synthyra/FastPLMs)
+  - Coming soon: Additional protein, SMILES, SELFIES, codon, and nucleotide language models
+- **Flexible model probing**: Use efficient MLPs for sequence-wise tasks or transformer probes for token-wise tasks
+  - Coming soon: Full model fine-tuning, hybrid probing, and LoRA
+- **Automated model selection**: Find optimal scikit-learn models for your data with LazyPredict, enhanced by automatic hyperparameter optimization
+  - Coming soon: GPU acceleration
+- **Complete reproducibility**: Every session generates a detailed log that can be used to reproduce your entire workflow
+- **Publication-ready visualizations**: Generate cross-model and dataset comparisons with radar and bar plots, embedding analysis with PCA, t-SNE, and UMAP, and statistically sound confidence interval plots
+- **Extensive dataset support**: Access 25 protein datasets by default, or easily integrate your own local or private datasets
+  - Coming soon: Additional protein, SMILES, SELFIES, codon, and nucleotide property datasets
+- **Advanced interaction modeling**: Support for protein-protein interaction datasets
+  - Coming soon: Protein-small molecule interaction capabilities
+
+### Support Protify's Development
+
+Help us grow by sharing online, starring our repository, or contributing through our [bounty program](https://gleghornlab.notion.site/1de62a314a2e808bb6fdc1e714725900?v=1de62a314a2e80389ed7000c97c1a709&pvs=4).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -162,7 +162,8 @@ Distributed under the Protify License. See `LICENSE.md` for more information.
 <!-- CONTACT -->
 ## Contact
 
-info@synthyra.com
+Email: info@synthyra.com  
+Website: [https://synthyra.com](https://synthyra.com)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

@@ -20,7 +20,7 @@ class EmbeddingArguments:
             download_embeddings: bool = False,
             download_dir: str = 'Synthyra/plm_embeddings',
             matrix_embed: bool = False,
-            embedding_pooling_types: List[str] = field(default_factory=lambda: ['mean']),
+            embedding_pooling_types: List[str] = ['mean'],
             save_embeddings: bool = False,
             embed_dtype: torch.dtype = torch.float32,
             sql: bool = False,
@@ -311,7 +311,6 @@ if __name__ == '__main__':
     parser.add_argument('--token', default=None, help='Huggingface token')
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--num_workers', type=int, default=0)
-    parser.add_argument('--pooling_types', nargs='+', default=['mean'])
     parser.add_argument('--embed_dtype', type=str, default='float16')
     parser.add_argument('--embedding_save_dir', type=str, default='embeddings')
     parser.add_argument('--download_dir', type=str, default='Synthyra/mean_pooled_embeddings')
@@ -343,7 +342,7 @@ if __name__ == '__main__':
         num_workers=args.num_workers,
         download_embeddings=False,
         matrix_embed=False,
-        pooling_types=args.pooling_types,
+        pooling_types=['mean'],
         save_embeddings=True,
         embed_dtype=dtype,
         sql=False,
