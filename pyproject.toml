@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "Protify"
+version = "0.0.1"
+description = "Low code chemcial property prediction"
+authors = ["Synthyra <info@synthyra.com>"]
+keywords = ["plm, protein, transformer"]
+repository = "https://github.com/Synthyra/Protify"
+license = "Protify License"
+readme = "README.md"
+include = [
+    "LICENSE.md",
+    "README.md",
+]
+
+packages = [
+    { include = "protify", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+torch = ">=2.5.1"
+torchvision = "*"
+transformers = ">=4.47"
+accelerate = ">=1.1.0"
+tf-keras = "*"
+tensorflow = "*"
+torchinfo = "*"
+torchmetrics = "*"
+scikit-learn = "*"
+scipy = "*"
+datasets = "*"
+einops = "*"
+numpy = "==1.26.1"
+networkx = ">=3.4.2"
+xgboost = "*"
+lightgbm = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

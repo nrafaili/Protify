@@ -18,7 +18,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/Synthyra/Protify">
-    <img src="images/protify.png" alt="Logo">
+    <img src="images/github_banner.png" alt="Logo">
   </a>
 
   <h3 align="center">Protify</h3>
