@@ -352,7 +352,7 @@ if __name__ == '__main__':
     embedder = Embedder(embedder_args, all_seqs)
     
     # Embed for each model
-    model_args = BaseModelArguments(model_names='standard')
+    model_args = BaseModelArguments(model_names=['standard'])
     for model_name in model_args.model_names:
         model, tokenizer = get_base_model(model_name)
         _ = embedder(model_name, model, tokenizer)

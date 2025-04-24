@@ -82,6 +82,12 @@ Protify is a new project in beta. Bear with us as we get the features and docume
 - Find the best scikit-learn model for your model / dataset with LazyPredict, and then use our automatic hyperparameter search to improve the model further
   - GPU enhancement here in the future
 - Every session gets an informative log that is completely reproducible. Simple pass the log file as the `replay_path` and have your entire session repeat infront of your eyes
+- Publication ready figures including radar plots, bar plots, custom CI regression plots, and utilizing [pAUC](https://github.com/srijitseal/pauc) for statistically sound classification CI plots
+- 25 protein datasets offered by default, utilize your own local or private datasets with ease
+ - More protein, smiles, selfies, codon, and nucleotide property datasets to come
+- Supports protein-protein interaction datasets
+ - Protein small molecule to come
+
 
 ### Want to support Protify?
 Share online everywhere and anywhere! Contribute or suggest features with our [bounty program](https://gleghornlab.notion.site/1de62a314a2e808bb6fdc1e714725900?v=1de62a314a2e80389ed7000c97c1a709&pvs=4) (mentioned below).
