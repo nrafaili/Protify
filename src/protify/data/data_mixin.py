@@ -35,7 +35,7 @@ class DataArguments:
             col_names: List[str] = ['seqs', 'labels'],
             max_length: int = 1024,
             trim: bool = False,
-            data_dirs: Optional[List[str]] = None,
+            data_dirs: Optional[List[str]] = [],
             **kwargs):
         self.data_names = data_names
         self.data_dirs = data_dirs
