@@ -4,6 +4,7 @@ import argparse
 import queue
 import traceback
 import webbrowser
+import os
 from types import SimpleNamespace
 from tkinter import ttk, font, messagebox
 from base_models.get_base_models import BaseModelArguments, standard_benchmark
@@ -15,6 +16,9 @@ from main import MainProcess
 from concurrent.futures import ThreadPoolExecutor
 from data.data_mixin import DataArguments
 from probes.scikit_classes import ScikitArguments
+
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  
 
 
 class BackgroundTask:
@@ -48,7 +52,7 @@ class GUI(MainProcess):
         self.master.title("Settings GUI")
         self.master.geometry("600x800")
 
-        icon = tk.PhotoImage(file="synthyra_logo.png")  
+        icon = tk.PhotoImage(file="Protify_logo.png")
         # Set the window icon
         self.master.iconphoto(True, icon)
 
@@ -790,9 +794,9 @@ class GUI(MainProcess):
                 self.get_full_finetuning_model()
                 self.run_full_finetuning_model()
             elif self.full_args.hybrid_probe:
-                self.init_hybrid_probe()
+                self.init_hybrid_probes()
             else:
-                self.run_nn_probe()
+                self.run_nn_probes()
             
         self.run_in_background(background_run_trainer)
         
