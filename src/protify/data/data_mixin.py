@@ -3,9 +3,9 @@ import numpy as np
 import random
 import os
 import sqlite3
+from typing import List, Tuple, Dict, Optional
 from glob import glob
 from pandas import read_csv, read_excel
-from typing import List, Tuple, Dict
 from datasets import load_dataset, Dataset
 from dataclasses import dataclass
 from .supported_datasets import supported_datasets, standard_data_benchmark
@@ -31,11 +31,11 @@ class DataArguments:
     def __init__(
             self,
             data_names: List[str],
-            data_dirs: List[str],
             delimiter: str = ',',
             col_names: List[str] = ['seqs', 'labels'],
             max_length: int = 1024,
             trim: bool = False,
+            data_dirs: Optional[List[str]] = None,
             **kwargs):
         self.data_names = data_names
         self.data_dirs = data_dirs
@@ -54,11 +54,12 @@ class DataArguments:
                 else:
                     self.data_paths.append(data_name)
         
-        for dir in data_dirs:
-            if os.path.exists(dir):
-                self.data_paths.append(dir)
-            else:
-                raise FileNotFoundError(f'{dir} does not exist')
+        if data_dirs is not None:
+            for dir in data_dirs:
+                if os.path.exists(dir):
+                    self.data_paths.append(dir)
+                else:
+                    raise FileNotFoundError(f'{dir} does not exist')
 
 
 class DataMixin:
