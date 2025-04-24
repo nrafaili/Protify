@@ -70,9 +70,18 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-Protify is an open source effort to simplify and democratize workflows for chemical language models, where deep learning models can be traied to predict chemical properties at the click of a button. Need to benchmark 10 different protein language models against 15 diverse datasets, and want publication ready figures when the models are done? With Protify you can do this without writing any code. Looking to build more custom pipelines and ready to write some code yourself? That is also easy with the Protify ecosystem. No GPU? No problem. Synthyra offers precomputed embeddings for many popular datasets, and Protify can download them for analysis with scikit-learn on your laptop. Soon, the Synthyra API will be integrated, offering low cost solutions for GPU training. Our colab notebook is also an affordable way to dive into GPU reliant analysis. 
+Protify is an open source effort to simplify and democratize workflows for chemical language models, where deep learning models can be trained to predict chemical properties at the click of a button. Need to benchmark 10 different protein language models against 15 diverse datasets, and want publication ready figures when the models are done? With Protify you can do this without writing any code. Looking to build more custom pipelines and ready to write some code yourself? That is also easy with the Protify ecosystem. No GPU? No problem. Synthyra offers precomputed embeddings for many popular datasets, and Protify can download them for analysis with scikit-learn on your laptop. Soon, the Synthyra API will be integrated, offering low cost solutions for GPU training. Our colab notebook is also an affordable way to dive into GPU reliant analysis. 
 
 Protify is a new project in beta. Bear with us as we get the features and documentation on par with our ambitions. 
+
+### Current Key features
+- Offers fast and efficient embeddings from ESM2 and ESMC from [FastPLMs](https://github.com/Synthyra/FastPLMs)
+  - More protein, smiles, selfies, codon, and nucleotide language models to come
+- Probe base models with efficient MLPs for sequence-wise tasks, or use transformer probes for token-wise tasks
+  - Full model fine tuning, hybrid probing, and Lora coming soon
+- Find the best scikit-learn model for your model / dataset with LazyPredict, and then use our automatic hyperparameter search to improve the model further
+  - GPU enhancement here in the future
+- Every session gets an informative log that is completely reproducible. Simple pass the log file as the `replay_path` and have your entire session repeat infront of your eyes
 
 ### Want to support Protify?
 Share online everywhere and anywhere! Contribute or suggest features with our [bounty program](https://gleghornlab.notion.site/1de62a314a2e808bb6fdc1e714725900?v=1de62a314a2e80389ed7000c97c1a709&pvs=4) (mentioned below).

@@ -339,7 +339,6 @@ if __name__ == '__main__':
 
     # Set up embedder
     embedder_args = EmbeddingArguments(
-        all_seqs=all_seqs,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         download_embeddings=False,
@@ -350,7 +349,7 @@ if __name__ == '__main__':
         sql=False,
         embedding_save_dir='embeddings'
     )
-    embedder = Embedder(embedder_args)
+    embedder = Embedder(embedder_args, all_seqs)
     
     # Embed for each model
     model_args = BaseModelArguments(model_names='standard')
