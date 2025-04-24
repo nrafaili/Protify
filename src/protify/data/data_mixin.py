@@ -63,7 +63,7 @@ class DataArguments:
 
 
 class DataMixin:
-    def __init__(self):
+    def __init__(self, data_args: Optional[DataArguments] = None):
         # intialize defaults
         self._sql = False
         self._full = False
@@ -71,6 +71,7 @@ class DataMixin:
         self._trim = False
         self._delimiter = ','
         self._col_names = ['seqs', 'labels']
+        self.data_args = data_args
 
     def _not_regression(self, labels): # not a great assumption but works most of the time
         return all(isinstance(label, (int, float)) and label == int(label) for label in labels)
