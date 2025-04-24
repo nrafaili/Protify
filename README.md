@@ -24,7 +24,7 @@
   <h3 align="center">Protify</h3>
 
   <p align="center">
-    A low code solution for predicting the properties of chemicals.
+    A low code solution for computationally predicting the properties of chemicals.
     <br />
     <a href="https://github.com/Synthyra/Protify/tree/main/docs"><strong>Explore the docs »</strong></a>
     <br />
