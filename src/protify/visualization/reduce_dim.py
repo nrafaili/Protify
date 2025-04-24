@@ -202,6 +202,7 @@ class UMAP(DimensionalityReducer):
 
 if __name__ == "__main__":
     # py -m visualization.reduce_dim
+    ### TODO update with datamixin
     from data.hf_data import HFDataArguments, get_hf_data
     
     # Get some example data

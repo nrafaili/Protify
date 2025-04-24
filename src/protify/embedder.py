@@ -354,8 +354,7 @@ if __name__ == '__main__':
     # Embed for each model
     model_args = BaseModelArguments(model_names=['standard'])
     for model_name in model_args.model_names:
-        model, tokenizer = get_base_model(model_name)
-        _ = embedder(model_name, model, tokenizer)
+        _ = embedder(model_name)
         save_path = os.path.join(embedder_args.embedding_save_dir, f'{model_name}.pth')
         upload_file(
             path_or_fileobj=save_path,

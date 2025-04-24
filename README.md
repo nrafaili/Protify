@@ -75,6 +75,7 @@ Protify is an open source effort to simplify and democratize workflows for chemi
 Protify is a new project in beta. Bear with us as we get the features and documentation on par with our ambitions. 
 
 ### Current Key features
+- Run experiments with an easy to use GUI, CLI, or prepared yaml files
 - Offers fast and efficient embeddings from ESM2 and ESMC from [FastPLMs](https://github.com/Synthyra/FastPLMs)
   - More protein, smiles, selfies, codon, and nucleotide language models to come
 - Probe base models with efficient MLPs for sequence-wise tasks, or use transformer probes for token-wise tasks
@@ -82,7 +83,7 @@ Protify is a new project in beta. Bear with us as we get the features and docume
 - Find the best scikit-learn model for your model / dataset with LazyPredict, and then use our automatic hyperparameter search to improve the model further
   - GPU enhancement here in the future
 - Every session gets an informative log that is completely reproducible. Simple pass the log file as the `replay_path` and have your entire session repeat infront of your eyes
-- Publication ready figures including radar plots, bar plots, custom CI regression plots, and utilizing [pAUC](https://github.com/srijitseal/pauc) for statistically sound classification CI plots
+- Publication ready figures including cross model and dataset comparisons with radar and bar plots. Embedding analysis with PCA, tSNE, and UMAP. Confidence interval integration with custom CI regression plots, and utilizing [pAUC](https://github.com/srijitseal/pauc) for statistically sound classification CI plots
 - 25 protein datasets offered by default, utilize your own local or private datasets with ease
  - More protein, smiles, selfies, codon, and nucleotide property datasets to come
 - Supports protein-protein interaction datasets
