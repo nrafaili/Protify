@@ -24,9 +24,9 @@
   <h3 align="center">Protify</h3>
 
   <p align="center">
-    A low code solution for predicting the properties of chemicals.
+    A low code solution for computationally predicting the properties of chemicals.
     <br />
-    <a href="https://github.com/Synthyra/Protify"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/Synthyra/Protify/tree/main/docs"><strong>Explore the docs »</strong></a>
     <br />
     <br />
     <a href="https://github.com/Synthyra/Protify">View Demo</a>
@@ -70,8 +70,56 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
+Protify is an open source effort to simplify and democratize workflows for chemical language models, where deep learning models can be traied to predict chemical properties at the click of a button. Need to benchmark 10 different protein language models against 15 diverse datasets, and want publication ready figures when the models are done? With Protify you can do this without writing any code. Looking to build more custom pipelines and ready to write some code yourself? That is also easy with the Protify ecosystem. No GPU? No problem. Synthyra offers precomputed embeddings for many popular datasets, and Protify can download them for analysis with scikit-learn on your laptop. Soon, the Synthyra API will be integrated, offering low cost solutions for GPU training. Our colab notebook is also an affordable way to dive into GPU reliant analysis. 
+
+Protify is a new project in beta. Bear with us as we get the features and documentation on par with our ambitions. 
+
+### Want to support Protify?
+Share online everywhere and anywhere! Contribute or suggest features with our [bounty program](https://gleghornlab.notion.site/1de62a314a2e808bb6fdc1e714725900?v=1de62a314a2e80389ed7000c97c1a709&pvs=4) (mentioned below).
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Getting Started
+
+### Installation
+From pip
+`pip install Protify`
+
+To get started locally
+```console
+git clone https://@github.com/Synthyra/Protify.git
+cd Protify
+python -m pip install -r docs/requirements.txt
+git submodule update --init --remote --recursive
+cd src/protify
+```
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Usage
+
+Examples coming soon.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+## Contributing
+
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+We work with a [bounty system](https://gleghornlab.notion.site/1de62a314a2e808bb6fdc1e714725900?v=1de62a314a2e80389ed7000c97c1a709&pvs=4). You can find bounties on this page. Contributing bounties will get you listed on the Protify consortium and potentially coauthorship on published papers involving the framework.
+
+Simply open a pull request with the bounty ID in the title to claim one. For additional features not on the bounty list simply use a descriptive title.
+
+For bugs and general suggestions please use [GitHub issues](https://github.com/Synthyra/Protify/issues).
+
+### Top contributors:
+
+<a href="https://github.com/Synthyra/Protify/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Synthyra/Protify" alt="contrib.rocks image" />
+</a>
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 ### Built With
@@ -88,39 +136,6 @@
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
-## Getting Started
-
-### Prerequisites
-
-### Installation
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-## Usage
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-## Contributing
-
-Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-See the [open issues](https://github.com/Synthyra/Protify/issues) for a full list of proposed features (and known issues).
-
-### Top contributors:
-
-<a href="https://github.com/Synthyra/Protify/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Synthyra/Protify" alt="contrib.rocks image" />
-</a>
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
 <!-- LICENSE -->
 ## License
 
@@ -128,24 +143,16 @@ Distributed under the Protify License. See `LICENSE.md` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-
 <!-- CONTACT -->
 ## Contact
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- ACKNOWLEDGMENTS -->
-## Acknowledgments
+info@synthyra.com
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 
 ## Cite
 
-If you use this package, please cite the following papers.
+If you use this package, please cite the following papers. (Coming soon)
 
 
 
