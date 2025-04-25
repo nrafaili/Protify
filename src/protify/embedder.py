@@ -349,16 +349,16 @@ if __name__ == '__main__':
         embedding_save_dir='embeddings'
     )
     embedder = Embedder(embedder_args, all_seqs)
-    
+
     # Embed for each model
     model_args = BaseModelArguments(model_names=['standard'])
     for model_name in model_args.model_names:
         _ = embedder(model_name)
-        save_path = os.path.join(embedder_args.embedding_save_dir, f'{model_name}_False.pth')
+        save_path = os.path.join(args.embedding_save_dir, f'{model_name}_False.pth')
         upload_file(
             path_or_fileobj=save_path,
             path_in_repo=f'embeddings/{model_name}_False.pth',
-            repo_id=embedder_args.download_dir,
+            repo_id=args.download_dir,
             repo_type='dataset')
 
     print('Done')
