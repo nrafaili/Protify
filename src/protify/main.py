@@ -60,7 +60,6 @@ class MainProcess(MetricsLogger, DataMixin):
         for model_name in self.model_args.model_names:
             _ = embedder(model_name)
 
-    @log_method_calls
     def _run_nn_probe(self, model_name, data_name, train_set, valid_set, test_set, tokenizer, emb_dict, ppi):
         probe = get_probe(self.probe_args)
         summary(probe)

@@ -16,6 +16,7 @@ from main import MainProcess
 from concurrent.futures import ThreadPoolExecutor
 from data.data_mixin import DataArguments
 from probes.scikit_classes import ScikitArguments
+from logger import log_method_calls
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  
@@ -321,6 +322,7 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.data_tab, text="Get Data", command=self._get_data)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
+    @log_method_calls
     def _get_data(self):
         print("=== Getting Data ===")
         
@@ -416,6 +418,7 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.embed_tab, text="Embed sequences to disk", command=self._get_embeddings)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
+    @log_method_calls
     def _get_embeddings(self):
         if not self.all_seqs:
             print('Sequences are not loaded yet. Please run the data tab first.')
@@ -464,6 +467,7 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.model_tab, text="Select Models", command=self._select_models)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
+    @log_method_calls
     def _select_models(self):
         # Gather selected model names
         selected_indices = self.model_listbox.curselection()
@@ -746,6 +750,7 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.scikit_tab, text="Run Scikit Models", command=self._run_scikit)
         run_button.pack(pady=(20, 10))
 
+    @log_method_calls
     def _run_scikit(self):
         # Gather settings for scikit
         self.full_args.use_scikit = self.settings_vars["use_scikit"].get()
@@ -765,6 +770,7 @@ class GUI(MainProcess):
             
         self.run_in_background(background_run_scikit)
 
+    @log_method_calls
     def _run_trainer(self):
         # Gather settings
         self.full_args.use_lora = self.settings_vars["use_lora"].get()
@@ -799,7 +805,8 @@ class GUI(MainProcess):
                 self.run_nn_probes()
             
         self.run_in_background(background_run_trainer)
-        
+    
+    @log_method_calls
     def _create_probe_args(self):
         print("=== Creating Probe ===")
         

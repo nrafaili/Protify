@@ -207,20 +207,8 @@ def train_model(
     ### TODO PAUC plot
     if task_type == 'regression':
         regression_ci_plot(y_true, y_pred, trainer_args.plots_dir, data_name, model_name, log_id)
-    elif task_type != 'multilabel':
-        _, num_classes = y_pred.shape
-        y_pred = np.exp(y_pred) / np.sum(np.exp(y_pred), axis=-1, keepdims=True)
-        for class_idx in range(num_classes):
-            y_pred_class = y_pred[:, class_idx]
-            y_true_class = (y_true == class_idx).astype(int)
-            classification_ci_plot(y_true_class, y_pred_class, trainer_args.plots_dir, data_name, model_name, log_id, class_idx)
     else:
-        _, _, num_classes = y_pred.shape
-        y_pred = np.exp(y_pred) / np.sum(np.exp(y_pred), axis=-1, keepdims=True)
-        for class_idx in range(num_classes):
-            y_pred_class = y_pred[:, :, class_idx].flatten()
-            y_true_class = (y_true == class_idx).astype(int).flatten()
-            classification_ci_plot(y_true_class, y_pred_class, trainer_args.plots_dir, data_name, model_name, log_id, class_idx)
+        classification_ci_plot(y_true, y_pred, trainer_args.plots_dir, data_name, model_name, log_id)
 
     if trainer_args.save:
         try:

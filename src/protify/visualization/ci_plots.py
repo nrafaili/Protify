@@ -45,18 +45,18 @@ def regression_ci_plot(y_true, y_pred, output_dir, data_name, model_name, log_id
 
     # Save the figure
     os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}_regression_ci_plot.png")
+    save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}.png")
     fig.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.show()
     plt.close(fig)
 
 
-def classification_ci_plot(y_true, y_pred, output_dir, data_name, model_name, log_id, current_class):
+def classification_ci_plot(y_true, y_pred, output_dir, data_name, model_name, log_id):
     """
     Use pauc to display classification plot
     """
     os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}_classification_ci_plot_{current_class}.png")
+    save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}.png")
     plot_roc_with_ci(y_true, y_pred, save_path)
 
 
