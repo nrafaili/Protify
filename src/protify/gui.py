@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from data.data_mixin import DataArguments
 from probes.scikit_classes import ScikitArguments
 from logger import log_method_calls
+from utils import print_message
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  
@@ -36,7 +37,7 @@ class BackgroundTask:
             self.result = self.target(*self.args, **self.kwargs)
         except Exception as e:
             self.error = e
-            print(f"Error in background task: {str(e)}")
+            print_message(f"Error in background task: {str(e)}")
             traceback.print_exc()
         finally:
             self._complete = True
@@ -106,7 +107,7 @@ class GUI(MainProcess):
         """Periodically check for completed background tasks"""
         if self.current_task and self.current_task.complete:
             if self.current_task.error:
-                print(f"Task failed: {self.current_task.error}")
+                print_message(f"Task failed: {self.current_task.error}")
             self.current_task = None
             
         if not self.current_task and not self.task_queue.empty():
@@ -240,7 +241,7 @@ class GUI(MainProcess):
             visit_btn.pack(side=tk.LEFT, padx=(10, 20), pady=10)
             
         except Exception as e:
-            print(f"Error setting up logo and link: {str(e)}")
+            print_message(f"Error setting up logo and link: {str(e)}")
 
     def _session_start(self):
         # Update session variables
@@ -252,10 +253,11 @@ class GUI(MainProcess):
             if hf_token:
                 from huggingface_hub import login
                 login(hf_token)
+                print_message('Logged in to Hugging Face')
             if wandb_api_key:
-                print('Wandb not integrated yet')
+                print_message('Wandb not integrated yet')
             if synthyra_api_key:
-                print('Synthyra API not integrated yet')
+                print_message('Synthyra API not integrated yet')
             
             self.full_args.hf_username = self.settings_vars["huggingface_username"].get()
             self.full_args.hf_token = hf_token
@@ -324,7 +326,7 @@ class GUI(MainProcess):
 
     @log_method_calls
     def _get_data(self):
-        print("=== Getting Data ===")
+        print_message("=== Getting Data ===")
         
         # Gather settings
         selected_indices = self.data_listbox.curselection()
@@ -355,7 +357,7 @@ class GUI(MainProcess):
 
             self._write_args()
             self.get_datasets()
-            print("Data downloaded and stored")
+            print_message("Data downloaded and stored")
             
         self.run_in_background(background_get_data)
 
@@ -421,7 +423,7 @@ class GUI(MainProcess):
     @log_method_calls
     def _get_embeddings(self):
         if not self.all_seqs:
-            print('Sequences are not loaded yet. Please run the data tab first.')
+            print_message('Sequences are not loaded yet. Please run the data tab first.')
             return
             
         # Gather settings
@@ -449,9 +451,9 @@ class GUI(MainProcess):
             self.logger_args = SimpleNamespace(**args_dict)
             self._write_args()
             
-            print("Saving embeddings to disk")
+            print_message("Saving embeddings to disk")
             self.save_embeddings_to_disk()
-            print("Embeddings saved to disk")
+            print_message("Embeddings saved to disk")
             
         self.run_in_background(background_get_embeddings)
 
@@ -479,15 +481,15 @@ class GUI(MainProcess):
 
         # Update full_args with model settings
         self.full_args.model_names = selected_models
-        print(self.full_args.model_names)
+        print_message(self.full_args.model_names)
         # Create model args from full args
         self.model_args = BaseModelArguments(**self.full_args.__dict__)
 
-        print("Model Args:")
+        print_message("Model Args:")
         for k, v in self.model_args.__dict__.items():
             if k != 'model_names':
-                print(f"{k}:\n{v}")
-        print("=========================\n")
+                print_message(f"{k}:\n{v}")
+        print_message("=========================\n")
         args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
         self.logger_args = SimpleNamespace(**args_dict)
         self._write_args()
@@ -808,7 +810,7 @@ class GUI(MainProcess):
     
     @log_method_calls
     def _create_probe_args(self):
-        print("=== Creating Probe ===")
+        print_message("=== Creating Probe ===")
         
         # Convert pooling types string to list
         probe_pooling_types = [p.strip() for p in self.settings_vars["probe_pooling_types"].get().split(",")]
@@ -836,11 +838,11 @@ class GUI(MainProcess):
         # Create probe args from full args
         self.probe_args = ProbeArguments(**self.full_args.__dict__)
         
-        print("Probe Arguments:")
+        print_message("Probe Arguments:")
         for k, v in self.probe_args.__dict__.items():
             if k != 'model_names':
-                print(f"{k}:\n{v}")
-        print("========================\n")
+                print_message(f"{k}:\n{v}")
+        print_message("========================\n")
         args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
         self.logger_args = SimpleNamespace(**args_dict)
         self._write_args()
@@ -877,7 +879,7 @@ class GUI(MainProcess):
     def _start_replay(self):
         replay_path = self.settings_vars["replay_path"].get()
         if not replay_path:
-            print("Please select a replay log file first")
+            print_message("Please select a replay log file first")
             return
         
         from logger import LogReplayer
@@ -890,7 +892,7 @@ class GUI(MainProcess):
             if key in self.settings_vars:
                 self.settings_vars[key].set(value)
         
-        print(f"Loaded settings from {replay_path}")
+        print_message(f"Loaded settings from {replay_path}")
         replayer.run_replay(self)
 
     def add_help_button(self, parent, row, column, help_text):

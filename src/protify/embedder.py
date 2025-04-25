@@ -2,14 +2,14 @@ import os
 import torch
 import warnings
 import sqlite3
-import numpy as np
 import gzip
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
-from dataclasses import dataclass, field
-from typing import Optional, Callable, List, Dict, Tuple
+from dataclasses import dataclass
+from typing import Optional, Callable, List, Tuple
+from huggingface_hub import hf_hub_download
 from base_models.get_base_models import get_base_model
-from utils import torch_load
+from utils import torch_load, print_message
 
 
 @dataclass
@@ -157,10 +157,48 @@ class Embedder:
         self.embedding_save_dir = args.embedding_save_dir
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f'Device {self.device} found')
+        print_message(f'Device {self.device} found')
 
-    def _download_embeddings(self):
-        pass
+    def _download_embeddings(self, model_name: str):
+        # download from download_dir
+        # unzip
+        # move to embedding_save_dir
+        local_path = hf_hub_download(
+            repo_id=self.download_dir,
+            filename=f'embeddings/{model_name}_{self.matrix_embed}.pth.gz',
+            repo_type='dataset'
+        )
+        # unzip
+        print_message(f'Unzipping {local_path}')
+        with gzip.open(local_path, 'rb') as f_in:
+            with open(local_path.replace('.gz', ''), 'wb') as f_out:
+                f_out.write(f_in.read())
+        # move to embedding_save_dir
+        unzipped_path = local_path.replace('.gz', '')
+        final_path = os.path.join(self.embedding_save_dir, f'{model_name}_{self.matrix_embed}.pth')
+        
+        if os.path.exists(final_path):
+            print_message(f'Found existing embeddings in {final_path}')
+            # Load downloaded embeddings
+            downloaded_embeddings = torch_load(unzipped_path)
+            existing_embeddings = torch_load(final_path)
+
+            download_dtype = torch.float16
+            if self.embed_dtype != download_dtype:
+                print_message(f"Warning:\nDownloaded embeddings are {download_dtype} but the current setting is {self.embed_dtype}\nWhen combining with existing embeddings, this could result in unintended biases or reductions in performance")
+
+            # Combine with existing embeddings
+            print_message('Combining and casting')
+            downloaded_embeddings.update(existing_embeddings)
+
+            # Cast all embeddings to the correct dtype
+            for seq in downloaded_embeddings:
+                downloaded_embeddings[seq] = downloaded_embeddings[seq].to(self.embed_dtype)
+
+            # Save the combined embeddings
+            print_message(f'Saving combined embeddings to {final_path}')
+            torch.save(downloaded_embeddings, final_path)
+        return final_path
 
     def _read_sequences_from_db(self, db_path: str) -> set[str]:
         """Read sequences from SQLite database."""
@@ -184,25 +222,27 @@ class Embedder:
                 c = conn.cursor()
                 c.execute('CREATE TABLE IF NOT EXISTS embeddings (sequence text PRIMARY KEY, embedding blob)')
                 already_embedded = self._read_sequences_from_db(save_path)
-                print(f"Loaded {len(already_embedded)} already embedded sequences from {save_path}")
                 to_embed = [seq for seq in self.all_seqs if seq not in already_embedded]
-                print(f"Embedding {len(to_embed)} new sequences")
+                print_message(f"Loaded {len(already_embedded)} already embedded sequences from {save_path}\nEmbedding {len(to_embed)} new sequences")
                 return to_embed, save_path, {}
             else:
-                print(f"No embeddings found in {save_path}")
+                print_message(f"No embeddings found in {save_path}")
                 return self.all_seqs, save_path, {}
 
         else:
             embeddings_dict = {}
             save_path = os.path.join(self.embedding_save_dir, f'{model_name}_{self.matrix_embed}.pth')
             if os.path.exists(save_path):
-                print(f"Loading embeddings from {save_path}")
+                print_message(f"Loading embeddings from {save_path}")
                 embeddings_dict = torch_load(save_path)
-                print(f"Loaded {len(embeddings_dict)} embeddings from {save_path}")
+                print_message(f"Loaded {len(embeddings_dict)} embeddings from {save_path}")
+                # Cast existing embeddings to the specified dtype
+                #for seq in embeddings_dict:
+                #    embeddings_dict[seq] = embeddings_dict[seq].to(self.embed_dtype)
                 to_embed = [seq for seq in self.all_seqs if seq not in embeddings_dict]
                 return to_embed, save_path, embeddings_dict
             else:
-                print(f"No embeddings found in {save_path}")
+                print_message(f"No embeddings found in {save_path}")
                 return self.all_seqs, save_path, {}
 
     def _embed_sequences(
@@ -217,7 +257,7 @@ class Embedder:
         torch.compile(model)
         device = self.device
         collate_fn = build_collator(tokenizer)
-        print('Pooling types: ', self.pooling_types)
+        print_message(f'Pooling types: {self.pooling_types}')
         if self.pooling_types[0] == 'parti':
             pooler = pool_parti
         elif not self.matrix_embed:
@@ -248,8 +288,7 @@ class Embedder:
                         residue_embeddings, attentions = model(input_ids, attention_mask, output_attentions=True)
                         embeddings = pooler(residue_embeddings, attentions, attention_mask).cpu()
                     except Exception as e:
-                        print(f"Error in parti pooling: {e}")
-                        print(f"Defaulting to mean pooling")
+                        print_message(f"Error in parti pooling: {e}\nDefaulting to mean pooling")
                         self.pooling_types = ['mean']
                         pooler = Pooler(self.pooling_types)
                         residue_embeddings = model(input_ids, attention_mask)
@@ -277,7 +316,7 @@ class Embedder:
             return None
         
         if self.save_embeddings:
-            print(f"Saving embeddings to {save_path}")
+            print_message(f"Saving embeddings to {save_path}")
             torch.save(embeddings_dict, save_path)
             
         return embeddings_dict
@@ -285,17 +324,18 @@ class Embedder:
     def __call__(self, model_name: str):
         if self.download_embeddings:
             self._download_embeddings(model_name)
+
+        if self.device == 'cpu':
+            warnings.warn("Downloading embeddings is recommended for CPU usage - Embedding on CPU will be extremely slow!")
+        to_embed, save_path, embeddings_dict = self._read_embeddings_from_disk(model_name)
+        
+        if len(to_embed) > 0:
+            print_message(f"Embedding {len(to_embed)} sequences with {model_name}")
+            model, tokenizer = get_base_model(model_name)
+            return self._embed_sequences(to_embed, save_path, model, tokenizer, embeddings_dict)
         else:
-            if self.device == 'cpu':
-                warnings.warn("Downloading embeddings is recommended for CPU usage - Embedding on CPU will be extremely slow!")
-            to_embed, save_path, embeddings_dict = self._read_embeddings_from_disk(model_name)
-            if len(to_embed) > 0:
-                print(f"Embedding {len(to_embed)} sequences with {model_name}")
-                model, tokenizer = get_base_model(model_name)
-                return self._embed_sequences(to_embed, save_path, model, tokenizer, embeddings_dict)
-            else:
-                print(f"No sequences to embed with {model_name}")
-                return None
+            print_message(f"No sequences to embed with {model_name}")
+            return None
 
 
 if __name__ == '__main__':
@@ -315,7 +355,7 @@ if __name__ == '__main__':
     parser.add_argument('--embed_dtype', type=str, default='float16')
     parser.add_argument('--embedding_save_dir', type=str, default='embeddings')
     parser.add_argument('--download_dir', type=str, default='Synthyra/mean_pooled_embeddings')
-    parser.add_argument('--compress', action='store_true', help='Compress embeddings with gzip before uploading')
+    parser.add_argument('--compress', default=True, action='store_true', help='Compress embeddings with gzip before uploading')
     args = parser.parse_args()
 
     if args.token is not None:
@@ -361,6 +401,7 @@ if __name__ == '__main__':
         # Compress file if requested
         if args.compress:
             compressed_path = f"{save_path}.gz"
+            print(f"Compressing {save_path} to {compressed_path}")
             with open(save_path, 'rb') as f_in:
                 with gzip.open(compressed_path, 'wb') as f_out:
                     f_out.write(f_in.read())
@@ -374,6 +415,7 @@ if __name__ == '__main__':
             path_or_fileobj=upload_path,
             path_in_repo=path_in_repo,
             repo_id=args.download_dir,
-            repo_type='dataset')
+            repo_type='dataset'
+        )
 
     print('Done')

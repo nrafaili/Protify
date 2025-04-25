@@ -8,7 +8,7 @@ from sklearn.decomposition import PCA as SklearnPCA
 from sklearn.manifold import TSNE as SklearnTSNE
 from typing import Optional, Union, List
 from matplotlib.colors import LinearSegmentedColormap
-from utils import torch_load
+from utils import torch_load, print_message
 
 
 @dataclass
@@ -60,7 +60,7 @@ class DimensionalityReducer:
                     embedding = embedding.mean(axis=0)
                 embeddings.append(embedding)
 
-        print(f"Loaded {len(embeddings)} embeddings")
+        print_message(f"Loaded {len(embeddings)} embeddings")
         self.embeddings = np.stack(embeddings)
         if labels is not None:
             # Convert labels to a numpy array. For multi-label, this can be shape (num_samples, num_labels).
@@ -77,9 +77,9 @@ class DimensionalityReducer:
         if self.embeddings is None:
             raise ValueError("No embeddings loaded. Call load_embeddings() first.")
             
-        print("Fitting and transforming")
+        print_message("Fitting and transforming")
         reduced = self.fit_transform()
-        print("Plotting")
+        print_message("Plotting")
         plt.figure(figsize=self.args.fig_size)
         
         if self.labels is None:
@@ -226,8 +226,8 @@ if __name__ == "__main__":
     )
     
     for Reducer in [PCA, TSNE, UMAP]:
-        print(f"Running {Reducer.__name__}")
+        print_message(f"Running {Reducer.__name__}")
         reducer = Reducer(vis_args)
-        print("Loading embeddings")
+        print_message("Loading embeddings")
         reducer.load_embeddings(sequences, labels)
         reducer.plot(f"{dataset_name}_{Reducer.__name__}.png")

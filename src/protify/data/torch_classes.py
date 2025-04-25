@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from typing import List, Tuple
 from tqdm.auto import tqdm
 from torch.utils.data import Dataset as TorchDataset
+from utils import print_message
 from .utils import pad_and_concatenate_dimer
 # from torch.nn.utils.rnn import pad_sequence
 
@@ -179,9 +180,9 @@ class PairEmbedsLabelsDatasetFromDisk(TorchDataset):
     def check_seqs(self, all_seqs):
         missing_seqs = [seq for seq in self.seqs_a + self.seqs_b if seq not in all_seqs]
         if missing_seqs:
-            print('Sequences not found in embeddings:', missing_seqs)
+            print_message('Sequences not found in embeddings:', missing_seqs)
         else:
-            print('All sequences in embeddings')
+            print_message('All sequences in embeddings')
 
     def reset_epoch(self):
         data = list(zip(self.seqs_a, self.seqs_b, self.labels))
@@ -310,7 +311,7 @@ class EmbedsLabelsDatasetFromDisk(TorchDataset):
         self.seqs, self.labels = hf_dataset[col_name], hf_dataset[label_col]
         self.length = len(self.labels)
         self.max_length = len(max(self.seqs, key=len))
-        print('Max length: ', self.max_length)
+        print_message('Max length: ', self.max_length)
 
         self.db_file = db_path
         self.batch_size = batch_size
@@ -335,9 +336,9 @@ class EmbedsLabelsDatasetFromDisk(TorchDataset):
             if cond:
                 break
         if cond:
-            print('Sequences not found in embeddings')
+            print_message('Sequences not found in embeddings')
         else:
-            print('All sequences in embeddings')
+            print_message('All sequences in embeddings')
 
     def reset_epoch(self):
         data = list(zip(self.seqs, self.labels))
@@ -395,7 +396,7 @@ class EmbedsLabelsDataset(TorchDataset):
         self.labels = hf_dataset[label_col]
         self.task_type = task_type
         self.max_length = len(max(hf_dataset[col_name], key=len))
-        print('Max length: ', self.max_length)
+        print_message('Max length: ', self.max_length)
 
     def __len__(self):
         return len(self.labels)

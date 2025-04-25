@@ -278,9 +278,9 @@ class LogReplayer:
         `target_obj` is an instance of the class/script that we want to replay.
         """
         for method in self.method_calls:
-            print(f"Replaying call to: {method}()")
+            print_message(f"Replaying call to: {method}()")
             func = getattr(target_obj, method, None)
             if not func:
-                print(f"Warning: {method} not found on target object.")
+                print_message(f"Warning: {method} not found on target object.")
                 continue
             func()

@@ -1,5 +1,5 @@
 import torch.nn as nn
-
+from utils import print_message
 
 def get_loss_fct(task_type):
     """
@@ -12,5 +12,5 @@ def get_loss_fct(task_type):
     elif task_type == 'regression':
         loss_fct = nn.MSELoss()
     else:
-        print(f'Specified wrong classification type {task_type}')
+        print_message(f'Specified wrong classification type {task_type}')
     return loss_fct

@@ -11,7 +11,7 @@ from data.torch_classes import (
     EmbedsLabelsDataset,
     PairEmbedsLabelsDataset
 )
-
+from utils import print_message
 from visualization.ci_plots import regression_ci_plot, classification_ci_plot
 
 
@@ -192,17 +192,17 @@ def train_model(
         callbacks=[EarlyStoppingCallback(early_stopping_patience=trainer_args.patience)]
     )
     metrics = trainer.evaluate(test_dataset)
-    print(f'Initial metrics: \n{metrics}\n')
+    print_message(f'Initial metrics: \n{metrics}\n')
 
     trainer.train()
 
     valid_metrics = trainer.evaluate(valid_dataset)
-    print(f'Final validation metrics: \n{valid_metrics}\n')
+    print_message(f'Final validation metrics: \n{valid_metrics}\n')
 
     y_pred, y_true, test_metrics = trainer.predict(test_dataset)
-    print(f'y_pred: {y_pred.shape}')
-    print(f'y_true: {y_true.shape}')
-    print(f'Final test metrics: \n{test_metrics}\n')
+    print_message(f'y_pred: {y_pred.shape}')
+    print_message(f'y_true: {y_true.shape}')
+    print_message(f'Final test metrics: \n{test_metrics}\n')
 
     ### TODO PAUC plot
     if task_type == 'regression':
@@ -214,7 +214,7 @@ def train_model(
         try:
             trainer.model.push_to_hub(trainer_args.model_save_dir, private=True)
         except Exception as e:
-            print(f'Error saving model: {e}')
+            print_message(f'Error saving model: {e}')
 
     model = trainer.model.cpu()
     trainer.accelerator.free_memory()

@@ -1,5 +1,6 @@
 import os
 import torch
+import shutil
 from functools import partial
 
 
@@ -8,6 +9,16 @@ torch_load = partial(torch.load, map_location='cpu', weights_only=True)
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
+
+
+def print_message(message: str):
+    try:
+        terminal_width = shutil.get_terminal_size().columns
+    except:
+        terminal_width = 50
+    print('\n' + '-' * terminal_width)
+    print(f'\n{message}\n')
+    print('-' * terminal_width + '\n')
 
 
 if __name__ == '__main__':

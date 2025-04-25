@@ -14,13 +14,13 @@ Spearman / R² / Pearson).
 import argparse
 import json
 import math
-from pathlib import Path
-from typing import List, Dict, Optional
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from pathlib import Path
+from typing import List, Dict, Optional
+from utils import print_message
 
 
 def radar_factory(num_vars: int):
@@ -187,7 +187,7 @@ def create_plots(df: pd.DataFrame, *,
 
         metric_key, metric_pretty = choose_metric(task_rows, models, metric_table)
         if metric_key is None:
-            print(f'No common metric for {task_name}; skipping.')
+            print_message(f'No common metric for {task_name}; skipping.')
             continue
 
         datasets = [r['dataset'] for r in task_rows]
@@ -205,7 +205,7 @@ def create_plots(df: pd.DataFrame, *,
                    title=f'{metric_pretty} across {task_name} datasets',
                    output_file=radar_path,
                    normalize=normalize)
-        print(f'🌐  radar plot → {radar_path}')
+        print_message(f'🌐  radar plot → {radar_path}')
 
         # bar
         bar_path = outdir / f'{fig_id}_bar_{task_name}.png'
@@ -213,7 +213,7 @@ def create_plots(df: pd.DataFrame, *,
                  metric_name=metric_pretty,
                  task_type=task_name,
                  output_file=bar_path)
-        print(f'📊  bar plot  → {bar_path}')
+        print_message(f'📊  bar plot  → {bar_path}')
 
 
 def main():
@@ -230,7 +230,7 @@ def main():
                  outdir=Path(args.output_dir),
                  fig_id=fig_id,
                  normalize=args.normalize)
-    print('✅  All plots saved.')
+    print_message('✅  All plots saved.')
 
 
 if __name__ == '__main__':

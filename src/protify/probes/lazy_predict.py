@@ -21,9 +21,11 @@ from sklearn.metrics import (
     r2_score,
     mean_squared_error,
 )
+from utils import print_message
 warnings.filterwarnings("ignore")
 pd.set_option("display.precision", 2)
 pd.set_option("display.float_format", lambda x: "%.2f" % x)
+
 
 removed_classifiers = [
     "ClassifierChain",
@@ -311,8 +313,8 @@ class LazyClassifier:
                     temp_list.append(full_name)
                 self.classifiers = temp_list
             except Exception as exception:
-                print(exception)
-                print("Invalid Classifier(s)")
+                print_message(exception)
+                print_message("Invalid Classifier(s)")
 
         pbar = tqdm(self.classifiers)
         for name, model in pbar:
@@ -342,8 +344,8 @@ class LazyClassifier:
                 except Exception as exception:
                     roc_auc = None
                     if self.ignore_warnings is False:
-                        print("ROC AUC couldn't be calculated for " + name)
-                        print(exception)
+                        print_message("ROC AUC couldn't be calculated for " + name)
+                        print_message(exception)
                 names.append(name)
                 Accuracy.append(accuracy)
                 B_Accuracy.append(b_accuracy)
@@ -357,7 +359,7 @@ class LazyClassifier:
 
                 if self.verbose > 0:
                     if self.custom_metric is not None:
-                        print(
+                        print_message(
                             {
                                 "Model": name,
                                 "Accuracy": accuracy,
@@ -369,7 +371,7 @@ class LazyClassifier:
                             }
                         )
                     else:
-                        print(
+                        print_message(
                             {
                                 "Model": name,
                                 "Accuracy": accuracy,
@@ -385,8 +387,8 @@ class LazyClassifier:
 
             except Exception as exception:
                 if self.ignore_warnings is False:
-                    print(f'\n{name} model failed to execute')
-                    print(exception)
+                    print_message(f'\n{name} model failed to execute')
+                    print_message(exception)
             pbar.update(1)
         pbar.close()
 
@@ -555,8 +557,8 @@ class LazyRegressor:
                     temp_list.append(full_name)
                 self.regressors = temp_list
             except Exception as exception:
-                print(exception)
-                print("Invalid Regressor(s)")
+                print_message(exception)
+                print_message("Invalid Regressor(s)")
 
         pbar = tqdm(self.regressors)
         for name, model in pbar:
@@ -607,14 +609,14 @@ class LazyRegressor:
                     if self.custom_metric:
                         scores_verbose[self.custom_metric.__name__] = custom_metric
 
-                    print(scores_verbose)
+                    print_message(scores_verbose)
                 if self.predictions:
                     predictions[name] = y_pred
 
             except Exception as exception:
                 if self.ignore_warnings is False:
-                    print(f'\n{name} model failed to execute')
-                    print(exception)
+                    print_message(f'\n{name} model failed to execute')
+                    print_message(exception)
 
             pbar.update(1)
         pbar.close()

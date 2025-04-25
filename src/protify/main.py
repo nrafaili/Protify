@@ -12,7 +12,7 @@ from probes.trainers import TrainerArguments, train_model
 from probes.scikit_classes import ScikitArguments, ScikitProbe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
-from utils import torch_load
+from utils import torch_load, print_message
 
 
 class MainProcess(MetricsLogger, DataMixin):
@@ -280,9 +280,9 @@ def parse_arguments(): # TODO update yaml
         from huggingface_hub import login
         login(args.hf_token)
     if args.wandb_api_key is not None:
-        print('Wandb not integrated yet')
+        print_message('Wandb not integrated yet')
     if args.synthyra_api_key is not None:
-        print('Synthyra API not integrated yet')
+        print_message('Synthyra API not integrated yet')
 
     if args.yaml_path is not None:
         with open(args.yaml_path, 'r') as file: 
@@ -303,15 +303,15 @@ if __name__ == "__main__":
         replay_args.replay_path = args.replay_path
         main = MainProcess(replay_args, GUI=False)
         for k, v in main.full_args.__dict__.items():
-            print(f"{k}:\t{v}")
+            print_message(f"{k}:\t{v}")
         replayer.run_replay(main)
     else:
         main = MainProcess(args, GUI=False)
         for k, v in main.full_args.__dict__.items():
-            print(f"{k}:\t{v}")
+            print_message(f"{k}:\t{v}")
         main.apply_current_settings()
         main.get_datasets()
-        print(len(main.all_seqs))
+        print_message(len(main.all_seqs))
         main.save_embeddings_to_disk()
         if main.full_args.use_scikit:
             main.run_scikit_scheme()

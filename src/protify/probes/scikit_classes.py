@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.model_selection import RandomizedSearchCV
 from typing import Dict, Any, Tuple, Optional
 from metrics import get_regression_scorer, get_classification_scorer, classification_scorer, regression_scorer
+from utils import print_message
 from .lazy_predict import (
     LazyRegressor,
     LazyClassifier,
@@ -119,7 +120,7 @@ class ScikitProbe:
             ModelResults object containing all results and the best model
         """
         # Initial lazy prediction
-        print(f"Initial lazy prediction started")
+        print_message(f"Initial lazy prediction started")
         regressor = LazyRegressor(
             verbose=0,
             ignore_warnings=False,
@@ -132,11 +133,11 @@ class ScikitProbe:
         # Get best model name and class
         best_model_name = initial_scores.index[0]
         best_model_class = regressor.models[best_model_name].named_steps['regressor'].__class__
-        print(f"Best model name: {best_model_name}")
-        print(f"Best model class: {best_model_class}")
-        print(f"Initial scores: \n{initial_scores}")
+        print_message(f"Best model name: {best_model_name}")
+        print_message(f"Best model class: {best_model_class}")
+        print_message(f"Initial scores: \n{initial_scores}")
 
-        print(f"Tuning hyperparameters")
+        print_message(f"Tuning hyperparameters")
         # Tune hyperparameters
         scorer = get_regression_scorer()
         best_model, best_params = self._tune_hyperparameters(
@@ -150,8 +151,8 @@ class ScikitProbe:
         # Get final scores with tuned model
         best_model.fit(X_train, y_train)
         final_scores = scorer(best_model, X_test, y_test)
-        print(f"Final scores: {final_scores}")
-        print(f"Best params: \n{best_params}")
+        print_message(f"Final scores: {final_scores}")
+        print_message(f"Best params: \n{best_params}")
 
         return ModelResults(
             initial_scores=initial_scores,
@@ -181,7 +182,7 @@ class ScikitProbe:
             ModelResults object containing all results and the best model
         """
         # Initial lazy prediction
-        print(f"Initial lazy prediction started")
+        print_message(f"Initial lazy prediction started")
         classifier = LazyClassifier(
             verbose=0,
             ignore_warnings=False,
@@ -194,11 +195,11 @@ class ScikitProbe:
         # Get best model name and class
         best_model_name = initial_scores.index[0]
         best_model_class = classifier.models[best_model_name].named_steps['classifier'].__class__
-        print(f"Best model name: {best_model_name}")
-        print(f"Best model class: {best_model_class}")
-        print(f"Initial scores: \n{initial_scores}")
+        print_message(f"Best model name: {best_model_name}")
+        print_message(f"Best model class: {best_model_class}")
+        print_message(f"Initial scores: \n{initial_scores}")
 
-        print(f"Tuning hyperparameters")
+        print_message(f"Tuning hyperparameters")
         # Tune hyperparameters
         scorer = get_classification_scorer()
         best_model, best_params = self._tune_hyperparameters(
@@ -212,8 +213,8 @@ class ScikitProbe:
         # Get final scores with tuned model
         best_model.fit(X_train, y_train)
         final_scores = scorer(best_model, X_test, y_test)
-        print(f"Final scores: {final_scores}")
-        print(f"Best params: \n{best_params}")
+        print_message(f"Final scores: {final_scores}")
+        print_message(f"Best params: \n{best_params}")
 
         return ModelResults(
             initial_scores=initial_scores,
@@ -249,9 +250,9 @@ class ScikitProbe:
         Returns:
             ModelResults object containing results and the model
         """
-        print("Running specific model")
+        print_message("Running specific model")
         if self.args.production_model:
-            print(f"Running in production mode, train and validation are combined")
+            print_message(f"Running in production mode, train and validation are combined")
             X_train = np.concatenate([X_train, X_valid])
             y_train = np.concatenate([y_train, y_valid])
 
@@ -273,11 +274,11 @@ class ScikitProbe:
             
             # Create and train the model with the best parameters
             cls = model_class(**model_params)
-            print(f"Training model {cls}")
+            print_message(f"Training model {cls}")
             cls.fit(X_train, y_train)
-            print(f"Model trained")
+            print_message(f"Model trained")
             final_scores = scorer(cls, X_test, y_test)
-            print(f"Final scores: {final_scores}")
+            print_message(f"Final scores: {final_scores}")
 
             return ModelResults(
                 initial_scores=None,

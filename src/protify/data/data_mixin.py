@@ -8,6 +8,7 @@ from glob import glob
 from pandas import read_csv, read_excel
 from datasets import load_dataset, Dataset
 from dataclasses import dataclass
+from utils import print_message
 from .supported_datasets import supported_datasets, standard_data_benchmark
 
 
@@ -141,7 +142,7 @@ class DataMixin:
         max_length = self._max_length
         datasets, all_seqs = {}, set()
         for dataset, data_name in zip(hf_datasets, data_names):
-            print(f'Processing {data_name}')
+            print_message(f'Processing {data_name}')
             train_set, valid_set, test_set, ppi = dataset
             if self._trim: # trim by length if necessary
                 original_train_size, original_valid_size, original_test_size = len(train_set), len(valid_set), len(test_set)
@@ -154,9 +155,9 @@ class DataMixin:
                     valid_set = valid_set.filter(lambda x: len(x['seqs']) <= max_length)
                     test_set = test_set.filter(lambda x: len(x['seqs']) <= max_length)
             
-                print(f'Trimmed {100 * round((original_train_size-len(train_set)) / original_train_size, 2)}% from train')
-                print(f'Trimmed {100 * round((original_valid_size-len(valid_set)) / original_valid_size, 2)}% from valid')
-                print(f'Trimmed {100 * round((original_test_size-len(test_set)) / original_test_size, 2)}% from test')
+                print_message(f'Trimmed {100 * round((original_train_size-len(train_set)) / original_train_size, 2)}% from train')
+                print_message(f'Trimmed {100 * round((original_valid_size-len(valid_set)) / original_valid_size, 2)}% from valid')
+                print_message(f'Trimmed {100 * round((original_test_size-len(test_set)) / original_test_size, 2)}% from test')
 
             else: # truncate to max_length
                 if ppi:
@@ -240,7 +241,7 @@ class DataMixin:
         for data_path in self.data_args.data_paths:
             data_name = data_path.split('/')[-1]
             ppi = 'ppi' in data_name.lower()
-            print(f'Loading {data_name}')
+            print_message(f'Loading {data_name}')
             dataset = load_dataset(data_path)
             train_set, valid_set, test_set = dataset['train'], dataset['valid'], dataset['test']
             datasets.append((train_set, valid_set, test_set, ppi))
@@ -350,10 +351,10 @@ class DataMixin:
             valid_array = np.mean(valid_array, axis=1)
             test_array = np.mean(test_array, axis=1)
 
-        print('Numpy dataset shapes')
-        print(f'Train: {train_array.shape}')
-        print(f'Valid: {valid_array.shape}')
-        print(f'Test: {test_array.shape}')
+        print_message('Numpy dataset shapes')
+        print_message(f'Train: {train_array.shape}')
+        print_message(f'Valid: {valid_array.shape}')
+        print_message(f'Test: {test_array.shape}')
         return train_array, valid_array, test_array
 
     def build_pair_vector_numpy_dataset_from_embeddings(
@@ -420,10 +421,10 @@ class DataMixin:
             valid_array = np.mean(valid_array, axis=1)
             test_array = np.mean(test_array, axis=1)
 
-        print('Numpy dataset shapes')
-        print(f'Train: {train_array.shape}')
-        print(f'Valid: {valid_array.shape}')
-        print(f'Test: {test_array.shape}')
+        print_message('Numpy dataset shapes')
+        print_message(f'Train: {train_array.shape}')
+        print_message(f'Valid: {valid_array.shape}')
+        print_message(f'Test: {test_array.shape}')
         return train_array, valid_array, test_array
 
     def prepare_scikit_dataset(self, model_name, dataset):
@@ -451,8 +452,8 @@ class DataMixin:
         y_valid = self._labels_to_numpy(valid_set['labels'])
         y_test = self._labels_to_numpy(test_set['labels'])
 
-        print('Numpy dataset shapes with labels')
-        print(f'Train: {X_train.shape}, {y_train.shape}')
-        print(f'Valid: {X_valid.shape}, {y_valid.shape}')
-        print(f'Test: {X_test.shape}, {y_test.shape}')
+        print_message('Numpy dataset shapes with labels')
+        print_message(f'Train: {X_train.shape}, {y_train.shape}')
+        print_message(f'Valid: {X_valid.shape}, {y_valid.shape}')
+        print_message(f'Test: {X_test.shape}, {y_test.shape}')
         return X_train, y_train, X_valid, y_valid, X_test, y_test, label_type
