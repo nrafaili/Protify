@@ -3,6 +3,7 @@ import torch
 import warnings
 import sqlite3
 import numpy as np
+import gzip
 from torch.utils.data import Dataset, DataLoader
 from tqdm.auto import tqdm
 from dataclasses import dataclass, field
@@ -314,6 +315,7 @@ if __name__ == '__main__':
     parser.add_argument('--embed_dtype', type=str, default='float16')
     parser.add_argument('--embedding_save_dir', type=str, default='embeddings')
     parser.add_argument('--download_dir', type=str, default='Synthyra/mean_pooled_embeddings')
+    parser.add_argument('--compress', action='store_true', help='Compress embeddings with gzip before uploading')
     args = parser.parse_args()
 
     if args.token is not None:
@@ -355,9 +357,22 @@ if __name__ == '__main__':
     for model_name in model_args.model_names:
         _ = embedder(model_name)
         save_path = os.path.join(args.embedding_save_dir, f'{model_name}_False.pth')
+        
+        # Compress file if requested
+        if args.compress:
+            compressed_path = f"{save_path}.gz"
+            with open(save_path, 'rb') as f_in:
+                with gzip.open(compressed_path, 'wb') as f_out:
+                    f_out.write(f_in.read())
+            upload_path = compressed_path
+            path_in_repo = f'embeddings/{model_name}_False.pth.gz'
+        else:
+            upload_path = save_path
+            path_in_repo = f'embeddings/{model_name}_False.pth'
+            
         upload_file(
-            path_or_fileobj=save_path,
-            path_in_repo=f'embeddings/{model_name}_False.pth',
+            path_or_fileobj=upload_path,
+            path_in_repo=path_in_repo,
             repo_id=args.download_dir,
             repo_type='dataset')
 
