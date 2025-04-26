@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "Protify"
-version = "0.0.2"
-description = "Low code chemcial property prediction"
+version = "0.0.3"
+description = "Low code molecular property prediction"
 authors = ["Synthyra <info@synthyra.com>"]
 keywords = ["plm, protein, transformer"]
 repository = "https://github.com/Synthyra/Protify"

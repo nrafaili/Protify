@@ -37,7 +37,8 @@ class DataArguments:
             max_length: int = 1024,
             trim: bool = False,
             data_dirs: Optional[List[str]] = [],
-            **kwargs):
+            **kwargs
+        ):
         self.data_names = data_names
         self.data_dirs = data_dirs
         self.delimiter = delimiter

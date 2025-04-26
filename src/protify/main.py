@@ -8,17 +8,18 @@ from probes.get_probe import ProbeArguments, get_probe
 from base_models.get_base_models import BaseModelArguments, get_tokenizer, get_base_model_for_training
 from base_models.utils import wrap_lora
 from data.data_mixin import DataMixin, DataArguments
-from probes.trainers import TrainerArguments, train_probe, train_base_model, train_hybrid_model
+from probes.trainers import TrainerMixin, TrainerArguments
 from probes.scikit_classes import ScikitArguments, ScikitProbe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
 from utils import torch_load, print_message
 
 
-class MainProcess(MetricsLogger, DataMixin):
+class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
     def __init__(self, full_args, GUI=False):
         super(MainProcess, self).__init__(full_args)
-        super(DataMixin, self).__init__()
+        super(DataMixin, self).__init__(full_args)
+        super(TrainerMixin, self).__init__(full_args)
         self.full_args = full_args
         if not GUI:
             self.start_log_main()

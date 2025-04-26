@@ -93,249 +93,247 @@ class TrainerArguments:
         )
 
 
-def train(
-        model,
-        task_type,
-        trainer_args,
-        data_collator,
-        train_dataset,
-        valid_dataset,
-        test_dataset,
-        model_name,
-        data_name,
-        log_id,
-    ):
+class TrainerMixin:
+    def __init__(self, trainer_args: TrainerArguments):
+        self.trainer_args = trainer_args
 
-    compute_metrics = get_compute_metrics(task_type)
-    trainer_args.train_data_size = len(train_dataset)
-    hf_trainer_args = trainer_args()
-    ### TODO add options for optimizers and schedulers
-    trainer = Trainer(
-        model=model,
-        args=hf_trainer_args,
-        train_dataset=train_dataset,
-        eval_dataset=valid_dataset,
-        data_collator=data_collator,
-        compute_metrics=compute_metrics,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=trainer_args.patience)]
-    )
-    metrics = trainer.evaluate(test_dataset)
-    print_message(f'Initial metrics: {metrics}')
-
-    trainer.train()
-
-    valid_metrics = trainer.evaluate(valid_dataset)
-    print_message(f'Final validation metrics: {valid_metrics}')
-
-    y_pred, y_true, test_metrics = trainer.predict(test_dataset)
-    y_pred, y_true = y_pred.astype(np.float32), y_true.astype(np.float32)
-    print_message(f'y_pred: {y_pred.shape}\ny_true: {y_true.shape}\nFinal test metrics: \n{test_metrics}\n')
-
-    output_dir = os.path.join(trainer_args.plots_dir, log_id)
-    os.makedirs(output_dir, parents=True, exist_ok=True)
-    save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}.png")
-
-    if task_type == 'regression':
-        regression_ci_plot(y_true, y_pred, save_path)
-    else:
-        classification_ci_plot(y_true, y_pred, save_path)
-
-    if trainer_args.save:
-        try:
-            trainer.model.push_to_hub(trainer_args.model_save_dir, private=True)
-        except Exception as e:
-            print_message(f'Error saving model: {e}')
-
-    model = trainer.model.cpu()
-    trainer.accelerator.free_memory()
-    torch.cuda.empty_cache()
-    return model, valid_metrics, test_metrics
-
-
-def train_probe(
-        model,
-        tokenizer,
-        trainer_args,
-        embedding_args,
-        model_name,
-        data_name,
-        input_dim,
-        task_type,
-        train_dataset,
-        valid_dataset,
-        test_dataset,
-        emb_dict=None,
-        ppi=False,
-        log_id=None,
-    ):
-
-    batch_size = trainer_args.batch_size
-    read_scaler = trainer_args.read_scaler
-    full = embedding_args.matrix_embed
-    db_path = os.path.join(embedding_args.embedding_save_dir, f'{model_name}_{full}.db')
-
-    if embedding_args.sql:
-        if ppi:
-            if full:
-                raise ValueError('Full matrix embeddings not currently supported for SQL and PPI') # TODO: Implement
-            DatasetClass = PairEmbedsLabelsDatasetFromDisk
-            CollatorClass = PairEmbedsLabelsCollator
-        else:
-            DatasetClass = EmbedsLabelsDatasetFromDisk
-            CollatorClass = EmbedsLabelsCollator
-    else:
-        if ppi:
-            DatasetClass = PairEmbedsLabelsDataset
-            CollatorClass = PairEmbedsLabelsCollator
-        else:
-            DatasetClass = EmbedsLabelsDataset
-            CollatorClass = EmbedsLabelsCollator
-
-    """
-    For collator need to pass tokenizer, full, task_type
-    For dataset need to pass
-    hf_dataset, col_a, col_b, label_col, input_dim, task_type, db_path, emb_dict, batch_size, read_scaler, full, train
-    """
-
-    data_collator = CollatorClass(tokenizer=tokenizer, full=full, task_type=task_type)
-    train_dataset = DatasetClass(
-        hf_dataset=train_dataset,
-        input_dim=input_dim,
-        task_type=task_type,
-        db_path=db_path,
-        emb_dict=emb_dict,
-        batch_size=batch_size,
-        read_scaler=read_scaler,
-        full=full,
-        train=True
-    )
-    valid_dataset = DatasetClass(
-        hf_dataset=valid_dataset,
-        input_dim=input_dim,
-        task_type=task_type,
-        db_path=db_path,
-        emb_dict=emb_dict,
-        batch_size=batch_size,
-        read_scaler=read_scaler,
-        full=full,
-        train=False
-    )
-    test_dataset = DatasetClass(
-        hf_dataset=test_dataset,
-        input_dim=input_dim,
-        task_type=task_type,
-        db_path=db_path,
-        emb_dict=emb_dict,
-        batch_size=batch_size,
-        read_scaler=read_scaler,
-        full=full,
-        train=False
-    )
-
-    return train(
-        model=model,
-        task_type=task_type,
-        trainer_args=trainer_args,
-        data_collator=data_collator,
-        train_dataset=train_dataset,
-        valid_dataset=valid_dataset,
-        test_dataset=test_dataset,
-        model_name=model_name,
-        data_name=data_name,
-        log_id=log_id,
-    )
-
-
-def train_base_model(
-        model,
-        tokenizer,
-        trainer_args,
-        model_name,
-        data_name,
-        task_type,
-        train_dataset,
-        valid_dataset,
-        test_dataset,
-        ppi=False,
-        log_id=None,
-    ):
-        if ppi:
-            DatasetClass = PairStringLabelDataset
-            CollatorClass = PairCollator_input_ids
-        else:
-            DatasetClass = StringLabelDataset
-            CollatorClass = StringLabelsCollator
-
-        data_collator = CollatorClass(tokenizer=tokenizer)
-
-        train_dataset = DatasetClass(hf_dataset=train_dataset, train=True)
-        valid_dataset = DatasetClass(hf_dataset=valid_dataset, train=False)
-        test_dataset = DatasetClass(hf_dataset=test_dataset, train=False)
-
-        return train(
+    def _train(
+            self,
+            model,
+            train_dataset,
+            valid_dataset,
+            test_dataset,
+            data_collator,
+            task_type,
+            log_id,
+            model_name,
+            data_name,
+        ):
+        compute_metrics = get_compute_metrics(task_type)
+        self.trainer_args.train_data_size = len(train_dataset)
+        hf_trainer_args = self.trainer_args()
+        ### TODO add options for optimizers and schedulers
+        trainer = Trainer(
             model=model,
-            task_type=task_type,
-            trainer_args=trainer_args,
-            data_collator=data_collator,
+            args=hf_trainer_args,
             train_dataset=train_dataset,
-            valid_dataset=valid_dataset,
-            test_dataset=test_dataset,
-            model_name=model_name,
-            data_name=data_name,
-            log_id=log_id,
+            eval_dataset=valid_dataset,
+            data_collator=data_collator,
+            compute_metrics=compute_metrics,
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=self.trainer_args.patience)]
         )
+        metrics = trainer.evaluate(test_dataset)
+        print_message(f'Initial metrics: {metrics}')
 
+        trainer.train()
 
+        valid_metrics = trainer.evaluate(valid_dataset)
+        print_message(f'Final validation metrics: {valid_metrics}')
 
-def train_hybrid_model(
-        model,
-        tokenizer,
-        probe,
-        trainer_args,
-        embedding_args,
-        model_name,
-        data_name,
-        tokenwise,
-        input_dim,
-        task_type,
-        train_dataset,
-        valid_dataset,
-        test_dataset,
-        emb_dict=None,
-        ppi=False,
-        log_id=None,
-    ):
-        probe = train_probe(
-            model=probe,
-            tokenizer=tokenizer,
-            trainer_args=trainer_args,
-            embedding_args=embedding_args,
-            model_name=model_name,
-            data_name=data_name,
+        y_pred, y_true, test_metrics = trainer.predict(test_dataset)
+        y_pred, y_true = y_pred.astype(np.float32), y_true.astype(np.float32)
+        print_message(f'y_pred: {y_pred.shape}\ny_true: {y_true.shape}\nFinal test metrics: \n{test_metrics}\n')
+
+        output_dir = os.path.join(self.trainer_args.plots_dir, log_id)
+        os.makedirs(output_dir, parents=True, exist_ok=True)
+        save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}.png")
+
+        if task_type == 'regression':
+            regression_ci_plot(y_true, y_pred, save_path)
+        else:
+            classification_ci_plot(y_true, y_pred, save_path)
+
+        if self.trainer_args.save:
+            try:
+                trainer.model.push_to_hub(self.trainer_args.model_save_dir, private=True)
+            except Exception as e:
+                print_message(f'Error saving model: {e}')
+
+        model = trainer.model.cpu()
+        trainer.accelerator.free_memory()
+        torch.cuda.empty_cache()
+        return model, valid_metrics, test_metrics
+
+    def train_probe(
+            self,
+            model,
+            tokenizer,
+            model_name,
+            data_name,
+            train_dataset,
+            valid_dataset,
+            test_dataset,
+            emb_dict=None,
+            ppi=False,
+            log_id=None,
+        ):
+        batch_size = self.trainer_args.batch_size
+        read_scaler = self.trainer_args.read_scaler
+        input_dim = self.probe_args.input_dim
+        task_type = self.probe_args.task_type
+        full = self.embedding_args.matrix_embed
+        db_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{full}.db')
+
+        if self.embedding_args.sql:
+            if ppi:
+                if full:
+                    raise ValueError('Full matrix embeddings not currently supported for SQL and PPI') # TODO: Implement
+                DatasetClass = PairEmbedsLabelsDatasetFromDisk
+                CollatorClass = PairEmbedsLabelsCollator
+            else:
+                DatasetClass = EmbedsLabelsDatasetFromDisk
+                CollatorClass = EmbedsLabelsCollator
+        else:
+            if ppi:
+                DatasetClass = PairEmbedsLabelsDataset
+                CollatorClass = PairEmbedsLabelsCollator
+            else:
+                DatasetClass = EmbedsLabelsDataset
+                CollatorClass = EmbedsLabelsCollator
+
+        """
+        For collator need to pass tokenizer, full, task_type
+        For dataset need to pass
+        hf_dataset, col_a, col_b, label_col, input_dim, task_type, db_path, emb_dict, batch_size, read_scaler, full, train
+        """
+
+        data_collator = CollatorClass(tokenizer=tokenizer, full=full, task_type=task_type)
+        train_dataset = DatasetClass(
+            hf_dataset=train_dataset,
             input_dim=input_dim,
             task_type=task_type,
+            db_path=db_path,
+            emb_dict=emb_dict,
+            batch_size=batch_size,
+            read_scaler=read_scaler,
+            full=full,
+            train=True
+        )
+        valid_dataset = DatasetClass(
+            hf_dataset=valid_dataset,
+            input_dim=input_dim,
+            task_type=task_type,
+            db_path=db_path,
+            emb_dict=emb_dict,
+            batch_size=batch_size,
+            read_scaler=read_scaler,
+            full=full,
+            train=False
+        )
+        test_dataset = DatasetClass(
+            hf_dataset=test_dataset,
+            input_dim=input_dim,
+            task_type=task_type,
+            db_path=db_path,
+            emb_dict=emb_dict,
+            batch_size=batch_size,
+            read_scaler=read_scaler,
+            full=full,
+            train=False
+        )
+        return self._train(
+            model=model,
             train_dataset=train_dataset,
             valid_dataset=valid_dataset,
             test_dataset=test_dataset,
-            emb_dict=emb_dict,
-            ppi=ppi,
+            data_collator=data_collator,
+            task_type=task_type,
             log_id=log_id,
-        )
-        config = HybridProbeConfig(
-            tokenwise=tokenwise,
-            pooling_types=embedding_args.embedding_pooling_types,
-        )
-        hybrid_model = HybridProbe(config=config, model=model, probe=probe)
-        return train_base_model(
-            model=hybrid_model,
-            tokenizer=tokenizer,
-            trainer_args=trainer_args,
             model_name=model_name,
             data_name=data_name,
-            task_type=task_type,
-            train_dataset=train_dataset,
-            valid_dataset=valid_dataset,
-            test_dataset=test_dataset,
-            ppi=ppi,
-            log_id=log_id,
         )
+
+    def train_base_model(
+            self,
+            model,
+            tokenizer,
+            model_name,
+            data_name,
+            task_type,
+            train_dataset,
+            valid_dataset,
+            test_dataset,
+            ppi=False,
+            log_id=None,
+        ):
+        if self.embedding_args.sql:
+            if ppi:
+                DatasetClass = PairStringLabelDataset
+                CollatorClass = PairCollator_input_ids
+            else:
+                DatasetClass = StringLabelDataset
+                CollatorClass = StringLabelsCollator
+
+            data_collator = CollatorClass(tokenizer=tokenizer)
+
+            train_dataset = DatasetClass(hf_dataset=train_dataset, train=True)
+            valid_dataset = DatasetClass(hf_dataset=valid_dataset, train=False)
+            test_dataset = DatasetClass(hf_dataset=test_dataset, train=False)
+
+            return self._train(
+                model=model,
+                train_dataset=train_dataset,
+                valid_dataset=valid_dataset,
+                test_dataset=test_dataset,
+                data_collator=data_collator,
+                task_type=task_type,
+                log_id=log_id,
+                model_name=model_name,
+                data_name=data_name,
+            )
+
+    def train_hybrid_model(
+            self,
+            model,
+            tokenizer,
+            probe,
+            model_name,
+            data_name,
+            tokenwise,
+            input_dim,
+            task_type,
+            train_dataset,
+            valid_dataset,
+            test_dataset,
+            emb_dict=None,
+            ppi=False,
+            log_id=None,
+        ):
+            probe = self.train_probe(
+                model=probe,
+                tokenizer=tokenizer,
+                model_name=model_name,
+                data_name=data_name,
+                train_dataset=train_dataset,
+                valid_dataset=valid_dataset,
+                test_dataset=test_dataset,
+                emb_dict=emb_dict,
+                ppi=ppi,
+                log_id=log_id,
+            )
+
+            config = HybridProbeConfig(
+                tokenwise=tokenwise,
+                pooling_types=self.embedding_args.embedding_pooling_types,
+            )
+
+            hybrid_model = HybridProbe(config=config, model=model, probe=probe)
+            
+            return self.train_base_model(
+                model=hybrid_model,
+                tokenizer=tokenizer,
+                model_name=model_name,
+                data_name=data_name,
+                task_type=task_type,
+                train_dataset=train_dataset,
+                valid_dataset=valid_dataset,
+                test_dataset=test_dataset,
+                ppi=ppi,
+                log_id=log_id,
+            )
+
+
+
+
+
+
