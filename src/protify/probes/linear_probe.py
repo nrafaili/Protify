@@ -20,6 +20,7 @@ class LinearProbeConfig(PretrainedConfig):
             pre_ln: bool = True,
             **kwargs,
     ):
+        super().__init__(**kwargs)
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.dropout = dropout

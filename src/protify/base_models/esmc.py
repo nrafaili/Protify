@@ -36,12 +36,15 @@ def build_esmc_model(preset: str):
     return model, tokenizer
 
 
-def get_esmc_for_training(preset: str, tokenwise: bool = False, num_labels: int = None):
+def get_esmc_for_training(preset: str, tokenwise: bool = False, num_labels: int = None, hybrid: bool = False):
     model_path = presets[preset]
-    if tokenwise:
-        model = ESMplusplusForTokenClassification.from_pretrained(model_path, num_labels=num_labels).eval()
+    if hybrid:
+        model = ESMplusplusModel.from_pretrained(model_path).eval()
     else:
-        model = ESMplusplusForSequenceClassification.from_pretrained(model_path, num_labels=num_labels).eval()
+        if tokenwise:
+            model = ESMplusplusForTokenClassification.from_pretrained(model_path, num_labels=num_labels).eval()
+        else:
+            model = ESMplusplusForSequenceClassification.from_pretrained(model_path, num_labels=num_labels).eval()
     tokenizer = model.esm.tokenizer
     return model, tokenizer
 

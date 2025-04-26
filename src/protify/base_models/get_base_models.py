@@ -57,13 +57,13 @@ def get_base_model(model_name: str):
         raise ValueError(f"Model {model_name} not supported")
 
 
-def get_base_model_for_training(model_name: str, tokenwise: bool = False, num_labels: int = None):
+def get_base_model_for_training(model_name: str, tokenwise: bool = False, num_labels: int = None, hybrid: bool = False):
     if 'esm2' in model_name.lower():
         from .esm2 import get_esm2_for_training
-        return get_esm2_for_training(model_name, tokenwise, num_labels)
+        return get_esm2_for_training(model_name, tokenwise, num_labels, hybrid)
     elif 'esmc' in model_name.lower():
         from .esmc import get_esmc_for_training
-        return get_esmc_for_training(model_name, tokenwise, num_labels)
+        return get_esmc_for_training(model_name, tokenwise, num_labels, hybrid)
     else:
         raise ValueError(f"Model {model_name} not supported")
 

@@ -6,7 +6,7 @@ import traceback
 import webbrowser
 import os
 from types import SimpleNamespace
-from tkinter import ttk, font, messagebox
+from tkinter import ttk, messagebox, filedialog
 from base_models.get_base_models import BaseModelArguments, standard_benchmark
 from data.supported_datasets import supported_datasets, standard_data_benchmark, internal_synthyra_datasets
 from embedder import EmbeddingArguments
@@ -17,7 +17,8 @@ from concurrent.futures import ThreadPoolExecutor
 from data.data_mixin import DataArguments
 from probes.scikit_classes import ScikitArguments
 from logger import log_method_calls
-from utils import print_message
+from utils import print_message, print_done, print_title
+from visualization.plot_result import create_plots
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  
@@ -74,6 +75,7 @@ class GUI(MainProcess):
         self.trainer_tab = ttk.Frame(self.notebook)
         self.scikit_tab = ttk.Frame(self.notebook)
         self.replay_tab = ttk.Frame(self.notebook)
+        self.viz_tab = ttk.Frame(self.notebook)
 
         # Add tabs to the notebook
         self.notebook.add(self.info_tab, text="Info")
@@ -84,6 +86,7 @@ class GUI(MainProcess):
         self.notebook.add(self.trainer_tab, text="Trainer")
         self.notebook.add(self.scikit_tab, text="Scikit")
         self.notebook.add(self.replay_tab, text="Replay")
+        self.notebook.add(self.viz_tab, text="Visualization")
 
         # Build these lines
         self.task_queue = queue.Queue()
@@ -102,6 +105,7 @@ class GUI(MainProcess):
         self.build_trainer_tab()
         self.build_scikit_tab()
         self.build_replay_tab()
+        self.build_viz_tab()
 
     def check_task_queue(self):
         """Periodically check for completed background tasks"""
@@ -164,46 +168,52 @@ class GUI(MainProcess):
         paths_frame = ttk.LabelFrame(self.info_tab, text="Paths")
         paths_frame.pack(fill="x", padx=10, pady=5)
 
+        ttk.Label(paths_frame, text='Home Directory:').grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["home_dir"] = tk.StringVar(value=os.getcwd())
+        entry_home_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["home_dir"], width=30)
+        entry_home_dir.grid(row=0, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 0, 2, "Home directory for Protify.")
+
         # Log directory
-        ttk.Label(paths_frame, text="Log Directory:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Log Directory:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["log_dir"] = tk.StringVar(value="logs")
         entry_log_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["log_dir"], width=30)
-        entry_log_dir.grid(row=0, column=1, padx=10, pady=5)
-        self.add_help_button(paths_frame, 0, 2, "Directory where log files will be stored.")
+        entry_log_dir.grid(row=1, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 1, 2, "Directory where log files will be stored.")
 
         # Results directory
-        ttk.Label(paths_frame, text="Results Directory:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Results Directory:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["results_dir"] = tk.StringVar(value="results")
         entry_results_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["results_dir"], width=30)
-        entry_results_dir.grid(row=1, column=1, padx=10, pady=5)
-        self.add_help_button(paths_frame, 1, 2, "Directory where results data will be stored.")
+        entry_results_dir.grid(row=2, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 2, 2, "Directory where results data will be stored.")
 
         # Model save directory
-        ttk.Label(paths_frame, text="Model Save Directory:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Model Save Directory:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["model_save_dir"] = tk.StringVar(value="weights")
         entry_model_save = ttk.Entry(paths_frame, textvariable=self.settings_vars["model_save_dir"], width=30)
-        entry_model_save.grid(row=2, column=1, padx=10, pady=5)
-        self.add_help_button(paths_frame, 2, 2, "Directory where trained models will be saved.")
+        entry_model_save.grid(row=3, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 3, 2, "Directory where trained models will be saved.")
 
-        ttk.Label(paths_frame, text="Plots Directory:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Plots Directory:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["plots_dir"] = tk.StringVar(value="plots")
         entry_plots_dir = ttk.Entry(paths_frame, textvariable=self.settings_vars["plots_dir"], width=30)
-        entry_plots_dir.grid(row=3, column=1, padx=10, pady=5)
-        self.add_help_button(paths_frame, 3, 2, "Directory where plots and visualizations will be saved.")
+        entry_plots_dir.grid(row=4, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 4, 2, "Directory where plots and visualizations will be saved.")
 
         # Embedding save directory
-        ttk.Label(paths_frame, text="Embedding Save Directory:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Embedding Save Directory:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["embedding_save_dir"] = tk.StringVar(value="embeddings")
         entry_embed_save = ttk.Entry(paths_frame, textvariable=self.settings_vars["embedding_save_dir"], width=30)
-        entry_embed_save.grid(row=4, column=1, padx=10, pady=5)
-        self.add_help_button(paths_frame, 4, 2, "Directory where computed embeddings will be saved.")
+        entry_embed_save.grid(row=5, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 5, 2, "Directory where computed embeddings will be saved.")
 
         # Download directory
-        ttk.Label(paths_frame, text="Download Directory:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(paths_frame, text="Download Directory:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["download_dir"] = tk.StringVar(value="Synthyra/mean_pooled_embeddings")
         entry_download = ttk.Entry(paths_frame, textvariable=self.settings_vars["download_dir"], width=30)
-        entry_download.grid(row=5, column=1, padx=10, pady=5)
-        self.add_help_button(paths_frame, 5, 2, "HuggingFace repository path for downloading pre-computed embeddings.")
+        entry_download.grid(row=6, column=1, padx=10, pady=5)
+        self.add_help_button(paths_frame, 6, 2, "HuggingFace repository path for downloading pre-computed embeddings.")
 
         # button to start logging
         start_logging_button = ttk.Button(self.info_tab, text="Start session", command=self._session_start)
@@ -242,38 +252,6 @@ class GUI(MainProcess):
             
         except Exception as e:
             print_message(f"Error setting up logo and link: {str(e)}")
-
-    def _session_start(self):
-        # Update session variables
-        hf_token = self.settings_vars["huggingface_token"].get()
-        synthyra_api_key = self.settings_vars["synthyra_api_key"].get()
-        wandb_api_key = self.settings_vars["wandb_api_key"].get()
-        
-        def background_login():
-            if hf_token:
-                from huggingface_hub import login
-                login(hf_token)
-                print_message('Logged in to Hugging Face')
-            if wandb_api_key:
-                print_message('Wandb not integrated yet')
-            if synthyra_api_key:
-                print_message('Synthyra API not integrated yet')
-            
-            self.full_args.hf_username = self.settings_vars["huggingface_username"].get()
-            self.full_args.hf_token = hf_token
-            self.full_args.synthyra_api_key = synthyra_api_key
-            self.full_args.wandb_api_key = wandb_api_key
-            self.full_args.log_dir = self.settings_vars["log_dir"].get()
-            self.full_args.results_dir = self.settings_vars["results_dir"].get()
-            self.full_args.model_save_dir = self.settings_vars["model_save_dir"].get()
-            self.full_args.plots_dir = self.settings_vars["plots_dir"].get()
-            self.full_args.embedding_save_dir = self.settings_vars["embedding_save_dir"].get()
-            self.full_args.download_dir = self.settings_vars["download_dir"].get()
-            self.full_args.replay_path = None
-            self.logger_args = SimpleNamespace(**self.full_args.__dict__)
-            self.start_log_gui()
-        
-        self.run_in_background(background_login)
 
     def build_data_tab(self):
         # Max length (Spinbox)
@@ -323,43 +301,6 @@ class GUI(MainProcess):
 
         run_button = ttk.Button(self.data_tab, text="Get Data", command=self._get_data)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
-
-    @log_method_calls
-    def _get_data(self):
-        print_message("=== Getting Data ===")
-        
-        # Gather settings
-        selected_indices = self.data_listbox.curselection()
-        selected_datasets = [self.data_listbox.get(i) for i in selected_indices]
-        
-        if not selected_datasets:
-            selected_datasets = standard_data_benchmark
-            
-        def background_get_data():
-            # Update full_args with data settings
-            self.full_args.data_names = selected_datasets
-            self.full_args.data_dirs = []
-            self.full_args.max_length = self.settings_vars["max_length"].get()
-            self.full_args.trim = self.settings_vars["trim"].get()
-            self.full_args.delimiter = self.settings_vars["delimiter"].get()
-            self.full_args.col_names = self.settings_vars["col_names"].get().split(",")
-
-            # Update mixin attributes
-            self._max_length = self.full_args.max_length
-            self._trim = self.full_args.trim
-            self._delimiter = self.full_args.delimiter
-            self._col_names = self.full_args.col_names
-
-            # Create data args and get datasets
-            self.data_args = DataArguments(**self.full_args.__dict__)
-            args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
-            self.logger_args = SimpleNamespace(**args_dict)
-
-            self._write_args()
-            self.get_datasets()
-            print_message("Data downloaded and stored")
-            
-        self.run_in_background(background_get_data)
 
     def build_embed_tab(self):
         # batch_size
@@ -420,43 +361,6 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.embed_tab, text="Embed sequences to disk", command=self._get_embeddings)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
-    @log_method_calls
-    def _get_embeddings(self):
-        if not self.all_seqs:
-            print_message('Sequences are not loaded yet. Please run the data tab first.')
-            return
-            
-        # Gather settings
-        pooling_str = self.settings_vars["embedding_pooling_types"].get().strip()
-        pooling_list = [p.strip() for p in pooling_str.split(",") if p.strip()]
-        dtype_str = self.settings_vars["embed_dtype"].get()
-        dtype_val = self.dtype_map.get(dtype_str, torch.float32)
-        
-        def background_get_embeddings():
-            # Update full args
-            self.full_args.all_seqs = self.all_seqs
-            self.full_args.embedding_batch_size = self.settings_vars["batch_size"].get()
-            self.full_args.embedding_num_workers = self.settings_vars["num_workers"].get()
-            self.full_args.download_embeddings = self.settings_vars["download_embeddings"].get()
-            self.full_args.matrix_embed = self.settings_vars["matrix_embed"].get()
-            self.full_args.embedding_pooling_types = pooling_list
-            self.full_args.save_embeddings = True
-            self.full_args.embed_dtype = dtype_val
-            self.full_args.sql = self.settings_vars["sql"].get()
-            self._sql = self.full_args.sql
-            self._full = self.full_args.matrix_embed
-            
-            self.embedding_args = EmbeddingArguments(**self.full_args.__dict__)
-            args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
-            self.logger_args = SimpleNamespace(**args_dict)
-            self._write_args()
-            
-            print_message("Saving embeddings to disk")
-            self.save_embeddings_to_disk()
-            print_message("Embeddings saved to disk")
-            
-        self.run_in_background(background_get_embeddings)
-
     def build_model_tab(self):
         ttk.Label(self.model_tab, text="Model Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
@@ -468,31 +372,6 @@ class GUI(MainProcess):
 
         run_button = ttk.Button(self.model_tab, text="Select Models", command=self._select_models)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
-
-    @log_method_calls
-    def _select_models(self):
-        # Gather selected model names
-        selected_indices = self.model_listbox.curselection()
-        selected_models = [self.model_listbox.get(i) for i in selected_indices]
-
-        # If no selection, default to the entire standard_benchmark
-        if not selected_models:
-            selected_models = standard_benchmark
-
-        # Update full_args with model settings
-        self.full_args.model_names = selected_models
-        print_message(self.full_args.model_names)
-        # Create model args from full args
-        self.model_args = BaseModelArguments(**self.full_args.__dict__)
-
-        print_message("Model Args:")
-        for k, v in self.model_args.__dict__.items():
-            if k != 'model_names':
-                print_message(f"{k}:\n{v}")
-        print_message("=========================\n")
-        args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
-        self.logger_args = SimpleNamespace(**args_dict)
-        self._write_args()
 
     def build_probe_tab(self):
         # Probe Type
@@ -752,28 +631,271 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.scikit_tab, text="Run Scikit Models", command=self._run_scikit)
         run_button.pack(pady=(20, 10))
 
-    @log_method_calls
-    def _run_scikit(self):
-        # Gather settings for scikit
-        self.full_args.use_scikit = self.settings_vars["use_scikit"].get()
-        self.full_args.scikit_n_iter = self.settings_vars["scikit_n_iter"].get()
-        self.full_args.scikit_cv = self.settings_vars["scikit_cv"].get()
-        self.full_args.scikit_random_state = self.settings_vars["scikit_random_state"].get()
-        self.full_args.scikit_model_name = self.settings_vars["scikit_model_name"].get()
-        self.full_args.n_jobs = self.settings_vars["n_jobs"].get()
+    def build_replay_tab(self):
+        # Create a frame for replay settings
+        replay_frame = ttk.LabelFrame(self.replay_tab, text="Log Replay Settings")
+        replay_frame.pack(fill="x", padx=10, pady=5)
 
-        def background_run_scikit():
-            self.scikit_args = ScikitArguments(**self.full_args.__dict__)
+        # Replay log path
+        ttk.Label(replay_frame, text="Replay Log Path:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["replay_path"] = tk.StringVar(value="")
+        entry_replay = ttk.Entry(replay_frame, textvariable=self.settings_vars["replay_path"], width=40)
+        entry_replay.grid(row=0, column=1, padx=10, pady=5)
+        self.add_help_button(replay_frame, 0, 2, "Path to the log file to replay. Use Browse button to select a file.")
+
+        # Browse button for selecting log file
+        browse_button = ttk.Button(replay_frame, text="Browse", command=self._browse_replay_log)
+        browse_button.grid(row=0, column=2, padx=5, pady=5)
+
+        # Start replay button
+        replay_button = ttk.Button(replay_frame, text="Start Replay", command=self._start_replay)
+        replay_button.grid(row=1, column=0, columnspan=3, pady=20)
+
+    def build_viz_tab(self):
+        # Create a frame for visualization settings
+        viz_frame = ttk.LabelFrame(self.viz_tab, text="Visualization Settings")
+        viz_frame.pack(fill="x", padx=10, pady=5)
+
+        # Result ID entry
+        ttk.Label(viz_frame, text="Result ID:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["result_id"] = tk.StringVar(value="")
+        entry_result_id = ttk.Entry(viz_frame, textvariable=self.settings_vars["result_id"], width=30)
+        entry_result_id.grid(row=0, column=1, padx=10, pady=5)
+        self.add_help_button(viz_frame, 0, 2, "ID of the result to visualize. Will look for results/{result_id}.tsv")
+
+        # Results file path
+        ttk.Label(viz_frame, text="Results File:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["results_file"] = tk.StringVar(value="")
+        entry_results_file = ttk.Entry(viz_frame, textvariable=self.settings_vars["results_file"], width=30)
+        entry_results_file.grid(row=1, column=1, padx=10, pady=5)
+        
+        # Browse button for selecting results file directly
+        browse_button = ttk.Button(viz_frame, text="Browse", command=self._browse_results_file)
+        browse_button.grid(row=1, column=2, padx=5, pady=5)
+        
+        # Use current run checkbox
+        ttk.Label(viz_frame, text="Use Current Run:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["use_current_run"] = tk.BooleanVar(value=True)
+        check_current_run = ttk.Checkbutton(viz_frame, variable=self.settings_vars["use_current_run"])
+        check_current_run.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(viz_frame, 2, 2, "Use results from the current run.")
+
+        # Output directory for plots
+        ttk.Label(viz_frame, text="Output Directory:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["viz_output_dir"] = tk.StringVar(value="plots")
+        entry_output_dir = ttk.Entry(viz_frame, textvariable=self.settings_vars["viz_output_dir"], width=30)
+        entry_output_dir.grid(row=3, column=1, padx=10, pady=5)
+        self.add_help_button(viz_frame, 3, 2, "Directory where plots will be saved.")
+        
+        ttk.Label(viz_frame, text="Normalize:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["normalize"] = tk.BooleanVar(value=False)
+        check_normalize = ttk.Checkbutton(viz_frame, variable=self.settings_vars["normalize"])
+        check_normalize.grid(row=4, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(viz_frame, 4, 2, "Normalize scores per category.")
+
+        # Generate plots button
+        generate_button = ttk.Button(viz_frame, text="Generate Plots", command=self._generate_plots)
+        generate_button.grid(row=99, column=0, columnspan=3, pady=20)
+
+    def add_help_button(self, parent, row, column, help_text):
+        """Add a small help button that displays information when clicked"""
+        help_button = ttk.Button(parent, text="?", width=2, 
+                                command=lambda: messagebox.showinfo("Help", help_text))
+        help_button.grid(row=row, column=column, padx=(0,5), pady=5)
+        return help_button
+
+    def _session_start(self):
+        print_message("Starting Protify session...")
+        # Update session variables
+        hf_token = self.settings_vars["huggingface_token"].get()
+        synthyra_api_key = self.settings_vars["synthyra_api_key"].get()
+        wandb_api_key = self.settings_vars["wandb_api_key"].get()
+
+        def background_login():
+            if hf_token:
+                from huggingface_hub import login
+                login(hf_token)
+                print_message('Logged in to Hugging Face')
+            if wandb_api_key:
+                print_message('Wandb not integrated yet')
+            if synthyra_api_key:
+                print_message('Synthyra API not integrated yet')
+            
+            self.full_args.hf_username = self.settings_vars["huggingface_username"].get()
+            self.full_args.hf_token = hf_token
+            self.full_args.synthyra_api_key = synthyra_api_key
+            self.full_args.wandb_api_key = wandb_api_key
+            self.full_args.home_dir = self.settings_vars["home_dir"].get()
+
+            def _make_true_dir(path):
+                true_path = os.path.join(self.full_args.home_dir, path)
+                os.makedirs(true_path, exist_ok=True)
+                return true_path
+
+            self.full_args.log_dir = _make_true_dir(self.settings_vars["log_dir"].get())
+            self.full_args.results_dir = _make_true_dir(self.settings_vars["results_dir"].get())
+            self.full_args.model_save_dir = _make_true_dir(self.settings_vars["model_save_dir"].get())
+            self.full_args.plots_dir = _make_true_dir(self.settings_vars["plots_dir"].get())
+            self.full_args.embedding_save_dir = _make_true_dir(self.settings_vars["embedding_save_dir"].get())
+            self.full_args.download_dir = _make_true_dir(self.settings_vars["download_dir"].get())
+
+            self.full_args.replay_path = None
+            self.logger_args = SimpleNamespace(**self.full_args.__dict__)
+            self.start_log_gui()
+
+            print_message(f"Session and logging started for id {self.random_id}")
+            print_done()
+        
+        self.run_in_background(background_login)
+
+    @log_method_calls
+    def _select_models(self):
+        print_message("Selecting models...")
+        # Gather selected model names
+        selected_indices = self.model_listbox.curselection()
+        selected_models = [self.model_listbox.get(i) for i in selected_indices]
+
+        # If no selection, default to the entire standard_benchmark
+        if not selected_models:
+            selected_models = standard_benchmark
+
+        # Update full_args with model settings
+        self.full_args.model_names = selected_models
+        print_message(self.full_args.model_names)
+        # Create model args from full args
+        self.model_args = BaseModelArguments(**self.full_args.__dict__)
+
+        print("Model Args:")
+        for k, v in self.model_args.__dict__.items():
+            if k != 'model_names':
+                print(f"{k}:\n{v}")
+        print("=========================\n")
+        args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
+        self.logger_args = SimpleNamespace(**args_dict)
+        self._write_args()
+        print_done()
+
+    @log_method_calls
+    def _get_data(self):
+        print_message("=== Getting Data ===")
+        print_message("Loading and preparing datasets...")
+        
+        # Gather settings
+        selected_indices = self.data_listbox.curselection()
+        selected_datasets = [self.data_listbox.get(i) for i in selected_indices]
+        
+        if not selected_datasets:
+            selected_datasets = standard_data_benchmark
+            
+        def background_get_data():
+            # Update full_args with data settings
+            self.full_args.data_names = selected_datasets
+            self.full_args.data_dirs = []
+            self.full_args.max_length = self.settings_vars["max_length"].get()
+            self.full_args.trim = self.settings_vars["trim"].get()
+            self.full_args.delimiter = self.settings_vars["delimiter"].get()
+            self.full_args.col_names = self.settings_vars["col_names"].get().split(",")
+
+            # Update mixin attributes
+            self._max_length = self.full_args.max_length
+            self._trim = self.full_args.trim
+            self._delimiter = self.full_args.delimiter
+            self._col_names = self.full_args.col_names
+
+            # Create data args and get datasets
+            self.data_args = DataArguments(**self.full_args.__dict__)
+            args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
+            self.logger_args = SimpleNamespace(**args_dict)
+
+            self._write_args()
+            self.get_datasets()
+            print_message("Data downloaded and stored")
+            print_done()
+            
+        self.run_in_background(background_get_data)
+
+    @log_method_calls
+    def _get_embeddings(self):
+        if not self.all_seqs:
+            print_message('Sequences are not loaded yet. Please run the data tab first.')
+            return
+            
+        # Gather settings
+        print_message("Computing embeddings...")
+        pooling_str = self.settings_vars["embedding_pooling_types"].get().strip()
+        pooling_list = [p.strip() for p in pooling_str.split(",") if p.strip()]
+        dtype_str = self.settings_vars["embed_dtype"].get()
+        dtype_val = self.dtype_map.get(dtype_str, torch.float32)
+        
+        def background_get_embeddings():
+            # Update full args
+            self.full_args.all_seqs = self.all_seqs
+            self.full_args.embedding_batch_size = self.settings_vars["batch_size"].get()
+            self.full_args.embedding_num_workers = self.settings_vars["num_workers"].get()
+            self.full_args.download_embeddings = self.settings_vars["download_embeddings"].get()
+            self.full_args.matrix_embed = self.settings_vars["matrix_embed"].get()
+            self.full_args.embedding_pooling_types = pooling_list
+            self.full_args.save_embeddings = True
+            self.full_args.embed_dtype = dtype_val
+            self.full_args.sql = self.settings_vars["sql"].get()
+            self._sql = self.full_args.sql
+            self._full = self.full_args.matrix_embed
+            
+            self.embedding_args = EmbeddingArguments(**self.full_args.__dict__)
             args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
             self.logger_args = SimpleNamespace(**args_dict)
             self._write_args()
             
-            self.run_scikit_scheme()
+            print_message("Saving embeddings to disk")
+            self.save_embeddings_to_disk()
+            print_message("Embeddings saved to disk")
+            print_done()
             
-        self.run_in_background(background_run_scikit)
+        self.run_in_background(background_get_embeddings)
+
+    @log_method_calls
+    def _create_probe_args(self):
+        print_message("Creating probe arguments...")
+        
+        # Convert pooling types string to list
+        probe_pooling_types = [p.strip() for p in self.settings_vars["probe_pooling_types"].get().split(",")]
+        
+        # Update full_args with probe settings
+        self.full_args.probe_type = self.settings_vars["probe_type"].get()
+        self.full_args.tokenwise = self.settings_vars["tokenwise"].get()
+        self.full_args.hidden_dim = self.settings_vars["hidden_dim"].get()
+        self.full_args.dropout = self.settings_vars["dropout"].get()
+        self.full_args.n_layers = self.settings_vars["n_layers"].get()
+        self.full_args.pre_ln = self.settings_vars["pre_ln"].get()
+        self.full_args.classifier_dim = self.settings_vars["classifier_dim"].get()
+        self.full_args.transformer_dropout = self.settings_vars["transformer_dropout"].get()
+        self.full_args.classifier_dropout = self.settings_vars["classifier_dropout"].get()
+        self.full_args.n_heads = self.settings_vars["n_heads"].get()
+        self.full_args.rotary = self.settings_vars["rotary"].get()
+        self.full_args.probe_pooling_types = probe_pooling_types
+        self.full_args.save_model = self.settings_vars["save_model"].get()
+        self.full_args.production_model = self.settings_vars["production_model"].get()
+        self.full_args.use_lora = self.settings_vars["use_lora"].get()
+        self.full_args.lora_r = self.settings_vars["lora_r"].get()
+        self.full_args.lora_alpha = self.settings_vars["lora_alpha"].get()
+        self.full_args.lora_dropout = self.settings_vars["lora_dropout"].get()
+
+        # Create probe args from full args
+        self.probe_args = ProbeArguments(**self.full_args.__dict__)
+        
+        print_message("Probe Arguments:")
+        for k, v in self.probe_args.__dict__.items():
+            if k != 'model_names':
+                print(f"{k}:\n{v}")
+        print("========================\n")
+        args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
+        self.logger_args = SimpleNamespace(**args_dict)
+        self._write_args()
+        print_done()
 
     @log_method_calls
     def _run_trainer(self):
+        print_message("Starting training process...")
         # Gather settings
         self.full_args.use_lora = self.settings_vars["use_lora"].get()
         self.full_args.hybrid_probe = self.settings_vars["hybrid_probe"].get()
@@ -805,70 +927,33 @@ class GUI(MainProcess):
                 self.init_hybrid_probes()
             else:
                 self.run_nn_probes()
+            print_done()
             
         self.run_in_background(background_run_trainer)
-    
+
     @log_method_calls
-    def _create_probe_args(self):
-        print_message("=== Creating Probe ===")
-        
-        # Convert pooling types string to list
-        probe_pooling_types = [p.strip() for p in self.settings_vars["probe_pooling_types"].get().split(",")]
-        
-        # Update full_args with probe settings
-        self.full_args.probe_type = self.settings_vars["probe_type"].get()
-        self.full_args.tokenwise = self.settings_vars["tokenwise"].get()
-        self.full_args.hidden_dim = self.settings_vars["hidden_dim"].get()
-        self.full_args.dropout = self.settings_vars["dropout"].get()
-        self.full_args.n_layers = self.settings_vars["n_layers"].get()
-        self.full_args.pre_ln = self.settings_vars["pre_ln"].get()
-        self.full_args.classifier_dim = self.settings_vars["classifier_dim"].get()
-        self.full_args.transformer_dropout = self.settings_vars["transformer_dropout"].get()
-        self.full_args.classifier_dropout = self.settings_vars["classifier_dropout"].get()
-        self.full_args.n_heads = self.settings_vars["n_heads"].get()
-        self.full_args.rotary = self.settings_vars["rotary"].get()
-        self.full_args.probe_pooling_types = probe_pooling_types
-        self.full_args.save_model = self.settings_vars["save_model"].get()
-        self.full_args.production_model = self.settings_vars["production_model"].get()
-        self.full_args.use_lora = self.settings_vars["use_lora"].get()
-        self.full_args.lora_r = self.settings_vars["lora_r"].get()
-        self.full_args.lora_alpha = self.settings_vars["lora_alpha"].get()
-        self.full_args.lora_dropout = self.settings_vars["lora_dropout"].get()
+    def _run_scikit(self):
+        print_message("Running scikit-learn models...")
+        # Gather settings for scikit
+        self.full_args.use_scikit = self.settings_vars["use_scikit"].get()
+        self.full_args.scikit_n_iter = self.settings_vars["scikit_n_iter"].get()
+        self.full_args.scikit_cv = self.settings_vars["scikit_cv"].get()
+        self.full_args.scikit_random_state = self.settings_vars["scikit_random_state"].get()
+        self.full_args.scikit_model_name = self.settings_vars["scikit_model_name"].get()
+        self.full_args.n_jobs = self.settings_vars["n_jobs"].get()
 
-        # Create probe args from full args
-        self.probe_args = ProbeArguments(**self.full_args.__dict__)
-        
-        print_message("Probe Arguments:")
-        for k, v in self.probe_args.__dict__.items():
-            if k != 'model_names':
-                print_message(f"{k}:\n{v}")
-        print_message("========================\n")
-        args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
-        self.logger_args = SimpleNamespace(**args_dict)
-        self._write_args()
-
-    def build_replay_tab(self):
-        # Create a frame for replay settings
-        replay_frame = ttk.LabelFrame(self.replay_tab, text="Log Replay Settings")
-        replay_frame.pack(fill="x", padx=10, pady=5)
-
-        # Replay log path
-        ttk.Label(replay_frame, text="Replay Log Path:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["replay_path"] = tk.StringVar(value="")
-        entry_replay = ttk.Entry(replay_frame, textvariable=self.settings_vars["replay_path"], width=40)
-        entry_replay.grid(row=0, column=1, padx=10, pady=5)
-        self.add_help_button(replay_frame, 0, 2, "Path to the log file to replay. Use Browse button to select a file.")
-
-        # Browse button for selecting log file
-        browse_button = ttk.Button(replay_frame, text="Browse", command=self._browse_replay_log)
-        browse_button.grid(row=0, column=2, padx=5, pady=5)
-
-        # Start replay button
-        replay_button = ttk.Button(replay_frame, text="Start Replay", command=self._start_replay)
-        replay_button.grid(row=1, column=0, columnspan=3, pady=20)
+        def background_run_scikit():
+            self.scikit_args = ScikitArguments(**self.full_args.__dict__)
+            args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
+            self.logger_args = SimpleNamespace(**args_dict)
+            self._write_args()
+            
+            self.run_scikit_scheme()
+            print_done()
+            
+        self.run_in_background(background_run_scikit)
 
     def _browse_replay_log(self):
-        from tkinter import filedialog
         filename = filedialog.askopenfilename(
             title="Select Replay Log",
             filetypes=(("Txt files", "*.txt"), ("All files", "*.*"))
@@ -882,6 +967,7 @@ class GUI(MainProcess):
             print_message("Please select a replay log file first")
             return
         
+        print_message("Starting replay from log file...")
         from logger import LogReplayer
         replayer = LogReplayer(replay_path)
         replay_args = replayer.parse_log()
@@ -894,18 +980,63 @@ class GUI(MainProcess):
         
         print_message(f"Loaded settings from {replay_path}")
         replayer.run_replay(self)
-
-    def add_help_button(self, parent, row, column, help_text):
-        """Add a small help button that displays information when clicked"""
-        help_button = ttk.Button(parent, text="?", width=2, 
-                                command=lambda: messagebox.showinfo("Help", help_text))
-        help_button.grid(row=row, column=column, padx=(0,5), pady=5)
-        return help_button
+        print_done()
+        
+    def _browse_results_file(self):
+        filename = filedialog.askopenfilename(
+            title="Select Results File",
+            filetypes=(("TSV files", "*.tsv"), ("All files", "*.*"))
+        )
+        if filename:
+            self.settings_vars["results_file"].set(filename)
+            # Set use_current_run to False since we're selecting a specific file
+            self.settings_vars["use_current_run"].set(False)
+    
+    def _generate_plots(self):
+        print_message("Generating visualization plots...")
+        
+        # Determine which results file to use
+        results_file = None
+        
+        if self.settings_vars["use_current_run"].get() and hasattr(self, 'random_id'):
+            # Use the current run's random ID
+            results_file = os.path.join(self.settings_vars["results_dir"].get(), f"{self.random_id}.tsv")
+            print_message(f"Using current run results: {results_file}")
+        elif self.settings_vars["results_file"].get():
+            # Use explicitly selected file
+            results_file = self.settings_vars["results_file"].get()
+            print_message(f"Using selected results file: {results_file}")
+        elif self.settings_vars["result_id"].get():
+            # Use the specified result ID
+            result_id = self.settings_vars["result_id"].get()
+            results_file = os.path.join(self.settings_vars["results_dir"].get(), f"{result_id}.tsv")
+            print_message(f"Using results file for ID {result_id}: {results_file}")
+        else:
+            print_message("No results file specified. Please enter a Result ID, browse for a file, or complete a run first.")
+            return
+        
+        # Check if the results file exists
+        if not os.path.exists(results_file):
+            print_message(f"Results file not found: {results_file}")
+            return
+        
+        # Get output directory
+        output_dir = self.settings_vars["viz_output_dir"].get()
+        normalize = self.settings_vars["normalize"].get()
+        def background_generate_plots():
+            # Call the plot generation function
+            print_message(f"Generating plots in {output_dir}...")
+            create_plots(results_file, output_dir, normalize)
+            print_message("Plots generated successfully!")
+            print_done()
+            
+        self.run_in_background(background_generate_plots)
 
 
 def main():
     root = tk.Tk()
     app = GUI(root)
+    print_title("Protify")
     root.mainloop()
 
 

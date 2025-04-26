@@ -4,148 +4,9 @@ import torch
 import numpy as np
 import sqlite3
 import torch.nn.functional as F
-from typing import List, Tuple
-from tqdm.auto import tqdm
 from torch.utils.data import Dataset as TorchDataset
 from utils import print_message
-from .utils import pad_and_concatenate_dimer
-# from torch.nn.utils.rnn import pad_sequence
-
-
-def _pad_matrix_embeds(embeds: List[torch.Tensor], max_len: int) -> Tuple[torch.Tensor, torch.Tensor]:
-    # pad and concatenate, return padded embeds and mask
-    padded_embeds, attention_masks = [], []
-    for embed in embeds:
-        seq_len = embed.size(0)
-        padding_size = max_len - seq_len
-        
-        # Create attention mask (1 for real tokens, 0 for padding)
-        attention_mask = torch.ones(max_len, dtype=torch.long)
-        if padding_size > 0:
-            attention_mask[seq_len:] = 0
-            
-            # Pad along the sequence dimension (dim=0)
-            padding = torch.zeros((padding_size, embed.size(1)), dtype=embed.dtype)
-            padded_embed = torch.cat((embed, padding), dim=0)
-        else:
-            padded_embed = embed
-            
-        padded_embeds.append(padded_embed)
-        attention_masks.append(attention_mask)
-        
-    return torch.stack(padded_embeds), torch.stack(attention_masks)
-
-
-def string_labels_collator_builder(tokenizer, **kwargs):
-    def _collate_fn(batch):
-        seqs = [ex[0] for ex in batch]
-        labels = torch.stack([torch.tensor(ex[1]) for ex in batch])
-        batch = tokenizer(seqs,
-                          padding='longest',
-                          padding_to_multiple_of=8,
-                          truncation=False,
-                          return_tensors='pt',
-                          add_special_tokens=True)
-        batch['labels'] = labels
-        return batch
-    return _collate_fn
-
-
-def embeds_labels_collator_builder(full=False, task_type='tokenwise', **kwargs):
-    def _collate_fn(batch):
-        if full:
-            embeds = [ex[0] for ex in batch]
-            labels = [ex[1] for ex in batch]
-            
-            # Find max sequence length for padding
-            max_len = max(embed.size(0) for embed in embeds)
-            
-            embeds, attention_mask = _pad_matrix_embeds(embeds, max_len)
-            
-            # Pad labels
-            if task_type == 'tokenwise':
-                padded_labels = []
-                for label in labels:
-                    padding_size = max_len - label.size(0)
-                    if padding_size > 0:
-                        # Use -100 as padding value for labels (ignored by loss functions)
-                        padding = torch.full((padding_size,), -100, dtype=label.dtype)
-                        padded_label = torch.cat((label.squeeze(-1), padding))
-                    else:
-                        padded_label = label.squeeze(-1)
-                    padded_labels.append(padded_label)
-            
-            labels = torch.stack(padded_labels)
-            
-            return {
-                'embeddings': embeds,
-                'attention_mask': attention_mask,
-                'labels': labels,
-            }
-        else:
-            embeds = torch.stack([ex[0] for ex in batch])
-            labels = torch.stack([ex[1] for ex in batch])
-        
-            return {
-                'embeddings': embeds,
-                'labels': labels
-            }
-    return _collate_fn
-
-
-def pair_string_collator_builder(tokenizer, **kwargs):
-    def _collate_fn(batch):
-        seqa = [f[0] for f in batch]
-        seqb = [f[1] for f in batch]
-        labels = torch.stack([torch.tensor(f[2]) for f in batch])
-        a = tokenizer(seqa,
-                      padding='longest',
-                      padding_to_multiple_of=8,
-                      truncation=False,
-                      return_tensors='pt',
-                      add_special_tokens=True)
-        b = tokenizer(seqb, 
-                      padding='longest',
-                      padding_to_multiple_of=8,
-                      truncation=False,
-                      return_tensors='pt',
-                      add_special_tokens=True)
-        return {
-            'a_tokenized': a,
-            'b_tokenized': b,
-            'labels': labels
-        }
-    return _collate_fn
-
-
-def pair_embeds_labels_collator_builder(full=False, **kwargs):
-    def _collate_fn(batch):
-        if full:
-            embeds_a = [ex[0] for ex in batch]
-            embeds_b = [ex[1] for ex in batch]
-            max_len_a = max(embed.size(0) for embed in embeds_a)
-            max_len_b = max(embed.size(0) for embed in embeds_b)
-            embeds_a, attention_mask_a = _pad_matrix_embeds(embeds_a, max_len_a)
-            embeds_b, attention_mask_b = _pad_matrix_embeds(embeds_b, max_len_b)
-            embeds, attention_mask = pad_and_concatenate_dimer(embeds_a, embeds_b, attention_mask_a, attention_mask_b)
-
-            labels = torch.stack([ex[2] for ex in batch])
-
-            return {
-                'embeddings': embeds,
-                'attention_mask': attention_mask,
-                'labels': labels
-            }
-        else:
-            embeds_a = torch.stack([ex[0] for ex in batch])
-            embeds_b = torch.stack([ex[1] for ex in batch]) 
-            labels = torch.stack([ex[2] for ex in batch])
-            embeds = torch.cat([embeds_a, embeds_b], dim=-1)
-        return {
-            'embeddings': embeds,
-            'labels': labels
-        }
-    return _collate_fn
+from tqdm.auto import tqdm
 
 
 class PairEmbedsLabelsDatasetFromDisk(TorchDataset):
@@ -180,7 +41,7 @@ class PairEmbedsLabelsDatasetFromDisk(TorchDataset):
     def check_seqs(self, all_seqs):
         missing_seqs = [seq for seq in self.seqs_a + self.seqs_b if seq not in all_seqs]
         if missing_seqs:
-            print_message('Sequences not found in embeddings:', missing_seqs)
+            print_message(f'Sequences not found in embeddings: {missing_seqs}')
         else:
             print_message('All sequences in embeddings')
 
@@ -311,7 +172,7 @@ class EmbedsLabelsDatasetFromDisk(TorchDataset):
         self.seqs, self.labels = hf_dataset[col_name], hf_dataset[label_col]
         self.length = len(self.labels)
         self.max_length = len(max(self.seqs, key=len))
-        print_message('Max length: ', self.max_length)
+        print_message(f'Max length: {self.max_length}')
 
         self.db_file = db_path
         self.batch_size = batch_size
@@ -396,7 +257,7 @@ class EmbedsLabelsDataset(TorchDataset):
         self.labels = hf_dataset[label_col]
         self.task_type = task_type
         self.max_length = len(max(hf_dataset[col_name], key=len))
-        print_message('Max length: ', self.max_length)
+        print_message(f'Max length: {self.max_length}')
 
     def __len__(self):
         return len(self.labels)
@@ -420,7 +281,7 @@ class EmbedsLabelsDataset(TorchDataset):
         return emb.squeeze(0), label
     
 
-class StringLabelDatasetFromHF(TorchDataset):    
+class StringLabelDataset(TorchDataset):    
     def __init__(self, hf_dataset, col_name='seqs', label_col='labels', **kwargs):
         self.seqs = hf_dataset[col_name]
         self.labels = hf_dataset[label_col]
@@ -438,7 +299,7 @@ class StringLabelDatasetFromHF(TorchDataset):
         return seq, label
     
 
-class PairStringLabelDatasetFromHF(TorchDataset):
+class PairStringLabelDataset(TorchDataset):
     def __init__(self, hf_dataset, col_a='SeqA', col_b='SeqB', label_col='labels', train=True, **kwargs):
         self.seqs_a, self.seqs_b = hf_dataset[col_a], hf_dataset[col_b]
         self.labels = hf_dataset[label_col]
@@ -456,63 +317,3 @@ class PairStringLabelDatasetFromHF(TorchDataset):
             seq_a, seq_b = seq_b, seq_a
         return seq_a, seq_b, self.labels[idx]
 
-
-class OneHotCollator:
-    def __init__(self, alphabet="ACDEFGHIKLMNPQRSTVWY"):
-        # Add X for unknown amino acids, and special CLS and EOS tokens
-        alphabet = alphabet + "X"
-        alphabet = list(alphabet)
-        alphabet.append('cls')
-        alphabet.append('eos')
-        self.mapping = {token: idx for idx, token in enumerate(alphabet)}
-        
-    def __call__(self, batch):
-        seqs = [ex[0] for ex in batch]
-        labels = torch.stack([torch.tensor(ex[1]) for ex in batch])
-        
-        # Find the longest sequence in the batch (plus 2 for CLS and EOS)
-        max_len = max(len(seq) for seq in seqs) + 2
-        
-        # One-hot encode and pad each sequence
-        batch_size = len(seqs)
-        one_hot_tensors = []
-        attention_masks = []
-        
-        for seq in seqs:
-            seq = ['cls'] + list(seq) + ['eos']
-            # Create one-hot encoding for each sequence (including CLS and EOS)
-            seq_len = len(seq)
-            one_hot = torch.zeros(seq_len, len(self.alphabet))
-            
-            # Add sequence tokens in the middle
-            for pos, token in enumerate(seq):
-                if token in self.mapping:
-                    one_hot[pos, self.mapping[token]] = 1.0
-                else:
-                    # For non-canonical amino acids, use the X token
-                    one_hot[pos, self.mapping["X"]] = 1.0
-            
-            # Create attention mask (1 for actual tokens, 0 for padding)
-            attention_mask = torch.ones(seq_len)
-            
-            # Pad to the max length in this batch
-            padding_size = max_len - seq_len
-            if padding_size > 0:
-                padding = torch.zeros(padding_size, len(self.alphabet))
-                one_hot = torch.cat([one_hot, padding], dim=0)
-                # Add zeros to attention mask for padding
-                mask_padding = torch.zeros(padding_size)
-                attention_mask = torch.cat([attention_mask, mask_padding], dim=0)
-            
-            one_hot_tensors.append(one_hot)
-            attention_masks.append(attention_mask)
-        
-        # Stack all tensors in the batch
-        embeddings = torch.stack(one_hot_tensors)
-        attention_masks = torch.stack(attention_masks)
-        
-        return {
-            'embeddings': embeddings,
-            'attention_mask': attention_masks,
-            'labels': labels,
-        }

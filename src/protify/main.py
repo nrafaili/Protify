@@ -8,7 +8,7 @@ from probes.get_probe import ProbeArguments, get_probe
 from base_models.get_base_models import BaseModelArguments, get_tokenizer, get_base_model_for_training
 from base_models.utils import wrap_lora
 from data.data_mixin import DataMixin, DataArguments
-from probes.trainers import TrainerArguments, train_model
+from probes.trainers import TrainerArguments, train_probe, train_base_model, train_hybrid_model
 from probes.scikit_classes import ScikitArguments, ScikitProbe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
@@ -60,20 +60,20 @@ class MainProcess(MetricsLogger, DataMixin):
         for model_name in self.model_args.model_names:
             _ = embedder(model_name)
 
-    def _run_nn_probe(self, model_name, data_name, train_set, valid_set, test_set, tokenizer, emb_dict, ppi):
-        probe = get_probe(self.probe_args)
+    def _run_nn_probe(self, model_name, data_name, probe_args, train_set, valid_set, test_set, tokenizer, emb_dict, ppi):
+        probe = get_probe(probe_args)
         summary(probe)
-        input_dim = self.probe_args.input_dim
-        task_type = self.probe_args.task_type
-        probe, valid_metrics, test_metrics = train_model(
+        input_dim = probe_args.input_dim
+        task_type = probe_args.task_type
+        probe, valid_metrics, test_metrics = train_probe(
+            model=probe,
+            tokenizer=tokenizer,
             trainer_args=self.trainer_args,
             embedding_args=self.embedding_args,
-            model=probe,
             model_name=model_name,
             data_name=data_name,
             input_dim=input_dim,
             task_type=task_type,
-            tokenizer=tokenizer,
             train_dataset=train_set,
             valid_dataset=valid_set,
             test_dataset=test_set,
@@ -89,10 +89,26 @@ class MainProcess(MetricsLogger, DataMixin):
     def _train_base_model(self, model_name, data_name, train_set, valid_set, test_set, tokenizer, emb_dict, ppi):
         tokenwise = self.probe_args.tokenwise
         num_labels = self.probe_args.num_labels
+        task_type = self.probe_args.task_type
         model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels)
         if self.probe_args.lora:
             model = wrap_lora(model, self.probe_args.lora_r, self.probe_args.lora_alpha, self.probe_args.lora_dropout)
-        pass
+        model, valid_metrics, test_metrics = train_base_model(
+            model=model,
+            tokenizer=tokenizer,
+            trainer_args=self.trainer_args,
+            model_name=model_name,
+            data_name=data_name,
+            task_type=task_type,
+            train_dataset=train_set,
+            valid_dataset=valid_set,
+            test_dataset=test_set,
+            ppi=ppi,
+            log_id=self.random_id,
+        )
+        self.log_metrics(data_name, model_name, valid_metrics, split_name='valid')
+        self.log_metrics(data_name, model_name, test_metrics, split_name='test')
+        return model
 
     @log_method_calls
     def _run_hybrid_probe(self, model_name, data_name, train_set, valid_set, test_set, tokenizer, emb_dict, ppi):
@@ -146,6 +162,7 @@ class MainProcess(MetricsLogger, DataMixin):
                 ### TODO eventually add options for optimizers and schedulers
                 ### TODO here is probably where we can differentiate between the different training schemes
                 probe = self._run_nn_probe(model_name, data_name, train_set, valid_set, test_set, tokenizer, emb_dict, ppi)
+                ### TODO may link from probe here to running inference on input csv or HF datasets
 
     @log_method_calls
     def run_hybrid_probe(self):
@@ -153,14 +170,6 @@ class MainProcess(MetricsLogger, DataMixin):
         # train probe
         # unfreeze base model
         # train base model
-        pass
-
-    @log_method_calls
-    def init_lora_model(self):
-        pass
-
-    @log_method_calls
-    def run_lora_model(self):
         pass
 
     @log_method_calls

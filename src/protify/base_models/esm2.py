@@ -42,12 +42,15 @@ def build_esm2_model(preset: str):
     return model, tokenizer
 
 
-def get_esm2_for_training(preset: str, tokenwise: bool = False, num_labels: int = None):
+def get_esm2_for_training(preset: str, tokenwise: bool = False, num_labels: int = None, hybrid: bool = False):
     model_path = presets[preset]
-    if tokenwise:
-        model = FastEsmForTokenClassification.from_pretrained(model_path, num_labels=num_labels).eval()
+    if hybrid:
+        model = FastEsmModel.from_pretrained(model_path).eval()
     else:
-        model = FastEsmForSequenceClassification.from_pretrained(model_path, num_labels=num_labels).eval()
+        if tokenwise:
+            model = FastEsmForTokenClassification.from_pretrained(model_path, num_labels=num_labels).eval()
+        else:
+            model = FastEsmForSequenceClassification.from_pretrained(model_path, num_labels=num_labels).eval()
     tokenizer = model.esm.tokenizer
     return model, tokenizer
 

@@ -18,6 +18,7 @@ class CrossConvConfig(PretrainedConfig):
             task_type: str = 'singlelabel',
             pre_ln: bool = True,
     ):
+        super().__init__(**kwargs)
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.dropout = dropout

@@ -1,6 +1,7 @@
 import os
 import torch
 import shutil
+import pyfiglet
 from functools import partial
 
 
@@ -19,6 +20,14 @@ def print_message(message: str):
     print('\n' + '-' * terminal_width)
     print(f'\n{message}\n')
     print('-' * terminal_width + '\n')
+
+
+def print_title(title: str):
+    print(pyfiglet.figlet_format(title, font='3d-ascii'))
+
+
+def print_done():
+    print(pyfiglet.figlet_format('== Done ==', font='js_stick_letters'))
 
 
 if __name__ == '__main__':

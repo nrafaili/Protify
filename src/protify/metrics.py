@@ -314,14 +314,28 @@ def compute_regression_metrics(p: EvalPrediction) -> dict[str, float]:
     preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
     labels = p.label_ids[1] if isinstance(p.label_ids, tuple) else p.label_ids
 
-    logits = np.array(preds).flatten()
-    labels = np.array(labels).flatten()
+    y_pred = np.array(preds).flatten()
+    y_true = np.array(labels).flatten()
 
-    r2 = r2_score(labels, logits)
-    spearman_rho, spear_pval = spearmanr(logits, labels)
-    pearson_rho, pear_pval = pearsonr(logits, labels)
-    mse = mean_squared_error(labels, logits)
-    mae = mean_absolute_error(labels, logits)
+    if np.isnan(y_true).any():
+        print("y_true Nans were cast to 0")
+        y_true = np.where(np.isnan(y_true), 0, y_true)
+    if np.isnan(y_pred).any():
+        print("y_pred Nans were cast to 0")
+        y_pred = np.where(np.isnan(y_pred), 0, y_pred)
+
+    try:
+        spearman_rho, spear_pval = spearmanr(y_pred, y_true)
+        pearson_rho, pear_pval = pearsonr(y_pred, y_true)
+    except:
+        spearman_rho = -100.0
+        spear_pval = -100.0
+        pearson_rho = -100.0
+        pear_pval = -100.0
+
+    r2 = r2_score(y_true, y_pred)
+    mse = mean_squared_error(y_true, y_pred)
+    mae = mean_absolute_error(y_true, y_pred)
     rmse = np.sqrt(mse)
 
     return {
@@ -334,6 +348,20 @@ def compute_regression_metrics(p: EvalPrediction) -> dict[str, float]:
         'mae': round(mae, 5),
         'rmse': round(rmse, 5),
     }
+
+
+def get_compute_metrics(task_type: str):
+    if task_type == 'singlelabel':
+        compute_metrics = compute_single_label_classification_metrics
+    elif task_type == 'multilabel':
+        compute_metrics = compute_multi_label_classification_metrics
+    elif task_type == 'regression':
+        compute_metrics = compute_regression_metrics
+    elif task_type == 'tokenwise':
+        compute_metrics = compute_tokenwise_classification_metrics
+    else:
+        raise ValueError(f'Task type {task_type} not supported')
+    return compute_metrics
 
 
 if __name__ == "__main__":

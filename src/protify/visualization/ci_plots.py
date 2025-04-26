@@ -7,13 +7,16 @@ from sklearn.metrics import r2_score
 from pauc import plot_roc_with_ci
 
 
-def regression_ci_plot(y_true, y_pred, output_dir, data_name, model_name, log_id):
+def regression_ci_plot(y_true, y_pred, save_path):
     """
     Calculate the spearman rho and p-value of the regression model.
     Plot the line of best fit with 95% confidence intervals for spearman rho.
     Display the R-squared value, spearman rho, pearson rho, and p-values.
     """
     # Compute R‑squared, Spearman and Pearson correlations
+    y_true, y_pred = y_true.flatten(), y_pred.flatten()
+    mask = np.isfinite(y_true) & np.isfinite(y_pred)
+    y_true, y_pred = y_true[mask], y_pred[mask]
     r2 = r2_score(y_true, y_pred)
     r_s, p_s = spearmanr(y_true, y_pred)
     r_p, p_p = pearsonr(y_true, y_pred)
@@ -47,17 +50,17 @@ def regression_ci_plot(y_true, y_pred, output_dir, data_name, model_name, log_id
     os.makedirs(output_dir, exist_ok=True)
     save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}.png")
     fig.savefig(save_path, dpi=300, bbox_inches='tight')
-    plt.show()
     plt.close(fig)
 
 
-def classification_ci_plot(y_true, y_pred, output_dir, data_name, model_name, log_id):
+def classification_ci_plot(y_true, y_pred, save_path):
     """
     Use pauc to display classification plot
     """
-    os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}.png")
-    plot_roc_with_ci(y_true, y_pred, save_path)
+    try:
+        plot_roc_with_ci(y_true, y_pred, save_path)
+    except Exception as e:
+        print(f"Error plotting pAUC curve, likely the wrong version: {e}")
 
 
 if __name__ == "__main__":
@@ -66,38 +69,4 @@ if __name__ == "__main__":
     #y_pred = np.random.rand(100)
     output_dir = "plots"
     #regression_ci_plot(y_true, y_pred, output_dir, "regression", "regression", "regression")
-
-    # binary classification
-    y_true = np.random.randint(0, 2, (100, ))
-    y_pred = np.random.rand(100, 2)
-    # softmax y_pred
-    y_pred = np.exp(y_pred) / np.sum(np.exp(y_pred), axis=-1, keepdims=True)
-    num_examples, num_classes = y_pred.shape
-    for class_idx in range(num_classes):
-        y_pred_class = y_pred[:, class_idx]
-        y_true_class = (y_true == class_idx).astype(int)
-        classification_ci_plot(y_true_class, y_pred_class, output_dir, "binary", "binary", "binary", class_idx)
-
-    # multi-class classification
-    y_true = np.random.randint(0, 3, (100, ))
-    y_pred = np.random.rand(100, 3)
-    # softmax y_pred
-    y_pred = np.exp(y_pred) / np.sum(np.exp(y_pred), axis=-1, keepdims=True)
-    num_examples, num_classes = y_pred.shape
-    for class_idx in range(num_classes):
-        y_pred_class = y_pred[:, class_idx]
-        y_true_class = (y_true == class_idx).astype(int)
-        classification_ci_plot(y_true_class, y_pred_class, output_dir, "multiclass", "multiclass", "multiclass", class_idx)
-
-    # multi-label classification
-    y_true = np.random.randint(0, 2, (100, 100))
-    y_pred = np.random.rand(100, 100, 2)
-    # softmax y_pred
-    y_pred = np.exp(y_pred) / np.sum(np.exp(y_pred), axis=-1, keepdims=True)
-    num_examples, seq_len, num_classes = y_pred.shape
-    for class_idx in range(num_classes):
-        y_pred_class = y_pred[:, :, class_idx].flatten()
-        y_true_class = (y_true == class_idx).astype(int).flatten()
-        print(y_pred_class.shape, y_true_class.shape)
-        classification_ci_plot(y_true_class, y_pred_class, output_dir, "multilabel", "multilabel", "multilabel", class_idx)
 

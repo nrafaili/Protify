@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "Protify"
-version = "0.0.1"
+version = "0.0.2"
 description = "Low code chemcial property prediction"
 authors = ["Synthyra <info@synthyra.com>"]
 keywords = ["plm, protein, transformer"]
@@ -34,6 +34,7 @@ numpy = "==1.26.1"
 networkx = ">=3.4.2"
 xgboost = "*"
 lightgbm = "*"
+pyfiglet = "*"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

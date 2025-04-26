@@ -1,31 +1,75 @@
 #!/usr/bin/env python3
 """
-Create summary radar and bar plots from a TSV produced by our training
-pipeline.  Each non-“dataset” column is a JSON blob of metrics, e.g.
+Create radar and bar plots for *all* datasets in a TSV.
 
-dataset   ModelA                                             ModelB
-DL10_reg  '{"test_loss":0.81,"test_f1":0.57,"test_mcc":0.69}' ...
+Rules
+-----
+* Classification datasets → plot **MCC**  (fallback: F1, Accuracy)
+* Regression    datasets → plot **R²**   (fallback: Spearman, Pearson)
 
-The script figures out whether every dataset is classification or regression
-and then picks the best common metric to compare (MCC / F1 / Accuracy or
-Spearman / R² / Pearson).
+The final plots therefore mix task types on the same axes.
+Titles explicitly state that rule so readers know how to interpret numbers.
 """
 
-import argparse
-import json
-import math
+from __future__ import annotations
+import argparse, json, math, os
+from pathlib import Path
+from typing import Dict, List, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from pathlib import Path
-from typing import List, Dict, Optional
-from utils import print_message
 
 
-def radar_factory(num_vars: int):
-    theta = np.linspace(0, 2 * np.pi, num_vars, endpoint=False)
-    fig, ax = plt.subplots(subplot_kw=dict(polar=True), figsize=(10, 10))
+# ---------- metric logic -----------------------------------------------------
+
+CLS_PREFS: List[Tuple[str, str]] = [
+    ("mcc",       "MCC"),
+    ("f1",        "F1"),
+    ("accuracy",  "Accuracy"),
+]
+REG_PREFS: List[Tuple[str, str]] = [
+    ("r_squared", "R²"),
+    ("spearman",  "Spearman ρ"),
+    ("pearson",   "Pearson r"),
+]
+
+
+def is_regression(metrics: Dict[str, float]) -> bool:
+    """Heuristic based on key names."""
+    reg = ("spearman", "pearson", "r_squared", "rmse", "mse")
+    cls = ("accuracy", "f1", "mcc", "auc", "precision", "recall")
+    keys = {k.lower() for k in metrics}
+    if any(k for k in keys if any(r in k for r in reg)):
+        return True
+    if any(k for k in keys if any(c in k for c in cls)):
+        return False
+    return False  # default to classification
+
+
+def pick_metric(metrics: Dict[str, float], prefs: List[Tuple[str, str]]) -> Tuple[str, str]:
+    """Return (key, pretty_name) for the first preference present in metrics."""
+    for k, nice in prefs:
+        for mk in metrics:
+            if mk.lower().endswith(k):
+                return k, nice
+    raise KeyError("No preferred metric found.")
+
+
+def get_metric_value(metrics: Dict[str, float], key_suffix: str) -> float:
+    """Fetch metric value case-/prefix-insensitively; NaN if absent."""
+    for k, v in metrics.items():
+        if k.lower().endswith(key_suffix):
+            return v
+    return math.nan
+
+
+# ---------- plotting helpers -------------------------------------------------
+
+def radar_factory(n_axes: int):
+    theta = np.linspace(0, 2 * np.pi, n_axes, endpoint=False)
+    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw={"polar": True})
     ax.set_theta_offset(np.pi / 2)
     ax.set_theta_direction(-1)
     return fig, ax, theta
@@ -34,204 +78,130 @@ def radar_factory(num_vars: int):
 def plot_radar(*,
                categories: List[str],
                models: List[str],
-               scores: List[List[float]],
+               data: List[List[float]],
                title: str,
-               output_file: Path,
-               colors: Optional[List] = None,
-               normalize: bool = False,
-               average: bool = True):
-    if average:
-        categories = categories + ["Avg"]
-        scores = [score + [np.mean(score)] for score in scores]
+               outfile: Path,
+               normalize: bool = False):
+    if normalize:
+        arr = np.asarray(data)
+        rng = np.where(arr.ptp(0) == 0, 1, arr.ptp(0))
+        data = (arr - arr.min(0)) / rng
+
+    # append mean column
+    categories = categories + ["Avg"]
+    data = [row + [np.nanmean(row)] for row in data]
 
     fig, ax, theta = radar_factory(len(categories))
-
-    if colors is None:
-        colors = [plt.cm.tab20(i / len(models)) for i in range(len(models))]
-
-    ax.set_thetagrids(np.degrees(theta), categories, fontsize=12)
+    ax.set_thetagrids(np.degrees(theta), categories, fontsize=11)
     ax.set_ylim(0, 1.0)
-    ax.set_yticks(np.arange(0, 1.1, 0.1))
+    ax.set_yticks(np.linspace(0, 1, 11))
 
-    if normalize:
-        arr = np.asarray(scores)
-        s_min, s_max = arr.min(0), arr.max(0)
-        rng = np.where(s_max - s_min == 0, 1, s_max - s_min)
-        scores = (arr - s_min) / rng
-
-    for i, (model, vals) in enumerate(zip(models, scores)):
-        vals = np.concatenate((vals, [vals[0]]))
-        angs = np.concatenate((theta, [theta[0]]))
-        ax.plot(angs, vals, color=colors[i], label=model, lw=2)
-        ax.fill(angs, vals, color=colors[i], alpha=0.25)
+    palette = [plt.cm.tab20(i / len(models)) for i in range(len(models))]
+    for i, (m, vals) in enumerate(zip(models, data)):
+        ang = np.concatenate([theta, [theta[0]]])
+        val = np.concatenate([vals,  [vals[0]]])
+        ax.plot(ang, val, lw=2, label=m, color=palette[i])
+        ax.fill(ang, val, alpha=.25, color=palette[i])
 
     ax.grid(True)
-    plt.title(title, fontsize=14, pad=20)
-    plt.legend(bbox_to_anchor=(1.3, 1.0))
+    plt.title(title, pad=20)
+    plt.legend(bbox_to_anchor=(1.25, 1.05))
     plt.tight_layout()
-    plt.savefig(output_file, dpi=450, bbox_inches='tight')
-    plt.close()
+    plt.savefig(outfile, dpi=450, bbox_inches="tight")
+    plt.close(fig)
 
 
 def bar_plot(datasets: List[str],
              models: List[str],
-             scores: List[List[float]],
-             *,
+             data: List[List[float]],
              metric_name: str,
-             task_type: str,
-             output_file: Path):
-    rows = [{'Dataset': d, 'Model': m, 'Score': s}
-            for m, col in zip(models, scores)
-            for d, s in zip(datasets, col)]
-    df_plot = pd.DataFrame(rows)
-
+             outfile: Path):
+    rows = [
+        {"Dataset": d, "Model": m, "Score": s}
+        for m, col in zip(models, data)
+        for d, s in zip(datasets, col)
+    ]
+    dfp = pd.DataFrame(rows)
     plt.figure(figsize=(max(12, .8 * len(datasets)), 8))
-    sns.barplot(x='Dataset', y='Score', hue='Model', data=df_plot)
-    plt.title(f'{metric_name} comparison across {task_type} datasets')
-    plt.xlabel('Dataset')
-    plt.ylabel(metric_name)
-    plt.xticks(rotation=45, ha='right')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    sns.barplot(dfp, x="Dataset", y="Score", hue="Model")
+    plt.title(f"{metric_name} across datasets (Cls→MCC, Reg→R²)")
+    plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
-    plt.savefig(output_file, dpi=450, bbox_inches='tight')
+    plt.savefig(outfile, dpi=450, bbox_inches="tight")
     plt.close()
 
 
-def load_data(tsv: str) -> pd.DataFrame:
-    df = pd.read_csv(tsv, sep='\t')
-    for col in df.columns:
-        if col != 'dataset':
-            df[col] = df[col].apply(json.loads)
+# ---------- main entry -------------------------------------------------------
+
+def load_tsv(tsv: Path) -> pd.DataFrame:
+    df = pd.read_csv(tsv, sep="\t")
+    for c in df.columns:
+        if c != "dataset":
+            df[c] = df[c].apply(json.loads)
     return df
 
 
-def is_regression(metrics: Dict[str, float]) -> bool:
-    """Heuristic: look for any rank/continuous metrics."""
-    reg_keys = ('spearman', 'pearson', 'r_squared', 'rmse', 'mse')
-    cls_keys = ('accuracy', 'f1', 'mcc', 'auc', 'precision', 'recall')
-    keys = [k.lower() for k in metrics.keys()]
-    if any(k for k in keys if any(r in k for r in reg_keys)):
-        return True
-    if any(k for k in keys if any(c in k for c in cls_keys)):
-        return False
-    # default: assume classification
-    return False
+def create_plots(tsv: str, outdir: str, normalize: bool = False):
+    tsv, outdir = Path(tsv), Path(outdir)
+    df = load_tsv(tsv)
+    models = [c for c in df.columns if c != "dataset"]
 
+    # Resolve metric per-dataset (MCC or R², w/ fallbacks).
+    datasets, scores_by_model = [], {m: [] for m in models}
 
-CLASSIFICATION_METRICS = [
-    # preference order
-    ('mcc', 'Matthews correlation'),
-    ('f1', 'F1'),
-    ('accuracy', 'Accuracy'),
-]
+    for _, row in df.iterrows():
+        name = row["dataset"]
+        metrics0 = row[models[0]]
+        task = "regression" if is_regression(metrics0) else "classification"
+        prefs = REG_PREFS if task == "regression" else CLS_PREFS
 
-REGRESSION_METRICS = [
-    ('spearman', "Spearman's ρ"),
-    ('r_squared', 'R²'),
-    ('pearson', "Pearson's r"),
-]
+        try:
+            suffix, pretty = pick_metric(metrics0, prefs)
+        except KeyError:
+            print(f"[WARN] {name}: no suitable metric – skipped.")
+            continue
 
+        datasets.append(name)
+        for m in models:
+            val = get_metric_value(row[m], suffix)
+            scores_by_model[m].append(val)
 
-def choose_metric(rows: List[pd.Series],
-                  models: List[str],
-                  metric_table: List):
-    """
-    Pick the first metric that every model possesses for all supplied rows.
-    Returns (metric_key, pretty_name) or (None, None).
-    """
-    for short_key, pretty in metric_table:
-        for row in rows:
-            for m in models:
-                metrics = row[m]
-                # Search regardless of 'test_' / 'eval_' prefix, case-insensitive
-                cand = next((v for k, v in metrics.items()
-                             if k.lower().endswith(short_key)), None)
-                if cand is None or math.isnan(cand):
-                    break
-            else:   # inner loop ok
-                continue
-            break   # some missing
-        else:       # every dataset & model had it
-            return short_key, pretty
-    return None, None
+    if not datasets:
+        raise RuntimeError("No plottable datasets found.")
 
-
-def extract_metric_value(metrics: Dict[str, float], metric_key: str):
-    # pull key regardless of prefix/case
-    for k, v in metrics.items():
-        if k.lower().endswith(metric_key):
-            return v
-    return np.nan
-
-
-def create_plots(df: pd.DataFrame, *,
-                 outdir: Path,
-                 fig_id: str,
-                 normalize: bool = False):
-
-    models = [c for c in df.columns if c != 'dataset']
+    # assemble lists in model order
+    plot_matrix = [scores_by_model[m] for m in models]
+    fig_tag = tsv.stem
+    outdir = outdir / fig_tag
     outdir.mkdir(parents=True, exist_ok=True)
 
-    # split datasets by task
-    cls_rows, reg_rows = [], []
-    for _, row in df.iterrows():
-        first_metrics = row[models[0]]
-        (reg_rows if is_regression(first_metrics) else cls_rows).append(row)
+    radar_path = outdir / f"{fig_tag}_radar_all.png"
+    bar_path   = outdir / f"{fig_tag}_bar_all.png"
 
-    for task_rows, metric_table, task_name in [
-        (cls_rows, CLASSIFICATION_METRICS, 'classification'),
-        (reg_rows, REGRESSION_METRICS, 'regression'),
-    ]:
-        if not task_rows:
-            continue
+    subtitle = "Classification datasets plot MCC; Regression datasets plot R²"
+    plot_radar(categories=datasets,
+               models=models,
+               data=plot_matrix,
+               title=subtitle,
+               outfile=radar_path,
+               normalize=normalize)
+    bar_plot(datasets, models, plot_matrix, "Score (MCC / R²)", bar_path)
 
-        metric_key, metric_pretty = choose_metric(task_rows, models, metric_table)
-        if metric_key is None:
-            print_message(f'No common metric for {task_name}; skipping.')
-            continue
-
-        datasets = [r['dataset'] for r in task_rows]
-        scores_by_model = []
-        for m in models:
-            scores_by_model.append([
-                extract_metric_value(r[m], metric_key) for r in task_rows
-            ])
-
-        # radar
-        radar_path = outdir / f'{fig_id}_radar_{task_name}.png'
-        plot_radar(categories=datasets,
-                   models=models,
-                   scores=scores_by_model,
-                   title=f'{metric_pretty} across {task_name} datasets',
-                   output_file=radar_path,
-                   normalize=normalize)
-        print_message(f'🌐  radar plot → {radar_path}')
-
-        # bar
-        bar_path = outdir / f'{fig_id}_bar_{task_name}.png'
-        bar_plot(datasets, models, scores_by_model,
-                 metric_name=metric_pretty,
-                 task_type=task_name,
-                 output_file=bar_path)
-        print_message(f'📊  bar plot  → {bar_path}')
+    print(f"✓ Radar saved to {radar_path}")
+    print(f"✓ Bar   saved to {bar_path}")
 
 
-def main():
-    p = argparse.ArgumentParser(description='Generate radar/bar plots from TSV')
-    p.add_argument('--input', required=True, help='TSV file with metrics')
-    p.add_argument('--output_dir', default='plots')
-    p.add_argument('--normalize', action='store_true',
-                   help='Normalize scores per category')
-    args = p.parse_args()
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Generate radar & bar plots for all datasets.")
+    ap.add_argument("--input", required=True, help="TSV file with metrics")
+    ap.add_argument("--output_dir", default="plots", help="Directory for plots")
+    ap.add_argument("--normalize", action="store_true",
+                    help="Min-max normalise scores per dataset before plotting")
+    args = ap.parse_args()
 
-    df = load_data(args.input)
-    fig_id = Path(args.input).stem  # e.g. 2025-04-24-15-50_SECS
-    create_plots(df,
-                 outdir=Path(args.output_dir),
-                 fig_id=fig_id,
-                 normalize=args.normalize)
-    print_message('✅  All plots saved.')
+    create_plots(Path(args.input), Path(args.output_dir), args.normalize)
+    print("Finished.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

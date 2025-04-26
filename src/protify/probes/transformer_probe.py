@@ -26,6 +26,7 @@ class TransformerProbeConfig(PretrainedConfig):
             probe_pooling_types: List[str] = ['mean', 'cls'],
             **kwargs,
     ):
+        super().__init__(**kwargs)
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.classifier_dim = classifier_dim
