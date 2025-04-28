@@ -18,8 +18,8 @@ from utils import torch_load, print_message
 class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
     def __init__(self, full_args, GUI=False):
         super(MainProcess, self).__init__(full_args)
-        super(DataMixin, self).__init__(full_args)
-        super(TrainerMixin, self).__init__(full_args)
+        super(DataMixin, self).__init__()
+        super(TrainerMixin, self).__init__()
         self.full_args = full_args
         if not GUI:
             self.start_log_main()
@@ -61,20 +61,14 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         for model_name in self.model_args.model_names:
             _ = embedder(model_name)
 
-    def _run_nn_probe(self, model_name, data_name, probe_args, train_set, valid_set, test_set, tokenizer, emb_dict, ppi):
-        probe = get_probe(probe_args)
+    def _run_nn_probe(self, model_name, data_name, train_set, valid_set, test_set, tokenizer, emb_dict, ppi):
+        probe = get_probe(self.probe_args)
         summary(probe)
-        input_dim = probe_args.input_dim
-        task_type = probe_args.task_type
-        probe, valid_metrics, test_metrics = train_probe(
+        probe, valid_metrics, test_metrics = self.trainer_probe(
             model=probe,
             tokenizer=tokenizer,
-            trainer_args=self.trainer_args,
-            embedding_args=self.embedding_args,
             model_name=model_name,
             data_name=data_name,
-            input_dim=input_dim,
-            task_type=task_type,
             train_dataset=train_set,
             valid_dataset=valid_set,
             test_dataset=test_set,
@@ -86,21 +80,17 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         self.log_metrics(data_name, model_name, test_metrics, split_name='test')
         return probe
 
-    @log_method_calls
-    def _train_base_model(self, model_name, data_name, train_set, valid_set, test_set, tokenizer, emb_dict, ppi):
+    def _run_full_finetuning(self, model_name, data_name, train_set, valid_set, test_set, ppi):
         tokenwise = self.probe_args.tokenwise
         num_labels = self.probe_args.num_labels
-        task_type = self.probe_args.task_type
         model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels)
         if self.probe_args.lora:
             model = wrap_lora(model, self.probe_args.lora_r, self.probe_args.lora_alpha, self.probe_args.lora_dropout)
-        model, valid_metrics, test_metrics = train_base_model(
+        model, valid_metrics, test_metrics = self.trainer_base_model(
             model=model,
             tokenizer=tokenizer,
-            trainer_args=self.trainer_args,
             model_name=model_name,
             data_name=data_name,
-            task_type=task_type,
             train_dataset=train_set,
             valid_dataset=valid_set,
             test_dataset=test_set,
@@ -111,16 +101,46 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         self.log_metrics(data_name, model_name, test_metrics, split_name='test')
         return model
 
-    @log_method_calls
     def _run_hybrid_probe(self, model_name, data_name, train_set, valid_set, test_set, tokenizer, emb_dict, ppi):
-        pass
+        tokenwise = self.probe_args.tokenwise
+        num_labels = self.probe_args.num_labels
+        model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels)
+        if self.probe_args.lora:
+            model = wrap_lora(model, self.probe_args.lora_r, self.probe_args.lora_alpha, self.probe_args.lora_dropout)
+        probe = get_probe(self.probe_args)
+        model, valid_metrics, test_metrics = self.trainer_hybrid_model(
+            model=model,
+            tokenizer=tokenizer,
+            probe=probe,
+            model_name=model_name,
+            data_name=data_name,
+            train_dataset=train_set,
+            valid_dataset=valid_set,
+            test_dataset=test_set,
+            emb_dict=emb_dict,
+            ppi=ppi,
+            log_id=self.random_id,
+        )
+        self.log_metrics(data_name, model_name, valid_metrics, split_name='valid')
+        self.log_metrics(data_name, model_name, test_metrics, split_name='test')
+        return model
 
     @log_method_calls
-    def run_nn_probes(self):
-        """
-        TODO LoRA, Hybrid, and full finetuning should be wrapped in here
-        will require settings for full model batch size for full finetuning on its own and the full finetuning stage after the probe is trained for hybrid
-        """
+    def run_full_finetuning(self):
+        total_combinations = len(self.model_args.model_names) * len(self.datasets)
+        self.logger.info(f"Processing {total_combinations} model/dataset combinations")
+        for model_name in self.model_args.model_names:
+            for data_name, dataset in self.datasets.items():
+                self.logger.info(f"Processing dataset: {data_name}")
+                train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
+                self.probe_args.num_labels = num_labels
+                self.probe_args.task_type = label_type
+                self.trainer_args.task_type = label_type
+                self.logger.info(f'Training probe for {data_name} with {model_name}')
+                self._run_full_finetuning(model_name, data_name, train_set, valid_set, test_set, ppi)
+
+    @log_method_calls
+    def run_hybrid_probes(self):
         probe_args = self.probe_args
         test_seq = self.all_seqs[0]
 
@@ -156,30 +176,82 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                 else:
                     probe_args.input_dim = input_dim
             
-                probe_args.num_labels = num_labels
-                probe_args.task_type = label_type
+                self.probe_args.num_labels = num_labels
+                self.probe_args.task_type = label_type
+                ### TODO we currently need both, settings should probably be consolidated
                 self.trainer_args.task_type = label_type
                 self.logger.info(f'Training probe for {data_name} with {model_name}')
                 ### TODO eventually add options for optimizers and schedulers
                 ### TODO here is probably where we can differentiate between the different training schemes
-                probe = self._run_nn_probe(model_name, data_name, train_set, valid_set, test_set, tokenizer, emb_dict, ppi)
+                model = self._run_hybrid_probe(
+                    model_name=model_name,
+                    data_name=data_name,
+                    train_set=train_set,
+                    valid_set=valid_set,
+                    test_set=test_set,
+                    tokenizer=tokenizer,
+                    emb_dict=emb_dict,
+                    ppi=ppi,
+                )
                 ### TODO may link from probe here to running inference on input csv or HF datasets
+                return model
 
     @log_method_calls
-    def run_hybrid_probe(self):
-        # freeze base model
-        # train probe
-        # unfreeze base model
-        # train base model
-        pass
+    def run_nn_probes(self):
+        probe_args = self.probe_args
+        test_seq = self.all_seqs[0]
 
-    @log_method_calls
-    def get_full_finetuning_model(self):
-        pass
+        # Log the combinations we're going to process
+        total_combinations = len(self.model_args.model_names) * len(self.datasets)
+        self.logger.info(f"Processing {total_combinations} model/dataset combinations")
+        
+        # for each model, gather the settings and embeddings
+        # assumes save_embeddings_to_disk has already been called
+        for model_name in self.model_args.model_names:
+            self.logger.info(f"Processing model: {model_name}")
+    
+            # get embedding size
+            if self._sql:
+                # for sql, the embeddings will be gathered in real time during training
+                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{self._full}.db')
+                input_dim = self.get_embedding_dim_sql(save_path, test_seq)
+            else:
+                # for pth, the embeddings are loaded entirely into RAM and accessed during training
+                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{self._full}.pth')
+                emb_dict = torch_load(save_path)
+                input_dim = self.get_embedding_dim_pth(emb_dict, test_seq)
 
-    @log_method_calls
-    def run_full_finetuning_model(self):
-        pass
+            # get tokenizer
+            tokenizer = get_tokenizer(model_name)
+
+            # for each dataset, gather the settings and train the probe
+            for data_name, dataset in self.datasets.items():
+                self.logger.info(f"Processing dataset: {data_name}")
+                train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
+                if ppi and not self._full:
+                    probe_args.input_dim = input_dim * 2
+                else:
+                    probe_args.input_dim = input_dim
+            
+                self.probe_args.num_labels = num_labels
+                self.probe_args.task_type = label_type
+                ### TODO we currently need both, settings should probably be consolidated
+                self.trainer_args.task_type = label_type
+                self.logger.info(f'Training probe for {data_name} with {model_name}')
+                ### TODO eventually add options for optimizers and schedulers
+                ### TODO here is probably where we can differentiate between the different training schemes
+                probe = self._run_nn_probe(
+                    model_name=model_name,
+                    data_name=data_name,
+                    train_set=train_set,
+                    valid_set=valid_set,
+                    test_set=test_set,
+                    tokenizer=tokenizer,
+                    emb_dict=emb_dict,
+                    ppi=ppi,
+                )
+                ### TODO may link from probe here to running inference on input csv or HF datasets
+                return probe
 
     @log_method_calls
     def run_scikit_scheme(self):    
@@ -281,8 +353,10 @@ def parse_arguments(): # TODO update yaml
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="Gradient accumulation steps.")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
     parser.add_argument("--weight_decay", type=float, default=0.00, help="Weight decay.")
-    parser.add_argument("--patience", type=int, default=5, help="Patience for early stopping.")
+    parser.add_argument("--patience", type=int, default=1, help="Patience for early stopping.")
     parser.add_argument("--seed", type=int, default=42, help="Seed for random number generation.")
+    parser.add_argument("--full_finetuning", action="store_true", default=False, help="Full finetuning (default: False).")
+    parser.add_argument("--hybrid_probe", action="store_true", default=False, help="Hybrid probe (default: False).")
 
     args = parser.parse_args()
 
@@ -325,7 +399,11 @@ if __name__ == "__main__":
         main.save_embeddings_to_disk()
         if main.full_args.use_scikit:
             main.run_scikit_scheme()
+        elif main.full_args.full_finetuning:
+            main.run_full_finetuning()
+        elif main.full_args.hybrid_probe:
+            main.run_hybrid_probes()
         else:
-            main.run_nn_probe()
+            main.run_nn_probes()
         main.write_results()
     main.end_log()

@@ -33,8 +33,6 @@ class ProbeArguments:
             lora_r: int = 8,
             lora_alpha: float = 32.0,
             lora_dropout: float = 0.01,
-            ### Hybrid Probe
-            hybrid_probe: bool = False,
             **kwargs,
 
     ):
@@ -53,7 +51,6 @@ class ProbeArguments:
         self.n_heads = n_heads
         self.rotary = rotary
         self.pooling_types = probe_pooling_types
-        self.hybrid_probe = hybrid_probe
         self.lora = lora
         self.lora_r = lora_r
         self.lora_alpha = lora_alpha

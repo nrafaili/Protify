@@ -1,6 +1,7 @@
 import torch
 import os
 import numpy as np
+from typing import Optional
 from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
 from dataclasses import dataclass
 from probes.hybrid_probe import HybridProbe, HybridProbeConfig
@@ -40,6 +41,8 @@ class TrainerArguments:
             seed: int = 42,
             train_data_size: int = 100,
             plots_dir: str = None,
+            full_finetuning: bool = False,
+            hybrid_probe: bool = False,
             **kwargs
     ):
         self.model_save_dir = model_save_dir
@@ -55,6 +58,8 @@ class TrainerArguments:
         self.seed = seed
         self.train_data_size = train_data_size
         self.plots_dir = plots_dir
+        self.full_finetuning = full_finetuning
+        self.hybrid_probe = hybrid_probe
 
     def __call__(self):
         if self.train_data_size > 50000:
@@ -94,7 +99,7 @@ class TrainerArguments:
 
 
 class TrainerMixin:
-    def __init__(self, trainer_args: TrainerArguments):
+    def __init__(self, trainer_args: Optional[TrainerArguments] = None):
         self.trainer_args = trainer_args
 
     def _train(
@@ -104,11 +109,11 @@ class TrainerMixin:
             valid_dataset,
             test_dataset,
             data_collator,
-            task_type,
             log_id,
             model_name,
             data_name,
         ):
+        task_type = self.trainer_args.task_type
         compute_metrics = get_compute_metrics(task_type)
         self.trainer_args.train_data_size = len(train_dataset)
         hf_trainer_args = self.trainer_args()
@@ -135,7 +140,7 @@ class TrainerMixin:
         print_message(f'y_pred: {y_pred.shape}\ny_true: {y_true.shape}\nFinal test metrics: \n{test_metrics}\n')
 
         output_dir = os.path.join(self.trainer_args.plots_dir, log_id)
-        os.makedirs(output_dir, parents=True, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
         save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}.png")
 
         if task_type == 'regression':
@@ -154,7 +159,7 @@ class TrainerMixin:
         torch.cuda.empty_cache()
         return model, valid_metrics, test_metrics
 
-    def train_probe(
+    def trainer_probe(
             self,
             model,
             tokenizer,
@@ -237,61 +242,54 @@ class TrainerMixin:
             valid_dataset=valid_dataset,
             test_dataset=test_dataset,
             data_collator=data_collator,
-            task_type=task_type,
             log_id=log_id,
             model_name=model_name,
             data_name=data_name,
         )
 
-    def train_base_model(
+    def trainer_base_model(
             self,
             model,
             tokenizer,
             model_name,
             data_name,
-            task_type,
             train_dataset,
             valid_dataset,
             test_dataset,
             ppi=False,
             log_id=None,
         ):
-        if self.embedding_args.sql:
-            if ppi:
-                DatasetClass = PairStringLabelDataset
-                CollatorClass = PairCollator_input_ids
-            else:
-                DatasetClass = StringLabelDataset
-                CollatorClass = StringLabelsCollator
+        if ppi:
+            DatasetClass = PairStringLabelDataset
+            CollatorClass = PairCollator_input_ids
+        else:
+            DatasetClass = StringLabelDataset
+            CollatorClass = StringLabelsCollator
 
-            data_collator = CollatorClass(tokenizer=tokenizer)
+        data_collator = CollatorClass(tokenizer=tokenizer)
 
-            train_dataset = DatasetClass(hf_dataset=train_dataset, train=True)
-            valid_dataset = DatasetClass(hf_dataset=valid_dataset, train=False)
-            test_dataset = DatasetClass(hf_dataset=test_dataset, train=False)
+        train_dataset = DatasetClass(hf_dataset=train_dataset, train=True)
+        valid_dataset = DatasetClass(hf_dataset=valid_dataset, train=False)
+        test_dataset = DatasetClass(hf_dataset=test_dataset, train=False)
 
-            return self._train(
-                model=model,
-                train_dataset=train_dataset,
-                valid_dataset=valid_dataset,
-                test_dataset=test_dataset,
-                data_collator=data_collator,
-                task_type=task_type,
-                log_id=log_id,
-                model_name=model_name,
-                data_name=data_name,
-            )
+        return self._train(
+            model=model,
+            train_dataset=train_dataset,
+            valid_dataset=valid_dataset,
+            test_dataset=test_dataset,
+            data_collator=data_collator,
+            log_id=log_id,
+            model_name=model_name,
+            data_name=data_name,
+        )
 
-    def train_hybrid_model(
+    def trainer_hybrid_model(
             self,
             model,
             tokenizer,
             probe,
             model_name,
             data_name,
-            tokenwise,
-            input_dim,
-            task_type,
             train_dataset,
             valid_dataset,
             test_dataset,
@@ -299,7 +297,7 @@ class TrainerMixin:
             ppi=False,
             log_id=None,
         ):
-            probe = self.train_probe(
+            probe = self.trainer_probe(
                 model=probe,
                 tokenizer=tokenizer,
                 model_name=model_name,
@@ -311,20 +309,18 @@ class TrainerMixin:
                 ppi=ppi,
                 log_id=log_id,
             )
-
             config = HybridProbeConfig(
-                tokenwise=tokenwise,
+                tokenwise=self.probe_args.tokenwise,
                 pooling_types=self.embedding_args.embedding_pooling_types,
             )
 
             hybrid_model = HybridProbe(config=config, model=model, probe=probe)
             
-            return self.train_base_model(
+            return self.trainer_base_model(
                 model=hybrid_model,
                 tokenizer=tokenizer,
                 model_name=model_name,
                 data_name=data_name,
-                task_type=task_type,
                 train_dataset=train_dataset,
                 valid_dataset=valid_dataset,
                 test_dataset=test_dataset,

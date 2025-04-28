@@ -173,7 +173,7 @@ class Lyra(nn.Module):
         self.dropouts = nn.ModuleList()
         for _ in range(num_s4):
             self.s4_layers.append(
-                S4D(hidden_size, dropout=dropout, transposed=True, lr=min(0.001, 0.002))
+                S4D(hidden_size, dropout=dropout, transposed=True, lr=0.003)
             )
             self.norms.append(nn.RMSNorm(hidden_size))
             self.dropouts.append(nn.Dropout(dropout))
