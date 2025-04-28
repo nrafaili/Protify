@@ -13,6 +13,7 @@ from probes.scikit_classes import ScikitArguments, ScikitProbe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
 from utils import torch_load, print_message
+from plots import create_plots
 
 
 class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
@@ -268,11 +269,26 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                     raise ValueError(f'Label type {label_type} not supported')
                 ### train and evaluate best model
                 results = scikit_probe.run_specific_model(X_train, y_train, X_valid, y_valid, X_test, y_test, results)
-                
+    
+    @log_method_calls
+    def generate_plots(self):
+        print_message("Generating visualization plots...")
+        # Determine which results file to use
+        results_file = os.path.join(self.full_args.results_dir, f"{self.random_id}.tsv")
+        
+        # Check if the results file exists
+        if not os.path.exists(results_file):
+            print_message(f"Results file not found: {results_file}")
+            return
+        
+        # Get output directory
+        output_dir = self.full_args.plots_dir
+        normalize = self.full_args.normalize
 
-        ### if production, train on all data (train + valid + test) and save
-        ### else, just save the trained model and parameters
-        pass
+        print_message(f"Generating plots in {output_dir}...")
+        create_plots(results_file, output_dir, normalize)
+        print_message("Plots generated successfully!")
+        
 
 
 def parse_arguments(): # TODO update yaml
@@ -358,6 +374,8 @@ def parse_arguments(): # TODO update yaml
     parser.add_argument("--full_finetuning", action="store_true", default=False, help="Full finetuning (default: False).")
     parser.add_argument("--hybrid_probe", action="store_true", default=False, help="Hybrid probe (default: False).")
 
+    # ----------------- Vizualization ----------------- #
+    parser.add_argument("--normalize", action="store_true", default=False, help="Normalize plots (default: False).")
     args = parser.parse_args()
 
     if args.hf_token is not None:
@@ -389,6 +407,7 @@ if __name__ == "__main__":
         for k, v in main.full_args.__dict__.items():
             print_message(f"{k}:\t{v}")
         replayer.run_replay(main)
+    
     else:
         main = MainProcess(args, GUI=False)
         for k, v in main.full_args.__dict__.items():
@@ -396,14 +415,19 @@ if __name__ == "__main__":
         main.apply_current_settings()
         main.get_datasets()
         print_message(len(main.all_seqs))
-        main.save_embeddings_to_disk()
-        if main.full_args.use_scikit:
-            main.run_scikit_scheme()
-        elif main.full_args.full_finetuning:
+        if main.full_args.full_finetuning:
             main.run_full_finetuning()
+
         elif main.full_args.hybrid_probe:
+            main.save_embeddings_to_disk()
             main.run_hybrid_probes()
+
+        elif main.full_args.use_scikit:
+            main.save_embeddings_to_disk()
+            main.run_scikit_scheme()
         else:
+            main.save_embeddings_to_disk()
             main.run_nn_probes()
         main.write_results()
-    main.end_log()
+        main.generate_plots()
+        main.end_log()

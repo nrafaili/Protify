@@ -48,7 +48,6 @@ class StringLabelsCollator:
         labels = torch.stack([torch.tensor(ex[1]) for ex in batch])
         batch = self.tokenizer(seqs,
                           padding='longest',
-                          padding_to_multiple_of=8,
                           truncation=False,
                           return_tensors='pt',
                           add_special_tokens=True)
