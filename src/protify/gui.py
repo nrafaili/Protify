@@ -967,19 +967,23 @@ class GUI(MainProcess):
             return
         
         print_message("Starting replay from log file...")
-        from logger import LogReplayer
-        replayer = LogReplayer(replay_path)
-        replay_args = replayer.parse_log()
-        replay_args.replay_path = replay_path
         
-        # Update GUI with replay settings
-        for key, value in replay_args.__dict__.items():
-            if key in self.settings_vars:
-                self.settings_vars[key].set(value)
+        def background_replay():
+            from logger import LogReplayer
+            replayer = LogReplayer(replay_path)
+            replay_args = replayer.parse_log()
+            replay_args.replay_path = replay_path
+            
+            # Create a new MainProcess instance with replay_args
+            main = MainProcess(replay_args, GUI=False)
+            for k, v in main.full_args.__dict__.items():
+                print(f"{k}:\t{v}")
+            
+            # Run the replay on this MainProcess instance
+            replayer.run_replay(main)
+            print_done()
         
-        print_message(f"Loaded settings from {replay_path}")
-        replayer.run_replay(self)
-        print_done()
+        self.run_in_background(background_replay)
         
     def _browse_results_file(self):
         filename = filedialog.askopenfilename(

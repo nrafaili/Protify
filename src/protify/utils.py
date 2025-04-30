@@ -31,18 +31,22 @@ def print_done():
 
 
 if __name__ == '__main__':
-    ### Test clearing, gathers all code in the repo
-    import time
-    from pathlib import Path
+    folders_to_clean = ['logs', 'results', 'plots', 'embeddings', 'weights']
     
-    python_files = []
-    for path in Path('.').rglob('*.py'):
-        python_files.append(str(path))
-    
-    # Read and print contents of each file
-    for file in python_files:
-        print(f"\n=== Contents of {file} ===\n")
-        with open(file, 'r') as f:
-            print(f.read())
-        time.sleep(0.2)
-        clear_screen()
+    for folder in folders_to_clean:
+        if os.path.exists(folder):
+            files = os.listdir(folder)
+            if files:
+                response = input(f"Do you want to delete all files in '{folder}' folder? ({len(files)} files) [y/N]: ")
+                if response.lower() == 'y':
+                    for file in files:
+                        file_path = os.path.join(folder, file)
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                    print(f"All files in '{folder}' have been deleted.")
+                else:
+                    print(f"Skipped cleaning '{folder}' folder.")
+            else:
+                print(f"'{folder}' folder is already empty.")
+        else:
+            print(f"'{folder}' folder does not exist.")

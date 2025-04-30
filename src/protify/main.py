@@ -291,7 +291,7 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         
 
 
-def parse_arguments(): # TODO update yaml
+def parse_arguments():
     parser = argparse.ArgumentParser(description="Script with arguments mirroring the provided YAML settings.")
     # ----------------- ID ----------------- #
     parser.add_argument("--hf_username", default="Synthyra", help="Hugging Face username.")
