@@ -13,7 +13,7 @@ from probes.scikit_classes import ScikitArguments, ScikitProbe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
 from utils import torch_load, print_message
-from plots import create_plots
+from visualization.plot_result import create_plots
 
 
 class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
@@ -87,6 +87,7 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels)
         if self.probe_args.lora:
             model = wrap_lora(model, self.probe_args.lora_r, self.probe_args.lora_alpha, self.probe_args.lora_dropout)
+        summary(model)
         model, valid_metrics, test_metrics = self.trainer_base_model(
             model=model,
             tokenizer=tokenizer,
@@ -106,9 +107,11 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         tokenwise = self.probe_args.tokenwise
         num_labels = self.probe_args.num_labels
         model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels)
+        summary(model)
         if self.probe_args.lora:
             model = wrap_lora(model, self.probe_args.lora_r, self.probe_args.lora_alpha, self.probe_args.lora_dropout)
         probe = get_probe(self.probe_args)
+        summary(probe)
         model, valid_metrics, test_metrics = self.trainer_hybrid_model(
             model=model,
             tokenizer=tokenizer,
@@ -405,16 +408,16 @@ if __name__ == "__main__":
         replay_args.replay_path = args.replay_path
         main = MainProcess(replay_args, GUI=False)
         for k, v in main.full_args.__dict__.items():
-            print_message(f"{k}:\t{v}")
+            print(f"{k}:\t{v}")
         replayer.run_replay(main)
     
     else:
         main = MainProcess(args, GUI=False)
         for k, v in main.full_args.__dict__.items():
-            print_message(f"{k}:\t{v}")
+            print(f"{k}:\t{v}")
         main.apply_current_settings()
         main.get_datasets()
-        print_message(len(main.all_seqs))
+        print_message(f"Number of sequences: {len(main.all_seqs)}")
         if main.full_args.full_finetuning:
             main.run_full_finetuning()
 
