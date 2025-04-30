@@ -100,6 +100,7 @@ Help us grow by sharing online, starring our repository, or contributing through
 
 ### Installation
 From pip
+
 `pip install Protify`
 
 To get started locally
