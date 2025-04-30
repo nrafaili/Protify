@@ -11,3 +11,4 @@
 /weights/runs
 .qodo
 !images/*.png
+!images/example_workflow/*.png

@@ -7,8 +7,8 @@ import webbrowser
 import os
 from types import SimpleNamespace
 from tkinter import ttk, messagebox, filedialog
-from base_models.get_base_models import BaseModelArguments, standard_benchmark
-from data.supported_datasets import supported_datasets, standard_data_benchmark, internal_synthyra_datasets
+from base_models.get_base_models import BaseModelArguments, standard_models
+from data.supported_datasets import supported_datasets, standard_data_benchmark, internal_datasets
 from embedder import EmbeddingArguments
 from probes.get_probe import ProbeArguments
 from probes.trainers import TrainerArguments
@@ -253,6 +253,18 @@ class GUI(MainProcess):
         except Exception as e:
             print_message(f"Error setting up logo and link: {str(e)}")
 
+    def build_model_tab(self):
+        ttk.Label(self.model_tab, text="Model Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
+
+        self.model_listbox = tk.Listbox(self.model_tab, selectmode="extended", height=10)
+        for model_name in standard_models:
+            self.model_listbox.insert(tk.END, model_name)
+        self.model_listbox.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
+        self.add_help_button(self.model_tab, 0, 2, "Select the language models to use for embedding. Multiple models can be selected.")
+
+        run_button = ttk.Button(self.model_tab, text="Select Models", command=self._select_models)
+        run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
+
     def build_data_tab(self):
         # Max length (Spinbox)
         ttk.Label(self.data_tab, text="Max Sequence Length:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
@@ -294,7 +306,7 @@ class GUI(MainProcess):
         ttk.Label(self.data_tab, text="Dataset Names:").grid(row=4, column=0, padx=10, pady=5, sticky="nw")
         self.data_listbox = tk.Listbox(self.data_tab, selectmode="extended", height=25, width=25)
         for dataset_name in supported_datasets:
-            if dataset_name not in internal_synthyra_datasets:
+            if dataset_name not in internal_datasets:
                 self.data_listbox.insert(tk.END, dataset_name)
         self.data_listbox.grid(row=4, column=1, padx=10, pady=5, sticky="nw")
         self.add_help_button(self.data_tab, 4, 2, "Select datasets to use. Multiple datasets can be selected.")
@@ -359,18 +371,6 @@ class GUI(MainProcess):
         self.add_help_button(self.embed_tab, 8, 2, "Whether to use SQL database for storing embeddings instead of files.")
 
         run_button = ttk.Button(self.embed_tab, text="Embed sequences to disk", command=self._get_embeddings)
-        run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
-
-    def build_model_tab(self):
-        ttk.Label(self.model_tab, text="Model Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
-
-        self.model_listbox = tk.Listbox(self.model_tab, selectmode="extended", height=10)
-        for model_name in standard_benchmark + ['experimental']:
-            self.model_listbox.insert(tk.END, model_name)
-        self.model_listbox.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
-        self.add_help_button(self.model_tab, 0, 2, "Select the language models to use for embedding. Multiple models can be selected.")
-
-        run_button = ttk.Button(self.model_tab, text="Select Models", command=self._select_models)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
     def build_probe_tab(self):

@@ -19,11 +19,12 @@ currently_supported_models = [
     'ESM2-diffAV-150',
 ]
 
-standard_benchmark = [
+standard_models = [
     'ESM2-8',
     'ESM2-35',
     'ESM2-150',
     'ESM2-650',
+    'ESM2-3B',
     'ESMC-300',
     'ESMC-600',
     'Random',
@@ -37,7 +38,7 @@ experimental_models = []
 class BaseModelArguments:
     def __init__(self, model_names: list[str] = None, **kwargs):
         if model_names[0] == 'standard':
-            self.model_names = standard_benchmark
+            self.model_names = standard_models
         elif 'exp' in model_names[0].lower():
             self.model_names = experimental_models
         else:
