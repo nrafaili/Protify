@@ -1,0 +1,3 @@
+[submodule "src/protify/base_models/FastPLMs"]
+	path = src/protify/base_models/FastPLMs
+	url = https://github.com/Synthyra/FastPLMs.git

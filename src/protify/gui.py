@@ -536,47 +536,61 @@ class GUI(MainProcess):
         spin_num_epochs.grid(row=2, column=1, padx=10, pady=5)
         self.add_help_button(self.trainer_tab, 2, 2, "Number of training epochs (complete passes through the dataset).")
 
-        # trainer_batch_size
-        ttk.Label(self.trainer_tab, text="Trainer Batch Size:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["trainer_batch_size"] = tk.IntVar(value=64)
-        spin_trainer_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["trainer_batch_size"])
-        spin_trainer_batch_size.grid(row=3, column=1, padx=10, pady=5)
-        self.add_help_button(self.trainer_tab, 3, 2, "Number of samples per batch during training.")
+        # probe_batch_size
+        ttk.Label(self.trainer_tab, text="Probe Batch Size:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["probe_batch_size"] = tk.IntVar(value=64)
+        spin_probe_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["probe_batch_size"])
+        spin_probe_batch_size.grid(row=3, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 3, 2, "Batch size for probe training.")
 
-        # gradient_accumulation_steps
-        ttk.Label(self.trainer_tab, text="Gradient Accumulation Steps:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["gradient_accumulation_steps"] = tk.IntVar(value=1)
-        spin_gradient_accumulation_steps = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["gradient_accumulation_steps"])
-        spin_gradient_accumulation_steps.grid(row=4, column=1, padx=10, pady=5)
-        self.add_help_button(self.trainer_tab, 4, 2, "Number of batches to accumulate gradients before updating weights.")
+        # base_batch_size
+        ttk.Label(self.trainer_tab, text="Base Batch Size:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["base_batch_size"] = tk.IntVar(value=4)
+        spin_base_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["base_batch_size"])
+        spin_base_batch_size.grid(row=4, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 4, 2, "Batch size for base model training.")
+
+        # probe_grad_accum
+        ttk.Label(self.trainer_tab, text="Probe Grad Accum:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["probe_grad_accum"] = tk.IntVar(value=1)
+        spin_probe_grad_accum = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["probe_grad_accum"])
+        spin_probe_grad_accum.grid(row=5, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 5, 2, "Gradient accumulation steps for probe training.")
+
+        # base_grad_accum
+        ttk.Label(self.trainer_tab, text="Base Grad Accum:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["base_grad_accum"] = tk.IntVar(value=8)
+        spin_base_grad_accum = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["base_grad_accum"])
+        spin_base_grad_accum.grid(row=6, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 6, 2, "Gradient accumulation steps for base model training.")
 
         # lr
-        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["lr"] = tk.DoubleVar(value=1e-4)
         spin_lr = ttk.Spinbox(self.trainer_tab, from_=1e-6, to=1e-2, increment=1e-5, textvariable=self.settings_vars["lr"])
-        spin_lr.grid(row=5, column=1, padx=10, pady=5)
-        self.add_help_button(self.trainer_tab, 5, 2, "Learning rate for optimizer. Controls step size during training.")
+        spin_lr.grid(row=7, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 7, 2, "Learning rate for optimizer. Controls step size during training.")
 
         # weight_decay
-        ttk.Label(self.trainer_tab, text="Weight Decay:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Weight Decay:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["weight_decay"] = tk.DoubleVar(value=0.00)
         spin_weight_decay = ttk.Spinbox(self.trainer_tab, from_=0.0, to=1.0, increment=0.01, textvariable=self.settings_vars["weight_decay"])
-        spin_weight_decay.grid(row=6, column=1, padx=10, pady=5)
-        self.add_help_button(self.trainer_tab, 6, 2, "L2 regularization factor to prevent overfitting (0.0-1.0).")
+        spin_weight_decay.grid(row=8, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 8, 2, "L2 regularization factor to prevent overfitting (0.0-1.0).")
 
         # patience
-        ttk.Label(self.trainer_tab, text="Patience:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["patience"] = tk.IntVar(value=3)
+        ttk.Label(self.trainer_tab, text="Patience:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["patience"] = tk.IntVar(value=1)
         spin_patience = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["patience"])
-        spin_patience.grid(row=7, column=1, padx=10, pady=5, sticky="w")
-        self.add_help_button(self.trainer_tab, 7, 2, "Number of epochs with no improvement after which training will stop.")
+        spin_patience.grid(row=9, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.trainer_tab, 9, 2, "Number of epochs with no improvement after which training will stop.")
 
         # Random Seed
-        ttk.Label(self.trainer_tab, text="Random Seed:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Random Seed:").grid(row=10, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["seed"] = tk.IntVar(value=42)
         spin_seed = ttk.Spinbox(self.trainer_tab, from_=0, to=10000, textvariable=self.settings_vars["seed"])
-        spin_seed.grid(row=8, column=1, padx=10, pady=5, sticky="w")
-        self.add_help_button(self.trainer_tab, 8, 2, "Random seed for reproducibility of experiments.")
+        spin_seed.grid(row=10, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.trainer_tab, 10, 2, "Random seed for reproducibility of experiments.")
 
         run_button = ttk.Button(self.trainer_tab, text="Run trainer", command=self._run_trainer)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
@@ -686,12 +700,7 @@ class GUI(MainProcess):
         entry_output_dir = ttk.Entry(viz_frame, textvariable=self.settings_vars["viz_output_dir"], width=30)
         entry_output_dir.grid(row=3, column=1, padx=10, pady=5)
         self.add_help_button(viz_frame, 3, 2, "Directory where plots will be saved.")
-        
-        ttk.Label(viz_frame, text="Normalize:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["normalize"] = tk.BooleanVar(value=False)
-        check_normalize = ttk.Checkbutton(viz_frame, variable=self.settings_vars["normalize"])
-        check_normalize.grid(row=4, column=1, padx=10, pady=5, sticky="w")
-        self.add_help_button(viz_frame, 4, 2, "Normalize scores per category.")
+
 
         # Generate plots button
         generate_button = ttk.Button(viz_frame, text="Generate Plots", command=self._generate_plots)
@@ -904,8 +913,8 @@ class GUI(MainProcess):
         self.full_args.lora_alpha = self.settings_vars["lora_alpha"].get()
         self.full_args.lora_dropout = self.settings_vars["lora_dropout"].get()
         self.full_args.num_epochs = self.settings_vars["num_epochs"].get()
-        self.full_args.trainer_batch_size = self.settings_vars["trainer_batch_size"].get()
-        self.full_args.gradient_accumulation_steps = self.settings_vars["gradient_accumulation_steps"].get()
+        self.full_args.trainer_batch_size = self.settings_vars["probe_batch_size"].get()
+        self.full_args.gradient_accumulation_steps = self.settings_vars["probe_grad_accum"].get()
         self.full_args.lr = self.settings_vars["lr"].get()
         self.full_args.weight_decay = self.settings_vars["weight_decay"].get()
         self.full_args.patience = self.settings_vars["patience"].get()
@@ -916,19 +925,15 @@ class GUI(MainProcess):
             args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
             self.logger_args = SimpleNamespace(**args_dict)
             self._write_args()
-            
-            if self.full_args.use_lora:
-                self.init_lora_model()
-                self.run_lora_model()
-            elif self.full_args.full_finetuning:
-                self.get_full_finetuning_model()
-                self.run_full_finetuning_model()
+
+            if self.full_args.full_finetuning:
+                self.run_full_finetuning()
             elif self.full_args.hybrid_probe:
-                self.init_hybrid_probes()
+                self.run_hybrid_probes()
             else:
                 self.run_nn_probes()
             print_done()
-            
+                
         self.run_in_background(background_run_trainer)
 
     @log_method_calls
@@ -1022,11 +1027,10 @@ class GUI(MainProcess):
         
         # Get output directory
         output_dir = self.settings_vars["viz_output_dir"].get()
-        normalize = self.settings_vars["normalize"].get()
         def background_generate_plots():
             # Call the plot generation function
             print_message(f"Generating plots in {output_dir}...")
-            create_plots(results_file, output_dir, normalize)
+            create_plots(results_file, output_dir)
             print_message("Plots generated successfully!")
             print_done()
             

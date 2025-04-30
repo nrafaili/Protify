@@ -84,7 +84,7 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
     def _run_full_finetuning(self, model_name, data_name, train_set, valid_set, test_set, ppi):
         tokenwise = self.probe_args.tokenwise
         num_labels = self.probe_args.num_labels
-        model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels)
+        model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels, hybrid=False)
         if self.probe_args.lora:
             model = wrap_lora(model, self.probe_args.lora_r, self.probe_args.lora_alpha, self.probe_args.lora_dropout)
         summary(model)
@@ -106,11 +106,11 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
     def _run_hybrid_probe(self, model_name, data_name, train_set, valid_set, test_set, tokenizer, emb_dict, ppi):
         tokenwise = self.probe_args.tokenwise
         num_labels = self.probe_args.num_labels
-        model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels)
-        summary(model)
+        model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels, hybrid=True)
         if self.probe_args.lora:
             model = wrap_lora(model, self.probe_args.lora_r, self.probe_args.lora_alpha, self.probe_args.lora_dropout)
         probe = get_probe(self.probe_args)
+        summary(model)
         summary(probe)
         model, valid_metrics, test_metrics = self.trainer_hybrid_model(
             model=model,
@@ -141,7 +141,7 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                 self.probe_args.task_type = label_type
                 self.trainer_args.task_type = label_type
                 self.logger.info(f'Training probe for {data_name} with {model_name}')
-                self._run_full_finetuning(model_name, data_name, train_set, valid_set, test_set, ppi)
+                _ = self._run_full_finetuning(model_name, data_name, train_set, valid_set, test_set, ppi)
 
     @log_method_calls
     def run_hybrid_probes(self):
@@ -187,7 +187,7 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                 self.logger.info(f'Training probe for {data_name} with {model_name}')
                 ### TODO eventually add options for optimizers and schedulers
                 ### TODO here is probably where we can differentiate between the different training schemes
-                model = self._run_hybrid_probe(
+                _ = self._run_hybrid_probe(
                     model_name=model_name,
                     data_name=data_name,
                     train_set=train_set,
@@ -198,7 +198,6 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                     ppi=ppi,
                 )
                 ### TODO may link from probe here to running inference on input csv or HF datasets
-                return model
 
     @log_method_calls
     def run_nn_probes(self):
@@ -244,7 +243,7 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                 self.logger.info(f'Training probe for {data_name} with {model_name}')
                 ### TODO eventually add options for optimizers and schedulers
                 ### TODO here is probably where we can differentiate between the different training schemes
-                probe = self._run_nn_probe(
+                _ = self._run_nn_probe(
                     model_name=model_name,
                     data_name=data_name,
                     train_set=train_set,
@@ -255,7 +254,6 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                     ppi=ppi,
                 )
                 ### TODO may link from probe here to running inference on input csv or HF datasets
-                return probe
 
     @log_method_calls
     def run_scikit_scheme(self):    
@@ -286,10 +284,9 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         
         # Get output directory
         output_dir = self.full_args.plots_dir
-        normalize = self.full_args.normalize
 
         print_message(f"Generating plots in {output_dir}...")
-        create_plots(results_file, output_dir, normalize)
+        create_plots(results_file, output_dir)
         print_message("Plots generated successfully!")
         
 
@@ -368,8 +365,10 @@ def parse_arguments(): # TODO update yaml
 
     # ----------------- TrainerArguments ----------------- #
     parser.add_argument("--num_epochs", type=int, default=200, help="Number of epochs to train for.")
-    parser.add_argument("--trainer_batch_size", type=int, default=64, help="Batch size for training.")
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="Gradient accumulation steps.")
+    parser.add_argument("--probe_batch_size", type=int, default=64, help="Batch size for probe training.")
+    parser.add_argument("--base_batch_size", type=int, default=4, help="Batch size for base model training.")
+    parser.add_argument("--probe_grad_accum", type=int, default=1, help='Gradient accumulation steps for probe training.')
+    parser.add_argument("--base_grad_accum", type=int, default=8, help='Gradient accumulation steps for base model training.')
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
     parser.add_argument("--weight_decay", type=float, default=0.00, help="Weight decay.")
     parser.add_argument("--patience", type=int, default=1, help="Patience for early stopping.")
@@ -377,8 +376,6 @@ def parse_arguments(): # TODO update yaml
     parser.add_argument("--full_finetuning", action="store_true", default=False, help="Full finetuning (default: False).")
     parser.add_argument("--hybrid_probe", action="store_true", default=False, help="Hybrid probe (default: False).")
 
-    # ----------------- Vizualization ----------------- #
-    parser.add_argument("--normalize", action="store_true", default=False, help="Normalize plots (default: False).")
     args = parser.parse_args()
 
     if args.hf_token is not None:

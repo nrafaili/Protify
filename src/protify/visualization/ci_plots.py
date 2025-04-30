@@ -47,7 +47,6 @@ def regression_ci_plot(y_true, y_pred, save_path):
     )
 
     # Save the figure
-    os.makedirs(output_dir, exist_ok=True)
     fig.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close(fig)
 

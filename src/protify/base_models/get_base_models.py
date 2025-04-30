@@ -8,8 +8,9 @@ currently_supported_models = [
     'ESM2-650',
     'ESM2-3B',
     'Random',
+    'Random-Transformer',
     'Random-ESM2-8',
-    'Random-ESM2-35', # same as random_weights
+    'Random-ESM2-35', # same as Random-Transformer
     'Random-ESM2-150',
     'Random-ESM2-650',
     'ESMC-300',

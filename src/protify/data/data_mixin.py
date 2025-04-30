@@ -241,10 +241,19 @@ class DataMixin:
 
         for data_path in self.data_args.data_paths:
             data_name = data_path.split('/')[-1]
-            ppi = 'ppi' in data_name.lower()
             print_message(f'Loading {data_name}')
             dataset = load_dataset(data_path)
-            train_set, valid_set, test_set = dataset['train'], dataset['valid'], dataset['test']
+            ppi = 'SeqA' in dataset['train'].column_names
+            print_message(f'PPI: {ppi}')
+            try:
+                train_set, valid_set, test_set = dataset['train'], dataset['valid'], dataset['test']
+            except:
+                # No valid or test set, make 10% splits randomly
+                train_set = dataset['train'].train_test_split(test_size=0.2, seed=42)
+                valid_set = train_set['test']
+                train_set = train_set['train']
+                test_set = train_set.train_test_split(test_size=0.5, seed=42)
+                test_set = test_set['test']
             datasets.append((train_set, valid_set, test_set, ppi))
             data_names.append(data_name)
 

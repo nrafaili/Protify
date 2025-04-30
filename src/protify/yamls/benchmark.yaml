@@ -26,12 +26,45 @@ max_length: 1024
 trim: false
 data_names:
   - DeepLoc-2
+  - DeepLoc-10
+  - EC
+  - GO-CC
+  - GO-BP
+  - GO-MF
+  - MB
+  - enzyme-kcat
+  - solubility
+  - localization
+  - temperature-stability
+  - peptide-HLA-MHC-affinity
+  - optimal-temperature
+  - optimal-ph
+  - material-production
+  - fitness-prediction
+  - number-of-folds
+  - cloning-clf
+  - stability-prediction
+  - human-ppi
+  - human-ppi-pinui
+  - yest-ppi-pinui
+  - shs27-ppi
+  - shs148-ppi
+  - PPA-ppi
+
 data_dirs: []
 
 
 # BaseModelArguments:
 model_names:
   - ESM2-8
+  - ESM2-35
+  - ESM2-150
+  - ESM2-650
+  - ESM2-3B
+  - ESMC-300
+  - ESMC-600
+  - Random
+  - Random-Transformer
 
 
 # ProbeArguments:
@@ -47,6 +80,7 @@ classifier_dropout: 0.2
 n_heads: 4
 rotary: true
 probe_pooling_types:
+  - mean
   - cls
 save_model: false
 production_model: false
@@ -66,7 +100,7 @@ n_jobs: 1
 
 
 # EmbeddingArguments:
-embedding_batch_size: 4
+embedding_batch_size: 8
 num_workers: 0
 download_embeddings: false
 matrix_embed: false
@@ -85,7 +119,7 @@ probe_grad_accum: 1
 base_grad_accum: 8
 lr: 1e-4
 weight_decay: 0.00
-patience: 1
+patience: 5
 seed: 42
 full_finetuning: false
 hybrid_probe: false
