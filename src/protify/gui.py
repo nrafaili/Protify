@@ -757,7 +757,6 @@ class GUI(MainProcess):
         
         self.run_in_background(background_login)
 
-    @log_method_calls
     def _select_models(self):
         print_message("Selecting models...")
         # Gather selected model names
@@ -766,7 +765,7 @@ class GUI(MainProcess):
 
         # If no selection, default to the entire standard_benchmark
         if not selected_models:
-            selected_models = standard_benchmark
+            selected_models = standard_models
 
         # Update full_args with model settings
         self.full_args.model_names = selected_models
@@ -784,7 +783,6 @@ class GUI(MainProcess):
         self._write_args()
         print_done()
 
-    @log_method_calls
     def _get_data(self):
         print_message("=== Getting Data ===")
         print_message("Loading and preparing datasets...")
@@ -823,7 +821,6 @@ class GUI(MainProcess):
             
         self.run_in_background(background_get_data)
 
-    @log_method_calls
     def _get_embeddings(self):
         if not self.all_seqs:
             print_message('Sequences are not loaded yet. Please run the data tab first.')
@@ -862,7 +859,6 @@ class GUI(MainProcess):
             
         self.run_in_background(background_get_embeddings)
 
-    @log_method_calls
     def _create_probe_args(self):
         print_message("Creating probe arguments...")
         
@@ -902,7 +898,6 @@ class GUI(MainProcess):
         self._write_args()
         print_done()
 
-    @log_method_calls
     def _run_trainer(self):
         print_message("Starting training process...")
         # Gather settings
@@ -936,7 +931,6 @@ class GUI(MainProcess):
                 
         self.run_in_background(background_run_trainer)
 
-    @log_method_calls
     def _run_scikit(self):
         print_message("Running scikit-learn models...")
         # Gather settings for scikit
