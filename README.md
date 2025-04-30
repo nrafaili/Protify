@@ -113,8 +113,10 @@ cd src/protify
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Usage
+
 <details>
-  <summary>Usage </summary>
+  <summary>Toggle </summary>
   
   To launch the gui, run
   
