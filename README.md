@@ -116,7 +116,7 @@ cd src/protify
 ## Usage
 
 <details>
-  <summary>Toggle </summary>
+  <summary>Toggle </summary><br />
   
   To launch the gui, run
   
