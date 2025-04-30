@@ -177,7 +177,7 @@ cd src/protify
 
   To run the same session from the command line instead, you would simply execute
   ```
-  python -m main --model_names ESM2-8M ESM2-35 ESMC-300 Random Random-Transformer --data_names EC DeepLoc-2 enzyme-kcat --patience 3
+  python -m main --model_names ESM2-8 ESM2-35 ESMC-300 Random Random-Transformer --data_names EC DeepLoc-2 enzyme-kcat --patience 3
   ```
   Or, set up a yaml file with your desired settings (so you don't have to type out everything in the CLI)
   ```
