@@ -113,9 +113,84 @@ cd src/protify
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Usage
+<details>
+  <summary>Usage </summary>
+  
+  To launch the gui, run
+  
+  ```console
+  python -m gui
+  ```
+  
+  It's recommended to use the user interface alongside an open terminal, as helpful messages and progressbars will show in the terminal while you press the GUI buttons.
+  
+  ### An example workflow
+  
+  Here, we will compare various protein models against a random vector baseline (negative control) and random transformer (homology based control).
+  
+  1.) Start the session
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/1.PNG">
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/2.PNG">
+  
+  2.) Select the models you would like to benchmark
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/3.PNG">
+  
+  3.) Select the datasets you are interested in. Here we chose Enzynme Comission numbers (multi-label classification), metal-ion binding (binary classificaiton), solubility (deeploc2, binary classification), and catalytic rate (kcat, regression).
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/4.PNG">
+  
+  4.) Embed the proteins in the selected datasets. If your machine does not have a GPU, you can download precomputed embeddings for many common sequences.
+    Note: If you download embeddings, it will be faster to use the scikit model tab than the probe tab
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/5.PNG">
+  
+  5.) Select which probe and configuration you would like. Here, we will use a simple linear probe, a type neural network. It is the **fastest** (by a large margin) but worst performing option (by a small margin usually).
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/6.PNG">
+  
+  6.) Select your settings for training. Like most of the tabs, the defaults are pretty good. If you need information about what setting does what, the `?` button provides a helpful note. The documentations has more extensive information
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/7.PNG">
+  
+  This will train your models!
+  
+  7.) After training, you can render helpful visualizations by passing the log ID from before. If you forget it, you can look for the file generated in the `logs` folder.
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/8.PNG">
+  
+  Here's a sample of the many plots produced. You can find them all inside `plots/your_log_id/*`
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/9.PNG">
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/10.PNG">
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/11.PNG">
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/12.PNG">
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/13.PNG">
+  
+  8.) Need to replicate your findings for a report or paper? Just input the generated log into the replay tab
+  
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/14.PNG">
 
-Examples coming soon.
+  To run the same session from the command line instead, you would simply execute
+  ```
+  python -m main --model_names ESM2-8M ESM2-35 ESMC-300 Random Random-Transformer --data_names EC DeepLoc-2 enzyme-kcat --patience 3
+  ```
+  Or, set up a yaml file with your desired settings (so you don't have to type out everything in the CLI)
+  ```
+  python -m main --yaml_path yamls/your_custom_yaml_path.yaml
+  ```
+  Replaying from the CLI is just as simple
+  ```
+  python -m main --replay_path logs/your_log_id.txt
+  ```
+
+</details>
+
+
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
