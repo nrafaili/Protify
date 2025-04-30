@@ -204,35 +204,32 @@ def heatmap_plot(datasets: List[str],
     clean_model_names = [MODEL_NAMES.get(m, m) for m in models]
     clean_dataset_names = [DATASET_NAMES.get(d, d) for d in datasets_plus_avg]
 
-    # Normalization (per column/model)
+    # Normalization (per row/dataset)
     if normalize:
         random_idx = None
         for i, m in enumerate(models):
             if m.lower() == 'random':
                 random_idx = i
                 break
-        best_performance = np.nanmax(arr, axis=0)  # shape: (num_models,)
         
-        if random_idx is not None:
-            random_performance = arr[:, random_idx]  # shape: (num_datasets,)
-            
-            # Handle shape mismatch - ensure both arrays have compatible dimensions
-            if random_performance.shape[0] != arr.shape[1]:
-                # If only one random model, broadcast its value to all models
-                random_performance = np.full_like(best_performance, np.nanmean(random_performance))
+        normalized_data = np.zeros_like(arr)
+        
+        # Normalize each dataset (row) independently
+        for i in range(arr.shape[0]):
+            if random_idx is not None:
+                # Use random model as baseline if available
+                random_performance = arr[i, random_idx]
+                best_performance = np.nanmax(arr[i, :])
+                denom = best_performance - random_performance
+                denom = 1 if denom == 0 else denom
+                normalized_data[i, :] = (arr[i, :] - random_performance) / denom
             else:
-                # Reshape for proper broadcasting if needed
-                random_performance = random_performance.reshape(-1, 1)
-                
-            denom = best_performance - random_performance
-            denom = np.where(denom == 0, 1, denom)
-            normalized_data = (arr - random_performance) / denom
-        else:
-            # Fallback to min-max normalization if no Random model exists
-            lowest_performance = np.nanmin(arr, axis=0)
-            denom = best_performance - lowest_performance
-            denom = np.where(denom == 0, 1, denom)
-            normalized_data = (arr - lowest_performance) / denom
+                # Fallback to min-max normalization if no Random model exists
+                lowest_performance = np.nanmin(arr[i, :])
+                best_performance = np.nanmax(arr[i, :])
+                denom = best_performance - lowest_performance
+                denom = 1 if denom == 0 else denom
+                normalized_data[i, :] = (arr[i, :] - lowest_performance) / denom
         
         # Add average row to normalized data
         avg_row_norm = np.nanmean(normalized_data, axis=0, keepdims=True)

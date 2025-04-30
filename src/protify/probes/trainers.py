@@ -153,11 +153,12 @@ class TrainerMixin:
         output_dir = os.path.join(self.trainer_args.plots_dir, log_id)
         os.makedirs(output_dir, exist_ok=True)
         save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}.png")
+        title = f"{data_name} {model_name} {log_id}"
 
         if task_type == 'regression':
-            regression_ci_plot(y_true, y_pred, save_path)
+            regression_ci_plot(y_true, y_pred, save_path, title)
         else:
-            classification_ci_plot(y_true, y_pred, save_path)
+            classification_ci_plot(y_true, y_pred, save_path, title)
 
         if self.trainer_args.save:
             try:

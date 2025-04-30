@@ -33,22 +33,11 @@ data_names:
   - GO-MF
   - MB
   - enzyme-kcat
-  - solubility
-  - localization
-  - temperature-stability
-  - peptide-HLA-MHC-affinity
   - optimal-temperature
   - optimal-ph
-  - material-production
-  - fitness-prediction
-  - number-of-folds
-  - cloning-clf
-  - stability-prediction
   - human-ppi
-  - human-ppi-pinui
-  - yest-ppi-pinui
+  - gold-ppi
   - shs27-ppi
-  - shs148-ppi
   - PPA-ppi
 
 data_dirs: []
