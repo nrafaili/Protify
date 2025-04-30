@@ -100,6 +100,7 @@ Help us grow by sharing online, starring our repository, or contributing through
 
 ### Installation
 From pip
+
 `pip install Protify`
 
 To get started locally
@@ -113,8 +114,10 @@ cd src/protify
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Usage
+
 <details>
-  <summary>Usage </summary>
+  <summary>Toggle </summary><br />
   
   To launch the gui, run
   
@@ -129,51 +132,52 @@ cd src/protify
   Here, we will compare various protein models against a random vector baseline (negative control) and random transformer (homology based control).
   
   1.) Start the session
+  
   <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/1.PNG">
   
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/2.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/2.PNG" width="500">
   
   2.) Select the models you would like to benchmark
   
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/3.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/3.PNG" width="500">
   
   3.) Select the datasets you are interested in. Here we chose Enzynme Comission numbers (multi-label classification), metal-ion binding (binary classificaiton), solubility (deeploc2, binary classification), and catalytic rate (kcat, regression).
   
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/4.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/4.PNG" width="500">
   
   4.) Embed the proteins in the selected datasets. If your machine does not have a GPU, you can download precomputed embeddings for many common sequences.
     Note: If you download embeddings, it will be faster to use the scikit model tab than the probe tab
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/5.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/5.PNG" width="500">
   
   5.) Select which probe and configuration you would like. Here, we will use a simple linear probe, a type neural network. It is the **fastest** (by a large margin) but worst performing option (by a small margin usually).
   
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/6.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/6.PNG" width="500">
   
   6.) Select your settings for training. Like most of the tabs, the defaults are pretty good. If you need information about what setting does what, the `?` button provides a helpful note. The documentations has more extensive information
   
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/7.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/7.PNG" width="500">
   
   This will train your models!
   
   7.) After training, you can render helpful visualizations by passing the log ID from before. If you forget it, you can look for the file generated in the `logs` folder.
   
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/8.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/8.PNG" width="500">
   
   Here's a sample of the many plots produced. You can find them all inside `plots/your_log_id/*`
   
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/9.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/9.png" width="500">
   
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/10.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/10.png" width="500">
   
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/11.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/11.png" width="500">
   
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/12.PNG">
-  
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/13.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/13.png" width="500">
+
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/12.png" width="500">
   
   8.) Need to replicate your findings for a report or paper? Just input the generated log into the replay tab
   
-  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/14.PNG">
+  <img src="https://github.com/Synthyra/Protify/blob/main/images/example_workflow/14.PNG" width="500">
 
   To run the same session from the command line instead, you would simply execute
   ```
