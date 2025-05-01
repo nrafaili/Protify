@@ -55,7 +55,7 @@ class GUI(MainProcess):
         self.master.title("Settings GUI")
         self.master.geometry("600x800")
 
-        icon = tk.PhotoImage(file="Protify_logo.png")
+        icon = tk.PhotoImage(file="protify_logo.png")
         # Set the window icon
         self.master.iconphoto(True, icon)
 
