@@ -45,7 +45,7 @@ def get_esmc_for_training(preset: str, tokenwise: bool = False, num_labels: int 
             model = ESMplusplusForTokenClassification.from_pretrained(model_path, num_labels=num_labels).eval()
         else:
             model = ESMplusplusForSequenceClassification.from_pretrained(model_path, num_labels=num_labels).eval()
-    tokenizer = model.esm.tokenizer
+    tokenizer = model.tokenizer
     return model, tokenizer
 
 
