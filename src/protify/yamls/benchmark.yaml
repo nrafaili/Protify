@@ -40,7 +40,7 @@ data_names:
   - shs27-ppi
   - PPA-ppi
 
-data_dirs: !!list []
+data_dirs: []
 
 
 # BaseModelArguments:
