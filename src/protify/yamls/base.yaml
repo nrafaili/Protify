@@ -1,24 +1,24 @@
 # ID
-hf_username: !!str Synthyra
-hf_token: !!str null
-synthyra_api_key: !!str null
-wandb_api_key: !!str null
+hf_username: Synthyra
+hf_token: null
+synthyra_api_key: null
+wandb_api_key: null
 
 
 # Paths
-yaml_path: !!str null
-log_dir: !!str logs
-results_dir: !!str results
-model_save_dir: !!str weights
-embedding_save_dir: !!str embeddings
-download_dir: !!str Synthyra/mean_pooled_embeddings
-plots_dir: !!str plots
-replay_path: !!str null
-pretrained_probe_path: !!str null
+yaml_path: null
+log_dir: logs
+results_dir: results
+model_save_dir: weights
+embedding_save_dir: embeddings
+download_dir: Synthyra/mean_pooled_embeddings
+plots_dir: plots
+replay_path: null
+pretrained_probe_path: null
 
 
 # DataArguments:
-delimiter: !!str ','
+delimiter: ','
 col_names:
   - seqs
   - labels
@@ -35,7 +35,7 @@ model_names:
 
 
 # ProbeArguments:
-probe_type: !!str linear  # valid options: linear, transformer, crossconv
+probe_type: linear  # valid options: linear, transformer, crossconv
 tokenwise: !!bool false
 hidden_dim: !!int 8192
 dropout: !!float 0.2
@@ -60,7 +60,7 @@ lora_dropout: !!float 0.01
 scikit_n_iter: !!int 10
 scikit_cv: !!int 3
 scikit_random_state: !!int 42
-scikit_model_name: !!str null
+scikit_model_name: null
 use_scikit: !!bool false
 n_jobs: !!int 1
 
