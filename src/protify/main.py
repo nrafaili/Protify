@@ -16,6 +16,10 @@ from utils import torch_load, print_message
 from visualization.plot_result import create_plots
 
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
+
 class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
     def __init__(self, full_args, GUI=False):
         super(MainProcess, self).__init__(full_args)

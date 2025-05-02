@@ -139,7 +139,8 @@ class DataMixin:
     def process_datasets(
             self,
             hf_datasets: List[Tuple[Dataset, Dataset, Dataset, bool]],
-            data_names: List[str])-> Tuple[Dict[str, Tuple[Dataset, Dataset, Dataset, int, str, bool]], List[str]]:
+            data_names: List[str],
+        )-> Tuple[Dict[str, Tuple[Dataset, Dataset, Dataset, int, str, bool]], List[str]]:
         max_length = self._max_length
         datasets, all_seqs = {}, set()
         for dataset, data_name in zip(hf_datasets, data_names):
@@ -282,8 +283,8 @@ class DataMixin:
 
     def get_embedding_dim_sql(self, save_path, test_seq):
         import sqlite3
-        if len(test_seq) > self._max_length:
-            test_seq_len = self._max_length + 2
+        if len(test_seq) >= self._max_length:
+            test_seq_len = self._max_length
         else:
             test_seq_len = len(test_seq)
         
