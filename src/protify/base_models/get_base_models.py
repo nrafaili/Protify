@@ -37,6 +37,7 @@ standard_models = [
     'ESM2-3B',
     'ESMC-300',
     'ESMC-600',
+    'ProtBert',
     'ProtT5',
     'ANKH-Base',
     'ANKH-Large',
