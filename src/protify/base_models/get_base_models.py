@@ -17,6 +17,16 @@ currently_supported_models = [
     'ESMC-600',
     'ESM2-diff-150',
     'ESM2-diffAV-150',
+    'ProtBert',
+    'ProtBert-BFD',
+    'ProtT5',
+    'ProtT5-XL-UniRef50-full-prec',
+    'ProtT5-XXL-UniRef50',
+    'ProtT5-XL-BFD',
+    'ProtT5-XXL-BFD',
+    'ANKH-Base',
+    'ANKH-Large',
+    'ANKH2-Large',
 ]
 
 standard_models = [
@@ -27,6 +37,10 @@ standard_models = [
     'ESM2-3B',
     'ESMC-300',
     'ESMC-600',
+    'ProtT5',
+    'ANKH-Base',
+    'ANKH-Large',
+    'ANKH2-Large',
     'Random',
     'Random-Transformer',
 ]
@@ -55,6 +69,15 @@ def get_base_model(model_name: str):
     elif 'esmc' in model_name.lower():
         from .esmc import build_esmc_model
         return build_esmc_model(model_name)
+    elif 'protbert' in model_name.lower():
+        from .protbert import build_protbert_model
+        return build_protbert_model(model_name)
+    elif 'prott5' in model_name.lower():
+        from .prott5 import build_prott5_model
+        return build_prott5_model(model_name)
+    elif 'ankh' in model_name.lower():
+        from .ankh import build_ankh_model
+        return build_ankh_model(model_name)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
@@ -77,6 +100,15 @@ def get_tokenizer(model_name: str):
     elif 'esmc' in model_name.lower() or 'camp' in model_name.lower() or 'esmv' in model_name.lower():
         from .FastPLMs.modeling_esm_plusplus import EsmSequenceTokenizer
         return EsmSequenceTokenizer()
+    elif 'protbert' in model_name.lower():
+        from transformers import EsmTokenizer
+        return EsmTokenizer.from_pretrained('lhallee/no_space_protbert_tokenizer')
+    elif 'prott5' in model_name.lower():
+        from transformers import T5Tokenizer
+        return T5Tokenizer.from_pretrained('Rostlab/prot_t5_xl_half_uniref50-enc')
+    elif 'ankh' in model_name.lower():
+        from transformers import AutoTokenizer
+        return AutoTokenizer.from_pretrained('Synthyra/ANKH-Base')
     else:
         raise ValueError(f"Model {model_name} not supported")
 
