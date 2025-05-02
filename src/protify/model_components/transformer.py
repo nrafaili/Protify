@@ -50,7 +50,7 @@ class Transformer(nn.Module):
 
     def forward(self, x: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         batch_size, seq_len, _ = x.shape
-        if attention_mask is not None:
+        if attention_mask is not None and attention_mask.ndim == 2:
             attention_mask = attention_mask[:, None, None, :].expand(batch_size, 1, seq_len, seq_len).bool()
         for layer in self.layers:
             x = layer(x, attention_mask)

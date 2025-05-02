@@ -40,27 +40,34 @@ internal_datasets = {
 }
 
 possible_with_vector_reps = [
+    # multi-label
     'EC',
     'GO-CC',
     'GO-BP',
     'GO-MF',
+    # classification
     'MB',
     'DeepLoc-2',
     'DeepLoc-10',
-    'enzyme-kcat',
     'solubility',
     'localization',
     'temperature-stability',
-    'peptide-HLA-MHC-affinity',
-    'optimal-temperature',
-    'optimal-ph',
     'material-production',
     'fitness-prediction',
     'number-of-folds',
     'cloning-clf',
     'stability-prediction',
+    # regression
+    'enzyme-kcat',
+    'optimal-temperature',
+    'optimal-ph',
+    # ppi
     'human-ppi',
+    'PPA-ppi',
+    'human-ppi-pinui',
+    'yest-ppi-pinui',
     'gold-ppi',
+    'peptide-HLA-MHC-affinity',
 ]
 
 standard_data_benchmark = [

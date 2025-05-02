@@ -380,10 +380,10 @@ class GUI(MainProcess):
         combo_probe = ttk.Combobox(
             self.probe_tab,
             textvariable=self.settings_vars["probe_type"],
-            values=["linear", "transformer", "crossconv"]
+            values=["linear", "transformer", "retrievalnet"]
         )
         combo_probe.grid(row=0, column=1, padx=10, pady=5)
-        self.add_help_button(self.probe_tab, 0, 2, "Type of probe architecture to use (linear, transformer, or crossconv).")
+        self.add_help_button(self.probe_tab, 0, 2, "Type of probe architecture to use (linear, transformer, or retrievalnet).")
 
         # Tokenwise
         ttk.Label(self.probe_tab, text="Tokenwise:").grid(row=1, column=0, padx=10, pady=5, sticky="w")

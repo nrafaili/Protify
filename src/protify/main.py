@@ -224,6 +224,8 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                 emb_dict = torch_load(save_path)
                 input_dim = self.get_embedding_dim_pth(emb_dict, test_seq)
 
+            print(f'Input dim: {input_dim}')
+
             # get tokenizer
             tokenizer = get_tokenizer(model_name)
 
@@ -324,7 +326,7 @@ def parse_arguments():
     parser.add_argument("--model_names", nargs="+", default=["ESM2-8"], help="List of model names to use.")
 
     # ----------------- ProbeArguments ----------------- #
-    parser.add_argument("--probe_type", choices=["linear", "transformer", "crossconv"], default="linear", help="Type of probe.")
+    parser.add_argument("--probe_type", choices=["linear", "transformer", "retrievalnet"], default="linear", help="Type of probe.")
     parser.add_argument("--tokenwise", action="store_true", default=False, help="Tokenwise probe (default: False).")
     parser.add_argument("--hidden_dim", type=int, default=8192, help="Hidden dimension size.")
     parser.add_argument("--dropout", type=float, default=0.2, help="Dropout rate.")
@@ -370,6 +372,11 @@ def parse_arguments():
     parser.add_argument("--probe_grad_accum", type=int, default=1, help='Gradient accumulation steps for probe training.')
     parser.add_argument("--base_grad_accum", type=int, default=8, help='Gradient accumulation steps for base model training.')
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
+    ### TODO integrate
+    #parser.add_argument("--probe_lr", type=float, default=1e-4, help="Learning rate for probe training.")
+    #parser.add_argument("--base_lr", type=float, default=1e-5, help="Learning rate for base model training.")
+    #parser.add_argument("--lr_scheduler", type=str, default='cosine', help='Learning rate scheduler.')
+    #parser.add_argument("--optimizer", type=str, default='adamw', help='Optimizer.')
     parser.add_argument("--weight_decay", type=float, default=0.00, help="Weight decay.")
     parser.add_argument("--patience", type=int, default=1, help="Patience for early stopping.")
     parser.add_argument("--seed", type=int, default=42, help="Seed for random number generation.")

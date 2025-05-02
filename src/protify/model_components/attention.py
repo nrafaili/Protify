@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 from functools import partial
 from einops import rearrange, repeat
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 
 Linear = partial(nn.Linear, bias=False)
@@ -205,6 +206,7 @@ class AttentionPooler(nn.Module):
         super(AttentionPooler, self).__init__()
         assert hidden_size % n_heads == 0, "hidden_size must be divisible by n_heads"
         self.d_head = hidden_size // n_heads
+        self.n_heads = n_heads
         self.Q = nn.Parameter(torch.randn(1, n_tokens, hidden_size))
         self.Wq = Linear(hidden_size, hidden_size)
         self.Wv = Linear(hidden_size, hidden_size)
@@ -216,14 +218,29 @@ class AttentionPooler(nn.Module):
         self,
         x: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
+        output_attentions: Optional[bool] = False,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         q = self.Wq(self.Q).expand(x.size(0), -1, -1)  # (b, n_tokens, d)
         v = self.Wv(x)  # (b, L, d)
         k = self.Wk(x)  # (b, L, d)
-        q, k, v = map(self.reshaper, (q, k, v))  # (b, n_heads, n_tokens, d_head) (b, n_heads, L, d_head)
-        attn = F.scaled_dot_product_attention(
-            q, k, v, attn_mask=attention_mask, is_causal=False
-        ) # (b, n_heads, n_tokens, d_head)
-        attn = rearrange(attn, "b h s d -> b s (h d)")  # (b, n_tokens, n_heads * d_head)
-        return self.Wo(attn)  # (b, n_tokens, d_pooled)
-    
+        q, k, v = map(self.reshaper, (q, k, v))  # (b, n_heads, n_tokens, d_head) (b, n_heads, L, d_head) (b, n_heads, L, d_head)
+        if output_attentions:
+            # Manually compute attention scores
+            scale = 1.0 / math.sqrt(self.d_head)
+            scores = torch.matmul(q, k.transpose(-1, -2)) * scale  # (b, n_heads, n_tokens, L)
+            
+            if attention_mask is not None:
+                scores = scores + attention_mask
+                
+            attention_probs = F.softmax(scores, dim=-1)
+            context_layer = torch.matmul(attention_probs, v)  # (b, n_heads, n_tokens, d_head)
+            context_layer = rearrange(context_layer, "b h s d -> b s (h d)")  # (b, n_tokens, n_heads * d_head)
+            output = self.Wo(context_layer)  # (b, n_tokens, d_pooled)
+            
+            return output, attention_probs
+        else:
+            attn = F.scaled_dot_product_attention(
+                q, k, v, attn_mask=attention_mask, is_causal=False
+            ) # (b, n_heads, n_tokens, d_head)
+            attn = rearrange(attn, "b h s d -> b s (h d)")  # (b, n_tokens, n_heads * d_head)
+            return self.Wo(attn)  # (b, n_tokens, d_pooled)

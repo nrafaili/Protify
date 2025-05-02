@@ -57,7 +57,7 @@ model_names:
 
 
 # ProbeArguments:
-probe_type: linear  # valid options: linear, transformer, crossconv
+probe_type: linear  # valid options: linear, transformer, retrievalnet
 tokenwise: !!bool false
 hidden_dim: !!int 8192
 dropout: !!float 0.2

@@ -1,6 +1,7 @@
+import torch
 from torch import nn
 from transformers import PreTrainedModel, PretrainedConfig
-from typing import List
+from typing import List, Optional
 from embedder import Pooler
 
 
@@ -27,7 +28,12 @@ class HybridProbe(PreTrainedModel):
         self.model = model
         self.probe = probe
 
-    def forward(self, input_ids, attention_mask=None, labels=None):
+    def forward(
+            self,
+            input_ids,
+            attention_mask: Optional[torch.Tensor] = None,
+            labels: Optional[torch.Tensor] = None,
+    ):
         x = self.model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
         if not self.tokenwise:
             x = self.pooler(x, attention_mask)
