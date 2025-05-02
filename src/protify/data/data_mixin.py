@@ -299,10 +299,7 @@ class DataMixin:
         return embedding_dim
 
     def get_embedding_dim_pth(self, emb_dict, test_seq):
-        if len(test_seq) >= self._max_length:
-            test_seq_len = self._max_length
-        else:
-            test_seq_len = len(test_seq) + 2
+        test_seq_len = len(test_seq) + 2
 
         test_embedding = emb_dict[test_seq]
         print(test_embedding.shape)
