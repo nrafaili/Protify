@@ -22,7 +22,7 @@ class RandomModel(nn.Module):
         self.hidden_size = config.hidden_size
 
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        return torch.randn(input_ids.shape[0], self.hidden_size)
+        return torch.randn(input_ids.shape[0], input_ids.shape[1], self.hidden_size)
 
 
 class RandomTransformer(nn.Module):
