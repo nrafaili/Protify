@@ -58,9 +58,9 @@ hidden_dim: !!int 512
 dropout: !!float 0.1
 n_layers: !!int 1
 pre_ln: !!bool true
-classifier_dim: !!int 4096
+classifier_dim: !!int 2048
 transformer_dropout: !!float 0.1
-classifier_dropout: !!float 0.1
+classifier_dropout: !!float 0.2
 n_heads: !!int 8
 rotary: !!bool true
 probe_pooling_types:
@@ -97,11 +97,11 @@ sql: !!bool false
 
 # TrainerArguments:
 num_epochs: !!int 200
-probe_batch_size: !!int 64
+probe_batch_size: !!int 32
 base_batch_size: !!int 4
 probe_grad_accum: !!int 1
 base_grad_accum: !!int 8
-lr: !!float 1e-4
+lr: !!float 5e-5
 weight_decay: !!float 0.01
 patience: !!int 5
 seed: !!int 42
