@@ -16,6 +16,8 @@ currently_supported_models = [
     'ESMC-600',
     'ESM2-diff-150',
     'ESM2-diffAV-150',
+    'gLM2-150',
+    'gLM2-650',
 ]
 
 standard_benchmark = [
@@ -53,6 +55,9 @@ def get_base_model(model_name: str):
     elif 'esmc' in model_name.lower():
         from .esmc import build_esmc_model
         return build_esmc_model(model_name)
+    elif 'glm' in model_name.lower():
+        from .glm import build_glm2_model
+        return build_glm2_model(model_name)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
@@ -75,6 +80,9 @@ def get_tokenizer(model_name: str):
     elif 'esmc' in model_name.lower() or 'camp' in model_name.lower() or 'esmv' in model_name.lower():
         from .FastPLMs.modeling_esm_plusplus import EsmSequenceTokenizer
         return EsmSequenceTokenizer()
+    elif 'glm' in model_name.lower():
+        from transformers import AutoTokenizer
+        return AutoTokenizer.from_pretrained('tattabio/gLM2_150M')
     else:
         raise ValueError(f"Model {model_name} not supported")
 
