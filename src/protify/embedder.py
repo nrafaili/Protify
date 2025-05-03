@@ -19,7 +19,7 @@ class EmbeddingArguments:
             embedding_batch_size: int = 4,
             embedding_num_workers: int = 0,
             download_embeddings: bool = False,
-            download_dir: str = 'Synthyra/plm_embeddings',
+            download_dir: str = 'Synthyra/mean_pooled_embeddings',
             matrix_embed: bool = False,
             embedding_pooling_types: List[str] = ['mean'],
             save_embeddings: bool = False,
@@ -198,6 +198,10 @@ class Embedder:
             # Save the combined embeddings
             print_message(f'Saving combined embeddings to {final_path}')
             torch.save(downloaded_embeddings, final_path)
+        else:
+            print_message(f'Downloading embeddings from {self.download_dir}, no previous embeddings found')
+            downloaded_embeddings = torch.load(unzipped_path)
+            torch.save(downloaded_embeddings, final_path)
         return final_path
 
     def _read_sequences_from_db(self, db_path: str) -> set[str]:
@@ -340,6 +344,7 @@ class Embedder:
 
 if __name__ == '__main__':
     ### Embed all supported datasets with all supported models
+    # py -m embedder
     import argparse
     from huggingface_hub import upload_file, login
     from data.supported_datasets import possible_with_vector_reps
@@ -382,7 +387,7 @@ if __name__ == '__main__':
     embedder_args = EmbeddingArguments(
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        download_embeddings=False,
+        download_embeddings=True,
         matrix_embed=False,
         pooling_types=['mean'],
         save_embeddings=True,

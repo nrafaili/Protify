@@ -7,8 +7,8 @@ import webbrowser
 import os
 from types import SimpleNamespace
 from tkinter import ttk, messagebox, filedialog
-from base_models.get_base_models import BaseModelArguments, standard_benchmark
-from data.supported_datasets import supported_datasets, standard_data_benchmark, internal_synthyra_datasets
+from base_models.get_base_models import BaseModelArguments, standard_models
+from data.supported_datasets import supported_datasets, standard_data_benchmark, internal_datasets
 from embedder import EmbeddingArguments
 from probes.get_probe import ProbeArguments
 from probes.trainers import TrainerArguments
@@ -16,12 +16,12 @@ from main import MainProcess
 from concurrent.futures import ThreadPoolExecutor
 from data.data_mixin import DataArguments
 from probes.scikit_classes import ScikitArguments
-from logger import log_method_calls
 from utils import print_message, print_done, print_title
 from visualization.plot_result import create_plots
 
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 
 class BackgroundTask:
@@ -55,7 +55,7 @@ class GUI(MainProcess):
         self.master.title("Settings GUI")
         self.master.geometry("600x800")
 
-        icon = tk.PhotoImage(file="Protify_logo.png")
+        icon = tk.PhotoImage(file="protify_logo.png")
         # Set the window icon
         self.master.iconphoto(True, icon)
 
@@ -253,6 +253,18 @@ class GUI(MainProcess):
         except Exception as e:
             print_message(f"Error setting up logo and link: {str(e)}")
 
+    def build_model_tab(self):
+        ttk.Label(self.model_tab, text="Model Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
+
+        self.model_listbox = tk.Listbox(self.model_tab, selectmode="extended", height=30)
+        for model_name in standard_models:
+            self.model_listbox.insert(tk.END, model_name)
+        self.model_listbox.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
+        self.add_help_button(self.model_tab, 0, 2, "Select the language models to use for embedding. Multiple models can be selected.")
+
+        run_button = ttk.Button(self.model_tab, text="Select Models", command=self._select_models)
+        run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
+
     def build_data_tab(self):
         # Max length (Spinbox)
         ttk.Label(self.data_tab, text="Max Sequence Length:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
@@ -294,7 +306,7 @@ class GUI(MainProcess):
         ttk.Label(self.data_tab, text="Dataset Names:").grid(row=4, column=0, padx=10, pady=5, sticky="nw")
         self.data_listbox = tk.Listbox(self.data_tab, selectmode="extended", height=25, width=25)
         for dataset_name in supported_datasets:
-            if dataset_name not in internal_synthyra_datasets:
+            if dataset_name not in internal_datasets:
                 self.data_listbox.insert(tk.END, dataset_name)
         self.data_listbox.grid(row=4, column=1, padx=10, pady=5, sticky="nw")
         self.add_help_button(self.data_tab, 4, 2, "Select datasets to use. Multiple datasets can be selected.")
@@ -361,18 +373,6 @@ class GUI(MainProcess):
         run_button = ttk.Button(self.embed_tab, text="Embed sequences to disk", command=self._get_embeddings)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
 
-    def build_model_tab(self):
-        ttk.Label(self.model_tab, text="Model Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
-
-        self.model_listbox = tk.Listbox(self.model_tab, selectmode="extended", height=10)
-        for model_name in standard_benchmark + ['experimental']:
-            self.model_listbox.insert(tk.END, model_name)
-        self.model_listbox.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
-        self.add_help_button(self.model_tab, 0, 2, "Select the language models to use for embedding. Multiple models can be selected.")
-
-        run_button = ttk.Button(self.model_tab, text="Select Models", command=self._select_models)
-        run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
-
     def build_probe_tab(self):
         # Probe Type
         ttk.Label(self.probe_tab, text="Probe Type:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
@@ -380,10 +380,10 @@ class GUI(MainProcess):
         combo_probe = ttk.Combobox(
             self.probe_tab,
             textvariable=self.settings_vars["probe_type"],
-            values=["linear", "transformer", "crossconv"]
+            values=["linear", "transformer", "retrievalnet"]
         )
         combo_probe.grid(row=0, column=1, padx=10, pady=5)
-        self.add_help_button(self.probe_tab, 0, 2, "Type of probe architecture to use (linear, transformer, or crossconv).")
+        self.add_help_button(self.probe_tab, 0, 2, "Type of probe architecture to use (linear, transformer, or retrievalnet).")
 
         # Tokenwise
         ttk.Label(self.probe_tab, text="Tokenwise:").grid(row=1, column=0, padx=10, pady=5, sticky="w")
@@ -536,47 +536,61 @@ class GUI(MainProcess):
         spin_num_epochs.grid(row=2, column=1, padx=10, pady=5)
         self.add_help_button(self.trainer_tab, 2, 2, "Number of training epochs (complete passes through the dataset).")
 
-        # trainer_batch_size
-        ttk.Label(self.trainer_tab, text="Trainer Batch Size:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["trainer_batch_size"] = tk.IntVar(value=64)
-        spin_trainer_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["trainer_batch_size"])
-        spin_trainer_batch_size.grid(row=3, column=1, padx=10, pady=5)
-        self.add_help_button(self.trainer_tab, 3, 2, "Number of samples per batch during training.")
+        # probe_batch_size
+        ttk.Label(self.trainer_tab, text="Probe Batch Size:").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["probe_batch_size"] = tk.IntVar(value=64)
+        spin_probe_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["probe_batch_size"])
+        spin_probe_batch_size.grid(row=3, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 3, 2, "Batch size for probe training.")
 
-        # gradient_accumulation_steps
-        ttk.Label(self.trainer_tab, text="Gradient Accumulation Steps:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["gradient_accumulation_steps"] = tk.IntVar(value=1)
-        spin_gradient_accumulation_steps = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["gradient_accumulation_steps"])
-        spin_gradient_accumulation_steps.grid(row=4, column=1, padx=10, pady=5)
-        self.add_help_button(self.trainer_tab, 4, 2, "Number of batches to accumulate gradients before updating weights.")
+        # base_batch_size
+        ttk.Label(self.trainer_tab, text="Base Batch Size:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["base_batch_size"] = tk.IntVar(value=4)
+        spin_base_batch_size = ttk.Spinbox(self.trainer_tab, from_=1, to=1000, textvariable=self.settings_vars["base_batch_size"])
+        spin_base_batch_size.grid(row=4, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 4, 2, "Batch size for base model training.")
+
+        # probe_grad_accum
+        ttk.Label(self.trainer_tab, text="Probe Grad Accum:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["probe_grad_accum"] = tk.IntVar(value=1)
+        spin_probe_grad_accum = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["probe_grad_accum"])
+        spin_probe_grad_accum.grid(row=5, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 5, 2, "Gradient accumulation steps for probe training.")
+
+        # base_grad_accum
+        ttk.Label(self.trainer_tab, text="Base Grad Accum:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["base_grad_accum"] = tk.IntVar(value=8)
+        spin_base_grad_accum = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["base_grad_accum"])
+        spin_base_grad_accum.grid(row=6, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 6, 2, "Gradient accumulation steps for base model training.")
 
         # lr
-        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=5, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Learning Rate:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["lr"] = tk.DoubleVar(value=1e-4)
         spin_lr = ttk.Spinbox(self.trainer_tab, from_=1e-6, to=1e-2, increment=1e-5, textvariable=self.settings_vars["lr"])
-        spin_lr.grid(row=5, column=1, padx=10, pady=5)
-        self.add_help_button(self.trainer_tab, 5, 2, "Learning rate for optimizer. Controls step size during training.")
+        spin_lr.grid(row=7, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 7, 2, "Learning rate for optimizer. Controls step size during training.")
 
         # weight_decay
-        ttk.Label(self.trainer_tab, text="Weight Decay:").grid(row=6, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Weight Decay:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["weight_decay"] = tk.DoubleVar(value=0.00)
         spin_weight_decay = ttk.Spinbox(self.trainer_tab, from_=0.0, to=1.0, increment=0.01, textvariable=self.settings_vars["weight_decay"])
-        spin_weight_decay.grid(row=6, column=1, padx=10, pady=5)
-        self.add_help_button(self.trainer_tab, 6, 2, "L2 regularization factor to prevent overfitting (0.0-1.0).")
+        spin_weight_decay.grid(row=8, column=1, padx=10, pady=5)
+        self.add_help_button(self.trainer_tab, 8, 2, "L2 regularization factor to prevent overfitting (0.0-1.0).")
 
         # patience
-        ttk.Label(self.trainer_tab, text="Patience:").grid(row=7, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["patience"] = tk.IntVar(value=3)
+        ttk.Label(self.trainer_tab, text="Patience:").grid(row=9, column=0, padx=10, pady=5, sticky="w")
+        self.settings_vars["patience"] = tk.IntVar(value=1)
         spin_patience = ttk.Spinbox(self.trainer_tab, from_=1, to=100, textvariable=self.settings_vars["patience"])
-        spin_patience.grid(row=7, column=1, padx=10, pady=5, sticky="w")
-        self.add_help_button(self.trainer_tab, 7, 2, "Number of epochs with no improvement after which training will stop.")
+        spin_patience.grid(row=9, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.trainer_tab, 9, 2, "Number of epochs with no improvement after which training will stop.")
 
         # Random Seed
-        ttk.Label(self.trainer_tab, text="Random Seed:").grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        ttk.Label(self.trainer_tab, text="Random Seed:").grid(row=10, column=0, padx=10, pady=5, sticky="w")
         self.settings_vars["seed"] = tk.IntVar(value=42)
         spin_seed = ttk.Spinbox(self.trainer_tab, from_=0, to=10000, textvariable=self.settings_vars["seed"])
-        spin_seed.grid(row=8, column=1, padx=10, pady=5, sticky="w")
-        self.add_help_button(self.trainer_tab, 8, 2, "Random seed for reproducibility of experiments.")
+        spin_seed.grid(row=10, column=1, padx=10, pady=5, sticky="w")
+        self.add_help_button(self.trainer_tab, 10, 2, "Random seed for reproducibility of experiments.")
 
         run_button = ttk.Button(self.trainer_tab, text="Run trainer", command=self._run_trainer)
         run_button.grid(row=99, column=0, columnspan=2, pady=(10, 10))
@@ -686,12 +700,7 @@ class GUI(MainProcess):
         entry_output_dir = ttk.Entry(viz_frame, textvariable=self.settings_vars["viz_output_dir"], width=30)
         entry_output_dir.grid(row=3, column=1, padx=10, pady=5)
         self.add_help_button(viz_frame, 3, 2, "Directory where plots will be saved.")
-        
-        ttk.Label(viz_frame, text="Normalize:").grid(row=4, column=0, padx=10, pady=5, sticky="w")
-        self.settings_vars["normalize"] = tk.BooleanVar(value=False)
-        check_normalize = ttk.Checkbutton(viz_frame, variable=self.settings_vars["normalize"])
-        check_normalize.grid(row=4, column=1, padx=10, pady=5, sticky="w")
-        self.add_help_button(viz_frame, 4, 2, "Normalize scores per category.")
+
 
         # Generate plots button
         generate_button = ttk.Button(viz_frame, text="Generate Plots", command=self._generate_plots)
@@ -748,7 +757,6 @@ class GUI(MainProcess):
         
         self.run_in_background(background_login)
 
-    @log_method_calls
     def _select_models(self):
         print_message("Selecting models...")
         # Gather selected model names
@@ -757,7 +765,7 @@ class GUI(MainProcess):
 
         # If no selection, default to the entire standard_benchmark
         if not selected_models:
-            selected_models = standard_benchmark
+            selected_models = standard_models
 
         # Update full_args with model settings
         self.full_args.model_names = selected_models
@@ -775,7 +783,6 @@ class GUI(MainProcess):
         self._write_args()
         print_done()
 
-    @log_method_calls
     def _get_data(self):
         print_message("=== Getting Data ===")
         print_message("Loading and preparing datasets...")
@@ -814,7 +821,6 @@ class GUI(MainProcess):
             
         self.run_in_background(background_get_data)
 
-    @log_method_calls
     def _get_embeddings(self):
         if not self.all_seqs:
             print_message('Sequences are not loaded yet. Please run the data tab first.')
@@ -853,7 +859,6 @@ class GUI(MainProcess):
             
         self.run_in_background(background_get_embeddings)
 
-    @log_method_calls
     def _create_probe_args(self):
         print_message("Creating probe arguments...")
         
@@ -893,7 +898,6 @@ class GUI(MainProcess):
         self._write_args()
         print_done()
 
-    @log_method_calls
     def _run_trainer(self):
         print_message("Starting training process...")
         # Gather settings
@@ -904,8 +908,8 @@ class GUI(MainProcess):
         self.full_args.lora_alpha = self.settings_vars["lora_alpha"].get()
         self.full_args.lora_dropout = self.settings_vars["lora_dropout"].get()
         self.full_args.num_epochs = self.settings_vars["num_epochs"].get()
-        self.full_args.trainer_batch_size = self.settings_vars["trainer_batch_size"].get()
-        self.full_args.gradient_accumulation_steps = self.settings_vars["gradient_accumulation_steps"].get()
+        self.full_args.trainer_batch_size = self.settings_vars["probe_batch_size"].get()
+        self.full_args.gradient_accumulation_steps = self.settings_vars["probe_grad_accum"].get()
         self.full_args.lr = self.settings_vars["lr"].get()
         self.full_args.weight_decay = self.settings_vars["weight_decay"].get()
         self.full_args.patience = self.settings_vars["patience"].get()
@@ -916,22 +920,17 @@ class GUI(MainProcess):
             args_dict = {k: v for k, v in self.full_args.__dict__.items() if k != 'all_seqs' and 'token' not in k.lower() and 'api' not in k.lower()}
             self.logger_args = SimpleNamespace(**args_dict)
             self._write_args()
-            
-            if self.full_args.use_lora:
-                self.init_lora_model()
-                self.run_lora_model()
-            elif self.full_args.full_finetuning:
-                self.get_full_finetuning_model()
-                self.run_full_finetuning_model()
+
+            if self.full_args.full_finetuning:
+                self.run_full_finetuning()
             elif self.full_args.hybrid_probe:
-                self.init_hybrid_probes()
+                self.run_hybrid_probes()
             else:
                 self.run_nn_probes()
             print_done()
-            
+                
         self.run_in_background(background_run_trainer)
 
-    @log_method_calls
     def _run_scikit(self):
         print_message("Running scikit-learn models...")
         # Gather settings for scikit
@@ -968,19 +967,23 @@ class GUI(MainProcess):
             return
         
         print_message("Starting replay from log file...")
-        from logger import LogReplayer
-        replayer = LogReplayer(replay_path)
-        replay_args = replayer.parse_log()
-        replay_args.replay_path = replay_path
         
-        # Update GUI with replay settings
-        for key, value in replay_args.__dict__.items():
-            if key in self.settings_vars:
-                self.settings_vars[key].set(value)
+        def background_replay():
+            from logger import LogReplayer
+            replayer = LogReplayer(replay_path)
+            replay_args = replayer.parse_log()
+            replay_args.replay_path = replay_path
+            
+            # Create a new MainProcess instance with replay_args
+            main = MainProcess(replay_args, GUI=False)
+            for k, v in main.full_args.__dict__.items():
+                print(f"{k}:\t{v}")
+            
+            # Run the replay on this MainProcess instance
+            replayer.run_replay(main)
+            print_done()
         
-        print_message(f"Loaded settings from {replay_path}")
-        replayer.run_replay(self)
-        print_done()
+        self.run_in_background(background_replay)
         
     def _browse_results_file(self):
         filename = filedialog.askopenfilename(
@@ -1022,11 +1025,10 @@ class GUI(MainProcess):
         
         # Get output directory
         output_dir = self.settings_vars["viz_output_dir"].get()
-        normalize = self.settings_vars["normalize"].get()
         def background_generate_plots():
             # Call the plot generation function
             print_message(f"Generating plots in {output_dir}...")
-            create_plots(results_file, output_dir, normalize)
+            create_plots(results_file, output_dir)
             print_message("Plots generated successfully!")
             print_done()
             

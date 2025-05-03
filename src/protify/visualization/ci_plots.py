@@ -4,10 +4,10 @@ import seaborn as sns
 import numpy as np
 from scipy.stats import spearmanr, pearsonr
 from sklearn.metrics import r2_score
-from pauc import plot_roc_with_ci
+from .pauc.pauc import plot_roc_with_ci
 
 
-def regression_ci_plot(y_true, y_pred, save_path):
+def regression_ci_plot(y_true, y_pred, save_path, title=None):
     """
     Calculate the spearman rho and p-value of the regression model.
     Plot the line of best fit with 95% confidence intervals for spearman rho.
@@ -32,7 +32,10 @@ def regression_ci_plot(y_true, y_pred, save_path):
 
     ax.set_xlabel('True Values')
     ax.set_ylabel('Predicted Values')
-    ax.set_title('Regression Plot with 95% Confidence Interval')
+    if title:
+        ax.set_title(title)
+    else:
+        ax.set_title('Regression Plot with 95% Confidence Interval')
 
     # Annotate statistics on the plot
     stats_text = (
@@ -47,26 +50,26 @@ def regression_ci_plot(y_true, y_pred, save_path):
     )
 
     # Save the figure
-    os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}.png")
     fig.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close(fig)
 
 
-def classification_ci_plot(y_true, y_pred, save_path):
+def classification_ci_plot(y_true, y_pred, save_path, title=None):
     """
     Use pauc to display classification plot
     """
     try:
-        plot_roc_with_ci(y_true, y_pred, save_path)
+        plot_roc_with_ci(y_true, y_pred, save_path, fig_title=title)
     except Exception as e:
         print(f"Error plotting pAUC curve, likely the wrong version: {e}")
 
 
 if __name__ == "__main__":
-    # test the function
-    #y_true = np.random.rand(100)
-    #y_pred = np.random.rand(100)
-    output_dir = "plots"
-    #regression_ci_plot(y_true, y_pred, output_dir, "regression", "regression", "regression")
+    # py -m visualization.ci_plots
+    y_true = np.random.rand(100)
+    y_pred = np.random.rand(100)
+    regression_ci_plot(y_true, y_pred, "plots/test_plots/regression.png", title="Regression Plot")
 
+    y_true = np.random.randint(0, 2, 100)
+    y_pred = np.random.rand(100, 2)
+    classification_ci_plot(y_true, y_pred, "plots/test_plots/classification.png", title="Classification Plot")

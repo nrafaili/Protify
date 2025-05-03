@@ -139,7 +139,8 @@ class DataMixin:
     def process_datasets(
             self,
             hf_datasets: List[Tuple[Dataset, Dataset, Dataset, bool]],
-            data_names: List[str])-> Tuple[Dict[str, Tuple[Dataset, Dataset, Dataset, int, str, bool]], List[str]]:
+            data_names: List[str],
+        )-> Tuple[Dict[str, Tuple[Dataset, Dataset, Dataset, int, str, bool]], List[str]]:
         max_length = self._max_length
         datasets, all_seqs = {}, set()
         for dataset, data_name in zip(hf_datasets, data_names):
@@ -241,10 +242,19 @@ class DataMixin:
 
         for data_path in self.data_args.data_paths:
             data_name = data_path.split('/')[-1]
-            ppi = 'ppi' in data_name.lower()
             print_message(f'Loading {data_name}')
             dataset = load_dataset(data_path)
-            train_set, valid_set, test_set = dataset['train'], dataset['valid'], dataset['test']
+            ppi = 'SeqA' in dataset['train'].column_names
+            print_message(f'PPI: {ppi}')
+            try:
+                train_set, valid_set, test_set = dataset['train'], dataset['valid'], dataset['test']
+            except:
+                # No valid or test set, make 10% splits randomly
+                train_set = dataset['train'].train_test_split(test_size=0.2, seed=42)
+                valid_set = train_set['test']
+                train_set = train_set['train']
+                test_set = train_set.train_test_split(test_size=0.5, seed=42)
+                test_set = test_set['test']
             datasets.append((train_set, valid_set, test_set, ppi))
             data_names.append(data_name)
 
@@ -273,8 +283,8 @@ class DataMixin:
 
     def get_embedding_dim_sql(self, save_path, test_seq):
         import sqlite3
-        if len(test_seq) > self._max_length:
-            test_seq_len = self._max_length + 2
+        if len(test_seq) >= self._max_length:
+            test_seq_len = self._max_length
         else:
             test_seq_len = len(test_seq)
         
@@ -289,12 +299,10 @@ class DataMixin:
         return embedding_dim
 
     def get_embedding_dim_pth(self, emb_dict, test_seq):
-        if len(test_seq) >= self._max_length:
-            test_seq_len = len(test_seq) + 2
-        else:
-            test_seq_len = len(test_seq)
+        test_seq_len = len(test_seq) + 2
 
         test_embedding = emb_dict[test_seq]
+        print(test_embedding.shape)
         if self._full:
             test_embedding = test_embedding.reshape(test_seq_len, -1)
         else:

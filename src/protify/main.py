@@ -13,7 +13,11 @@ from probes.scikit_classes import ScikitArguments, ScikitProbe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
 from utils import torch_load, print_message
-from plots import create_plots
+from visualization.plot_result import create_plots
+
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 
 class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
@@ -84,9 +88,10 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
     def _run_full_finetuning(self, model_name, data_name, train_set, valid_set, test_set, ppi):
         tokenwise = self.probe_args.tokenwise
         num_labels = self.probe_args.num_labels
-        model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels)
+        model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels, hybrid=False)
         if self.probe_args.lora:
             model = wrap_lora(model, self.probe_args.lora_r, self.probe_args.lora_alpha, self.probe_args.lora_dropout)
+        summary(model)
         model, valid_metrics, test_metrics = self.trainer_base_model(
             model=model,
             tokenizer=tokenizer,
@@ -105,10 +110,12 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
     def _run_hybrid_probe(self, model_name, data_name, train_set, valid_set, test_set, tokenizer, emb_dict, ppi):
         tokenwise = self.probe_args.tokenwise
         num_labels = self.probe_args.num_labels
-        model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels)
+        model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels, hybrid=True)
         if self.probe_args.lora:
             model = wrap_lora(model, self.probe_args.lora_r, self.probe_args.lora_alpha, self.probe_args.lora_dropout)
         probe = get_probe(self.probe_args)
+        summary(model)
+        summary(probe)
         model, valid_metrics, test_metrics = self.trainer_hybrid_model(
             model=model,
             tokenizer=tokenizer,
@@ -138,7 +145,7 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                 self.probe_args.task_type = label_type
                 self.trainer_args.task_type = label_type
                 self.logger.info(f'Training probe for {data_name} with {model_name}')
-                self._run_full_finetuning(model_name, data_name, train_set, valid_set, test_set, ppi)
+                _ = self._run_full_finetuning(model_name, data_name, train_set, valid_set, test_set, ppi)
 
     @log_method_calls
     def run_hybrid_probes(self):
@@ -184,7 +191,7 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                 self.logger.info(f'Training probe for {data_name} with {model_name}')
                 ### TODO eventually add options for optimizers and schedulers
                 ### TODO here is probably where we can differentiate between the different training schemes
-                model = self._run_hybrid_probe(
+                _ = self._run_hybrid_probe(
                     model_name=model_name,
                     data_name=data_name,
                     train_set=train_set,
@@ -195,7 +202,6 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                     ppi=ppi,
                 )
                 ### TODO may link from probe here to running inference on input csv or HF datasets
-                return model
 
     @log_method_calls
     def run_nn_probes(self):
@@ -222,6 +228,8 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                 emb_dict = torch_load(save_path)
                 input_dim = self.get_embedding_dim_pth(emb_dict, test_seq)
 
+            print(f'Input dim: {input_dim}')
+
             # get tokenizer
             tokenizer = get_tokenizer(model_name)
 
@@ -241,7 +249,7 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                 self.logger.info(f'Training probe for {data_name} with {model_name}')
                 ### TODO eventually add options for optimizers and schedulers
                 ### TODO here is probably where we can differentiate between the different training schemes
-                probe = self._run_nn_probe(
+                _ = self._run_nn_probe(
                     model_name=model_name,
                     data_name=data_name,
                     train_set=train_set,
@@ -252,7 +260,6 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                     ppi=ppi,
                 )
                 ### TODO may link from probe here to running inference on input csv or HF datasets
-                return probe
 
     @log_method_calls
     def run_scikit_scheme(self):    
@@ -283,15 +290,14 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         
         # Get output directory
         output_dir = self.full_args.plots_dir
-        normalize = self.full_args.normalize
 
         print_message(f"Generating plots in {output_dir}...")
-        create_plots(results_file, output_dir, normalize)
+        create_plots(results_file, output_dir)
         print_message("Plots generated successfully!")
         
 
 
-def parse_arguments(): # TODO update yaml
+def parse_arguments():
     parser = argparse.ArgumentParser(description="Script with arguments mirroring the provided YAML settings.")
     # ----------------- ID ----------------- #
     parser.add_argument("--hf_username", default="Synthyra", help="Hugging Face username.")
@@ -324,7 +330,7 @@ def parse_arguments(): # TODO update yaml
     parser.add_argument("--model_names", nargs="+", default=["ESM2-8"], help="List of model names to use.")
 
     # ----------------- ProbeArguments ----------------- #
-    parser.add_argument("--probe_type", choices=["linear", "transformer", "crossconv"], default="linear", help="Type of probe.")
+    parser.add_argument("--probe_type", choices=["linear", "transformer", "retrievalnet"], default="linear", help="Type of probe.")
     parser.add_argument("--tokenwise", action="store_true", default=False, help="Tokenwise probe (default: False).")
     parser.add_argument("--hidden_dim", type=int, default=8192, help="Hidden dimension size.")
     parser.add_argument("--dropout", type=float, default=0.2, help="Dropout rate.")
@@ -365,17 +371,22 @@ def parse_arguments(): # TODO update yaml
 
     # ----------------- TrainerArguments ----------------- #
     parser.add_argument("--num_epochs", type=int, default=200, help="Number of epochs to train for.")
-    parser.add_argument("--trainer_batch_size", type=int, default=64, help="Batch size for training.")
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="Gradient accumulation steps.")
+    parser.add_argument("--probe_batch_size", type=int, default=64, help="Batch size for probe training.")
+    parser.add_argument("--base_batch_size", type=int, default=4, help="Batch size for base model training.")
+    parser.add_argument("--probe_grad_accum", type=int, default=1, help='Gradient accumulation steps for probe training.')
+    parser.add_argument("--base_grad_accum", type=int, default=8, help='Gradient accumulation steps for base model training.')
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
+    ### TODO integrate
+    #parser.add_argument("--probe_lr", type=float, default=1e-4, help="Learning rate for probe training.")
+    #parser.add_argument("--base_lr", type=float, default=1e-5, help="Learning rate for base model training.")
+    #parser.add_argument("--lr_scheduler", type=str, default='cosine', help='Learning rate scheduler.')
+    #parser.add_argument("--optimizer", type=str, default='adamw', help='Optimizer.')
     parser.add_argument("--weight_decay", type=float, default=0.00, help="Weight decay.")
     parser.add_argument("--patience", type=int, default=1, help="Patience for early stopping.")
     parser.add_argument("--seed", type=int, default=42, help="Seed for random number generation.")
     parser.add_argument("--full_finetuning", action="store_true", default=False, help="Full finetuning (default: False).")
     parser.add_argument("--hybrid_probe", action="store_true", default=False, help="Hybrid probe (default: False).")
 
-    # ----------------- Vizualization ----------------- #
-    parser.add_argument("--normalize", action="store_true", default=False, help="Normalize plots (default: False).")
     args = parser.parse_args()
 
     if args.hf_token is not None:
@@ -405,16 +416,16 @@ if __name__ == "__main__":
         replay_args.replay_path = args.replay_path
         main = MainProcess(replay_args, GUI=False)
         for k, v in main.full_args.__dict__.items():
-            print_message(f"{k}:\t{v}")
+            print(f"{k}:\t{v}")
         replayer.run_replay(main)
     
     else:
         main = MainProcess(args, GUI=False)
         for k, v in main.full_args.__dict__.items():
-            print_message(f"{k}:\t{v}")
+            print(f"{k}:\t{v}")
         main.apply_current_settings()
         main.get_datasets()
-        print_message(len(main.all_seqs))
+        print_message(f"Number of sequences: {len(main.all_seqs)}")
         if main.full_args.full_finetuning:
             main.run_full_finetuning()
 

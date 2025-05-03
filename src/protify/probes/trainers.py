@@ -30,8 +30,10 @@ class TrainerArguments:
             self,
             model_save_dir: str,
             num_epochs: int = 200,
-            trainer_batch_size: int = 64,
-            gradient_accumulation_steps: int = 1,
+            probe_batch_size: int = 64,
+            base_batch_size: int = 4,
+            probe_grad_accum: int = 1,
+            base_grad_accum: int = 1,
             lr: float = 1e-4,
             weight_decay: float = 0.00,
             task_type: str = 'regression',
@@ -47,8 +49,10 @@ class TrainerArguments:
     ):
         self.model_save_dir = model_save_dir
         self.num_epochs = num_epochs
-        self.batch_size = trainer_batch_size
-        self.gradient_accumulation_steps = gradient_accumulation_steps
+        self.probe_batch_size = probe_batch_size
+        self.base_batch_size = base_batch_size
+        self.probe_grad_accum = probe_grad_accum
+        self.base_grad_accum = base_grad_accum
         self.lr = lr
         self.weight_decay = weight_decay
         self.task_type = task_type
@@ -61,7 +65,7 @@ class TrainerArguments:
         self.full_finetuning = full_finetuning
         self.hybrid_probe = hybrid_probe
 
-    def __call__(self):
+    def __call__(self, probe: Optional[bool] = True):
         if self.train_data_size > 50000:
             eval_strats = {
                 'eval_strategy': 'steps',
@@ -79,14 +83,20 @@ class TrainerArguments:
             save_dir = self.model_save_dir.split('/')[-1]
         else:
             save_dir = self.model_save_dir
+
+        batch_size = self.probe_batch_size if probe else self.base_batch_size
+        grad_accum = self.probe_grad_accum if probe else self.base_grad_accum
+        warmup_steps = 100 if probe else 1000
         return TrainingArguments(
             output_dir=save_dir,
             num_train_epochs=self.num_epochs,
-            per_device_train_batch_size=self.batch_size,
-            per_device_eval_batch_size=self.batch_size,
-            gradient_accumulation_steps=self.gradient_accumulation_steps,
-            learning_rate=self.lr,
-            weight_decay=self.weight_decay,
+            per_device_train_batch_size=batch_size,
+            per_device_eval_batch_size=batch_size,
+            gradient_accumulation_steps=grad_accum,
+            learning_rate=float(self.lr),
+            lr_scheduler_type='cosine',
+            weight_decay=float(self.weight_decay),
+            warmup_steps=warmup_steps,
             save_total_limit=3,
             logging_steps=1000,
             report_to='none',
@@ -112,11 +122,12 @@ class TrainerMixin:
             log_id,
             model_name,
             data_name,
+            probe: Optional[bool] = True,
         ):
         task_type = self.trainer_args.task_type
         compute_metrics = get_compute_metrics(task_type)
         self.trainer_args.train_data_size = len(train_dataset)
-        hf_trainer_args = self.trainer_args()
+        hf_trainer_args = self.trainer_args(probe=probe)
         ### TODO add options for optimizers and schedulers
         trainer = Trainer(
             model=model,
@@ -142,11 +153,12 @@ class TrainerMixin:
         output_dir = os.path.join(self.trainer_args.plots_dir, log_id)
         os.makedirs(output_dir, exist_ok=True)
         save_path = os.path.join(output_dir, f"{data_name}_{model_name}_{log_id}.png")
+        title = f"{data_name} {model_name} {log_id}"
 
         if task_type == 'regression':
-            regression_ci_plot(y_true, y_pred, save_path)
+            regression_ci_plot(y_true, y_pred, save_path, title)
         else:
-            classification_ci_plot(y_true, y_pred, save_path)
+            classification_ci_plot(y_true, y_pred, save_path, title)
 
         if self.trainer_args.save:
             try:
@@ -172,7 +184,7 @@ class TrainerMixin:
             ppi=False,
             log_id=None,
         ):
-        batch_size = self.trainer_args.batch_size
+        batch_size = self.trainer_args.probe_batch_size
         read_scaler = self.trainer_args.read_scaler
         input_dim = self.probe_args.input_dim
         task_type = self.probe_args.task_type
@@ -245,6 +257,7 @@ class TrainerMixin:
             log_id=log_id,
             model_name=model_name,
             data_name=data_name,
+            probe=True,
         )
 
     def trainer_base_model(
@@ -281,6 +294,7 @@ class TrainerMixin:
             log_id=log_id,
             model_name=model_name,
             data_name=data_name,
+            probe=False,
         )
 
     def trainer_hybrid_model(
@@ -297,7 +311,7 @@ class TrainerMixin:
             ppi=False,
             log_id=None,
         ):
-            probe = self.trainer_probe(
+            probe, _, _ = self.trainer_probe(
                 model=probe,
                 tokenizer=tokenizer,
                 model_name=model_name,
@@ -311,7 +325,7 @@ class TrainerMixin:
             )
             config = HybridProbeConfig(
                 tokenwise=self.probe_args.tokenwise,
-                pooling_types=self.embedding_args.embedding_pooling_types,
+                pooling_types=self.embedding_args.pooling_types,
             )
 
             hybrid_model = HybridProbe(config=config, model=model, probe=probe)

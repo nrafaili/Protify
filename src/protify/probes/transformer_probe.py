@@ -1,7 +1,8 @@
+import torch
 from torch import nn
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.modeling_outputs import SequenceClassifierOutput, TokenClassifierOutput
-from typing import List
+from typing import List, Optional
 from embedder import Pooler
 from model_components.mlp import intermediate_correction_fn
 from model_components.transformer import Transformer
@@ -82,7 +83,13 @@ class TransformerForSequenceClassification(PreTrainedModel):
         )
         self.pooler = Pooler(config.pooling_types)
 
-    def forward(self, embeddings, attention_mask=None, labels=None):
+    def forward(
+            self,
+            embeddings,
+            attention_mask: Optional[torch.Tensor] = None,
+            labels: Optional[torch.Tensor] = None,
+            output_attentions: Optional[bool] = False,
+    ) -> SequenceClassifierOutput:
         x = self.input_layer(embeddings)
         x = self.transformer(x, attention_mask)
         x = self.pooler(x, attention_mask)
@@ -137,7 +144,13 @@ class TransformerForTokenClassification(PreTrainedModel):
             nn.Linear(proj_dim, config.num_labels)
         )
 
-    def forward(self, embeddings, attention_mask=None, labels=None):
+    def forward(
+            self,
+            embeddings,
+            attention_mask: Optional[torch.Tensor] = None,
+            labels: Optional[torch.Tensor] = None,
+            output_attentions: Optional[bool] = False,
+    ) -> TokenClassifierOutput:
         x = self.input_layer(embeddings)
         x = self.transformer(x, attention_mask)
         logits = self.classifier(x)

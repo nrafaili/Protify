@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "Protify"
-version = "0.0.3"
+version = "0.0.5"
 description = "Low code molecular property prediction"
 authors = ["Synthyra <info@synthyra.com>"]
 keywords = ["plm, protein, transformer"]

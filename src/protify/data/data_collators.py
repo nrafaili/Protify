@@ -82,6 +82,8 @@ class EmbedsLabelsCollator:
                     else:
                         padded_label = label.squeeze(-1)
                     padded_labels.append(padded_label)
+            else:
+                padded_labels = labels
             
             labels = torch.stack(padded_labels)
             

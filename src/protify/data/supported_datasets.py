@@ -25,35 +25,49 @@ supported_datasets = {
     'fluorescence-prediction': 'GleghornLab/fluorescence_prediction',
     'plastic': 'GleghornLab/plastic_degradation_benchmark',
     'gold-ppi': 'Synthyra/bernett_gold_ppi',
+    'human-ppi-pinui': 'GleghornLab/HPPI_PiNUI',
+    'yeast-ppi-pinui': 'GleghornLab/YPPI_PiNUI',
+    'shs27-ppi': 'Synthyra/SHS27k',
+    'shs148-ppi': 'Synthyra/SHS148k',
+    'PPA-ppi': 'Synthyra/ProteinProteinAffinity',
     'synthyra-ppi': 'Synthyra/ppi_set_v5',
+    
 }
 
-internal_synthyra_datasets = {
+internal_datasets = {
     'synthyra-ppi': 'Synthyra/ppi_set_v5',
+    'plastic': 'GleghornLab/plastic_degradation_benchmark',
 }
 
 possible_with_vector_reps = [
+    # multi-label
     'EC',
     'GO-CC',
     'GO-BP',
     'GO-MF',
+    # classification
     'MB',
     'DeepLoc-2',
     'DeepLoc-10',
-    'enzyme-kcat',
     'solubility',
     'localization',
     'temperature-stability',
-    'peptide-HLA-MHC-affinity',
-    'optimal-temperature',
-    'optimal-ph',
     'material-production',
     'fitness-prediction',
     'number-of-folds',
     'cloning-clf',
     'stability-prediction',
+    # regression
+    'enzyme-kcat',
+    'optimal-temperature',
+    'optimal-ph',
+    # ppi
     'human-ppi',
+    'PPA-ppi',
+    'human-ppi-pinui',
+    'yeast-ppi-pinui',
     'gold-ppi',
+    'peptide-HLA-MHC-affinity',
 ]
 
 standard_data_benchmark = [

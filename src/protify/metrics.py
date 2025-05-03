@@ -143,7 +143,7 @@ def compute_single_label_classification_metrics(p: EvalPrediction) -> dict[str, 
     labels = p.label_ids[1] if isinstance(p.label_ids, tuple) else p.label_ids
 
     y_pred = logits.argmax(axis=-1).flatten()
-    y_true = labels.flatten()
+    y_true = labels.flatten().astype(int)
 
     # Create one-hot encoded version of labels
     try:
@@ -151,9 +151,12 @@ def compute_single_label_classification_metrics(p: EvalPrediction) -> dict[str, 
         auc = roc_auc_score(y_true, y_pred)
     except:
         # multi-class
-        n_classes = logits.shape[1]
-        y_true_onehot = np.eye(n_classes)[y_true]
-        auc = roc_auc_score(y_true_onehot, softmax(logits), multi_class='ovr', average='weighted')
+        try:
+            n_classes = logits.shape[1]
+            y_true_onehot = np.eye(n_classes)[y_true]
+            auc = roc_auc_score(y_true_onehot, softmax(logits), multi_class='ovr', average='weighted')
+        except:
+            auc = -100.0
     
     cm = confusion_matrix(y_true, y_pred)
     print("\nConfusion Matrix:")

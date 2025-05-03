@@ -8,25 +8,42 @@ currently_supported_models = [
     'ESM2-650',
     'ESM2-3B',
     'Random',
+    'Random-Transformer',
     'Random-ESM2-8',
-    'Random-ESM2-35', # same as random_weights
+    'Random-ESM2-35', # same as Random-Transformer
     'Random-ESM2-150',
     'Random-ESM2-650',
     'ESMC-300',
     'ESMC-600',
     'ESM2-diff-150',
     'ESM2-diffAV-150',
+    'ProtBert',
+    'ProtBert-BFD',
+    'ProtT5',
+    'ProtT5-XL-UniRef50-full-prec',
+    'ProtT5-XXL-UniRef50',
+    'ProtT5-XL-BFD',
+    'ProtT5-XXL-BFD',
+    'ANKH-Base',
+    'ANKH-Large',
+    'ANKH2-Large',
     'gLM2-150',
     'gLM2-650',
 ]
 
-standard_benchmark = [
+standard_models = [
     'ESM2-8',
     'ESM2-35',
     'ESM2-150',
     'ESM2-650',
+    'ESM2-3B',
     'ESMC-300',
     'ESMC-600',
+    'ProtBert',
+    'ProtT5',
+    'ANKH-Base',
+    'ANKH-Large',
+    'ANKH2-Large',
     'Random',
     'Random-Transformer',
 ]
@@ -38,7 +55,7 @@ experimental_models = []
 class BaseModelArguments:
     def __init__(self, model_names: list[str] = None, **kwargs):
         if model_names[0] == 'standard':
-            self.model_names = standard_benchmark
+            self.model_names = standard_models
         elif 'exp' in model_names[0].lower():
             self.model_names = experimental_models
         else:
@@ -55,7 +72,16 @@ def get_base_model(model_name: str):
     elif 'esmc' in model_name.lower():
         from .esmc import build_esmc_model
         return build_esmc_model(model_name)
-    elif 'glm' in model_name.lower():
+    elif 'protbert' in model_name.lower():
+        from .protbert import build_protbert_model
+        return build_protbert_model(model_name)
+    elif 'prott5' in model_name.lower():
+        from .prott5 import build_prott5_model
+        return build_prott5_model(model_name)
+    elif 'ankh' in model_name.lower():
+        from .ankh import build_ankh_model
+        return build_ankh_model(model_name)
+      elif 'glm' in model_name.lower():
         from .glm import build_glm2_model
         return build_glm2_model(model_name)
     else:
@@ -80,6 +106,15 @@ def get_tokenizer(model_name: str):
     elif 'esmc' in model_name.lower() or 'camp' in model_name.lower() or 'esmv' in model_name.lower():
         from .FastPLMs.modeling_esm_plusplus import EsmSequenceTokenizer
         return EsmSequenceTokenizer()
+    elif 'protbert' in model_name.lower():
+        from transformers import EsmTokenizer
+        return EsmTokenizer.from_pretrained('lhallee/no_space_protbert_tokenizer')
+    elif 'prott5' in model_name.lower():
+        from transformers import T5Tokenizer
+        return T5Tokenizer.from_pretrained('Rostlab/prot_t5_xl_half_uniref50-enc')
+    elif 'ankh' in model_name.lower():
+        from transformers import AutoTokenizer
+        return AutoTokenizer.from_pretrained('Synthyra/ANKH-Base')
     elif 'glm' in model_name.lower():
         from transformers import AutoTokenizer
         return AutoTokenizer.from_pretrained('tattabio/gLM2_150M')

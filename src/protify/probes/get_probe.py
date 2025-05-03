@@ -2,14 +2,14 @@ from dataclasses import dataclass, field
 from typing import List
 from .linear_probe import LinearProbe, LinearProbeConfig
 from .transformer_probe import TransformerForSequenceClassification, TransformerForTokenClassification, TransformerProbeConfig
-#from .crossconv import CrossConv, CrossConvConfig
+from .retrievalnet import RetrievalNet, RetrievalNetConfig
 
 
 @dataclass
 class ProbeArguments:
     def __init__(
             self,
-            probe_type: str = 'linear', # valid options: linear, transformer, crossconv
+            probe_type: str = 'linear', # valid options: linear, transformer, retrievalnet
             tokenwise: bool = False,
             ### Linear Probe
             input_dim: int = 960,
@@ -26,7 +26,7 @@ class ProbeArguments:
             n_heads: int = 4,
             rotary: bool = True,
             probe_pooling_types: List[str] = field(default_factory=lambda: ['mean', 'cls']),
-            ### CrossConv
+            ### RetrievalNet
             # TODO
             ### LoRA
             lora: bool = False,
@@ -67,10 +67,8 @@ def get_probe(args: ProbeArguments):
     elif args.probe_type == 'transformer' and args.tokenwise:
         config = TransformerProbeConfig(**args.__dict__)
         return TransformerForTokenClassification(config)
-    elif args.probe_type == 'crossconv' and args.tokenwise:
-        # TODO
-        pass
-        # config = CrossConvConfig(args)
-        # return CrossConv(config)
+    elif args.probe_type == 'retrievalnet' and not args.tokenwise:
+        config = RetrievalNetConfig(**args.__dict__)
+        return RetrievalNet(config)
     else:
         raise ValueError(f"Invalid combination of probe type and tokenwise: {args.probe_type} {args.tokenwise}")

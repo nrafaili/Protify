@@ -26,27 +26,45 @@ max_length: !!int 1024
 trim: !!bool false
 data_names:
   - DeepLoc-2
+  - DeepLoc-10
+  - EC
+  - GO-CC
+  - GO-BP
+  - GO-MF
+  - MB
+  - enzyme-kcat
+  - optimal-temperature
+  - optimal-ph
+
 data_dirs: []
 
 
 # BaseModelArguments:
 model_names:
   - ESM2-8
+  - ESM2-35
+  - ESM2-150
+  - ESM2-650
+  - ESMC-300
+  - ESMC-600
+  - Random
+  - Random-Transformer
 
 
 # ProbeArguments:
-probe_type: linear  # valid options: linear, transformer, retrievalnet
+probe_type: retrievalnet  # valid options: linear, transformer, retrievalnet
 tokenwise: !!bool false
-hidden_dim: !!int 8192
-dropout: !!float 0.2
+hidden_dim: !!int 512
+dropout: !!float 0.1
 n_layers: !!int 1
 pre_ln: !!bool true
-classifier_dim: !!int 4096
+classifier_dim: !!int 2048
 transformer_dropout: !!float 0.1
 classifier_dropout: !!float 0.2
-n_heads: !!int 4
+n_heads: !!int 8
 rotary: !!bool true
 probe_pooling_types:
+  - mean
   - cls
 save_model: !!bool false
 production_model: !!bool false
@@ -66,10 +84,10 @@ n_jobs: !!int 1
 
 
 # EmbeddingArguments:
-embedding_batch_size: !!int 4
+embedding_batch_size: !!int 8
 num_workers: !!int 0
 download_embeddings: !!bool false
-matrix_embed: !!bool false
+matrix_embed: !!bool true
 embedding_pooling_types:
   - mean
 save_embeddings: !!bool false
@@ -79,13 +97,13 @@ sql: !!bool false
 
 # TrainerArguments:
 num_epochs: !!int 200
-probe_batch_size: !!int 64
+probe_batch_size: !!int 32
 base_batch_size: !!int 4
 probe_grad_accum: !!int 1
 base_grad_accum: !!int 8
-lr: !!float 1e-4
-weight_decay: !!float 0.00
-patience: !!int 1
+lr: !!float 5e-5
+weight_decay: !!float 0.01
+patience: !!int 5
 seed: !!int 42
 full_finetuning: !!bool false
 hybrid_probe: !!bool false

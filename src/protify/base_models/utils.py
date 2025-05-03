@@ -13,4 +13,7 @@ def wrap_lora(module: nn.Module, r: int, lora_alpha: float, lora_dropout: float)
         target_modules=target_modules,
     )
     module = LoraModel(module, lora_config, 'default')
+    for name, param in module.named_parameters():
+        if 'classifier' in name.lower():
+            param.requires_grad = True
     return module
