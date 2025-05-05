@@ -27,8 +27,9 @@ currently_supported_models = [
     'ANKH-Base',
     'ANKH-Large',
     'ANKH2-Large',
-    'gLM2-150',
-    'gLM2-650',
+    'GLM2-150',
+    'GLM2-650',
+    'GLM2-GAIA',
 ]
 
 standard_models = [
@@ -41,6 +42,9 @@ standard_models = [
     'ESMC-600',
     'ProtBert',
     'ProtT5',
+    'GLM2-150',
+    'GLM2-650',
+    'GLM2-GAIA',
     'ANKH-Base',
     'ANKH-Large',
     'ANKH2-Large',
@@ -81,7 +85,7 @@ def get_base_model(model_name: str):
     elif 'ankh' in model_name.lower():
         from .ankh import build_ankh_model
         return build_ankh_model(model_name)
-      elif 'glm' in model_name.lower():
+    elif 'glm' in model_name.lower():
         from .glm import build_glm2_model
         return build_glm2_model(model_name)
     else:

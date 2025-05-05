@@ -7,7 +7,7 @@ from transformers import AutoTokenizer, AutoModel, AutoModelForTokenClassificati
 class gLM2ForEmbedding(nn.Module):
     def __init__(self, model_path: str):
         super().__init__()
-        self.glm2 = AutoModel.from_pretrained(model_path)
+        self.glm2 = AutoModel.from_pretrained(model_path, trust_remote_code=True)
     
     def forward(
         self,
@@ -30,16 +30,16 @@ class gLM2ForEmbedding(nn.Module):
 
 
 presets = {
-    'gLM2-150': 'tattabio/gLM2_150M',
-    'gLM2-650': 'tattabio/gLM2_650M',
-    'glm2-650-embed': 'tattabio/gLM2_650M_embed'
+    'GLM2-150': 'tattabio/gLM2_150M',
+    'GLM2-650': 'tattabio/gLM2_650M',
+    'GLM2-GAIA': 'tattabio/gLM2_650M_embed'
 }
 
 
 def build_glm2_model(preset: str) -> Tuple[gLM2ForEmbedding, AutoTokenizer]:
     model_path = presets[preset]
     model = gLM2ForEmbedding(model_path).eval()
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     return model, tokenizer
 
 
@@ -47,17 +47,17 @@ def build_glm2_model(preset: str) -> Tuple[gLM2ForEmbedding, AutoTokenizer]:
 def get_glm2_for_training(preset: str, tokenwise: bool = False, num_labels: int = None, hybrid: bool = False):
     model_path = presets[preset]
     if hybrid:
-        model = AutoModel.from_pretrained(model_path).eval()
+        model = AutoModel.from_pretrained(model_path, trust_remote_code=True).eval()
     else:
         if tokenwise:
             model = AutoModelForTokenClassification.from_pretrained(
-                model_path, num_labels=num_labels
+                model_path, num_labels=num_labels, trust_remote_code=True
             ).eval()
         else:
             model = AutoModelForSequenceClassification.from_pretrained(
-                model_path, num_labels=num_labels
+                model_path, num_labels=num_labels, trust_remote_code=True
             ).eval()
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     return model, tokenizer
 
 
