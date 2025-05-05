@@ -209,12 +209,6 @@ Simply open a pull request with the bounty ID in the title to claim one. For add
 
 For bugs and general suggestions please use [GitHub issues](https://github.com/Synthyra/Protify/issues).
 
-### Top contributors:
-
-<a href="https://github.com/Synthyra/Protify/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Synthyra/Protify" alt="contrib.rocks image" />
-</a>
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
