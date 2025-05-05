@@ -27,6 +27,9 @@ currently_supported_models = [
     'ANKH-Base',
     'ANKH-Large',
     'ANKH2-Large',
+    'GLM2-150',
+    'GLM2-650',
+    'GLM2-GAIA',
 ]
 
 standard_models = [
@@ -39,6 +42,9 @@ standard_models = [
     'ESMC-600',
     'ProtBert',
     'ProtT5',
+    'GLM2-150',
+    'GLM2-650',
+    'GLM2-GAIA',
     'ANKH-Base',
     'ANKH-Large',
     'ANKH2-Large',
@@ -79,6 +85,9 @@ def get_base_model(model_name: str):
     elif 'ankh' in model_name.lower():
         from .ankh import build_ankh_model
         return build_ankh_model(model_name)
+    elif 'glm' in model_name.lower():
+        from .glm import build_glm2_model
+        return build_glm2_model(model_name)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
@@ -110,6 +119,9 @@ def get_tokenizer(model_name: str):
     elif 'ankh' in model_name.lower():
         from transformers import AutoTokenizer
         return AutoTokenizer.from_pretrained('Synthyra/ANKH-Base')
+    elif 'glm' in model_name.lower():
+        from transformers import AutoTokenizer
+        return AutoTokenizer.from_pretrained('tattabio/gLM2_150M')
     else:
         raise ValueError(f"Model {model_name} not supported")
 
