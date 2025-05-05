@@ -106,22 +106,32 @@ def get_base_model_for_training(model_name: str, tokenwise: bool = False, num_la
 def get_tokenizer(model_name: str):
     if 'esm2' in model_name.lower() or 'random' in model_name.lower():
         from transformers import EsmTokenizer
-        return EsmTokenizer.from_pretrained('facebook/esm2_t6_8M_UR50D')
+        from custom_tokenizers import ESMTokenizerWrapper
+        tokenizer = EsmTokenizer.from_pretrained('facebook/esm2_t6_8M_UR50D')
+        return ESMTokenizerWrapper(tokenizer)
     elif 'esmc' in model_name.lower() or 'camp' in model_name.lower() or 'esmv' in model_name.lower():
         from .FastPLMs.modeling_esm_plusplus import EsmSequenceTokenizer
         return EsmSequenceTokenizer()
     elif 'protbert' in model_name.lower():
         from transformers import EsmTokenizer
-        return EsmTokenizer.from_pretrained('lhallee/no_space_protbert_tokenizer')
+        from custom_tokenizers import BERTTokenizerWrapper
+        tokenizer = EsmTokenizer.from_pretrained('lhallee/no_space_protbert_tokenizer')
+        return BERTTokenizerWrapper(tokenizer)
     elif 'prott5' in model_name.lower():
         from transformers import T5Tokenizer
-        return T5Tokenizer.from_pretrained('Rostlab/prot_t5_xl_half_uniref50-enc')
+        from custom_tokenizers import T5TokenizerWrapper
+        tokenizer = T5Tokenizer.from_pretrained('Rostlab/prot_t5_xl_half_uniref50-enc')
+        return T5TokenizerWrapper(tokenizer)
     elif 'ankh' in model_name.lower():
         from transformers import AutoTokenizer
-        return AutoTokenizer.from_pretrained('Synthyra/ANKH-Base')
+        from custom_tokenizers import ANKHTokenizerWrapper
+        tokenizer = AutoTokenizer.from_pretrained('Synthyra/ANKH-Base')
+        return ANKHTokenizerWrapper(tokenizer)
     elif 'glm' in model_name.lower():
         from transformers import AutoTokenizer
-        return AutoTokenizer.from_pretrained('tattabio/gLM2_150M')
+        from custom_tokenizers import GLMTokenizerWrapper
+        tokenizer = AutoTokenizer.from_pretrained('tattabio/gLM2_150M')
+        return GLMTokenizerWrapper(tokenizer)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
