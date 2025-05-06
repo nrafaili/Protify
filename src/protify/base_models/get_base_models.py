@@ -30,6 +30,10 @@ currently_supported_models = [
     'GLM2-150',
     'GLM2-650',
     'GLM2-GAIA',
+    'DPLM-150',
+    'DPLM-650',
+    'DPLM-3B',
+
     'ESM-diff-150',
     'ESM-diff-650',
 ]
@@ -50,6 +54,8 @@ standard_models = [
     'ANKH-Base',
     'ANKH-Large',
     'ANKH2-Large',
+    'DPLM-150',
+    'DPLM-650',
     'Random',
     'Random-Transformer',
 ]
@@ -90,6 +96,9 @@ def get_base_model(model_name: str):
     elif 'glm' in model_name.lower():
         from .glm import build_glm2_model
         return build_glm2_model(model_name)
+    elif 'dplm' in model_name.lower():
+        from .dplm import build_dplm_model
+        return build_dplm_model(model_name)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
@@ -113,6 +122,9 @@ def get_base_model_for_training(model_name: str, tokenwise: bool = False, num_la
     elif 'glm' in model_name.lower():
         from .glm import get_glm2_for_training
         return get_glm2_for_training(model_name, tokenwise, num_labels, hybrid)
+    elif 'dplm' in model_name.lower():
+        from .dplm import get_dplm_for_training
+        return get_dplm_for_training(model_name, tokenwise, num_labels, hybrid)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
@@ -136,6 +148,9 @@ def get_tokenizer(model_name: str):
     elif 'glm' in model_name.lower():
         from .glm import get_glm2_tokenizer
         return get_glm2_tokenizer(model_name)
+    elif 'dplm' in model_name.lower():
+        from .dplm import get_dplm_tokenizer
+        return get_dplm_tokenizer(model_name)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
