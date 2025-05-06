@@ -74,7 +74,7 @@ Protify is an open source platform designed to simplify and democratize workflow
 
 Protify is currently in beta. We're actively working to enhance features and documentation to meet our ambitious goals.
 
-### Currently Supported Models
+## Currently Supported Models
 
 <details>
   <summary>Click to expand model list</summary>
@@ -108,14 +108,17 @@ Protify is currently in beta. We're actively working to enhance features and doc
   | Random-Transformer | Randomly initialized transformer model serving as a homology-based control. | Varies | Homology control |
 </details>
 
-### Currently Supported Datasets
+## Currently Supported Datasets
 
 <details>
   <summary>Click to expand dataset list</summary>
   
   BC - Binary Classification
+  
   MCC - Multi-Class Classification
+  
   MLC - Multi-Label Classification
+  
   R - Regression
 
   | Dataset Name | Description | Type | Task | Tokenwise | Dual inputs |
