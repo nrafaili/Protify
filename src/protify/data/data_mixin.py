@@ -283,10 +283,7 @@ class DataMixin:
 
     def get_embedding_dim_sql(self, save_path, test_seq):
         import sqlite3
-        if len(test_seq) >= self._max_length:
-            test_seq_len = self._max_length
-        else:
-            test_seq_len = len(test_seq)
+        test_seq_len = len(test_seq) + 2
         
         with sqlite3.connect(save_path) as conn:
             c = conn.cursor()
@@ -294,7 +291,10 @@ class DataMixin:
             test_embedding = c.fetchone()[0]
             test_embedding = torch.tensor(np.frombuffer(test_embedding, dtype=np.float32).reshape(1, -1))
         if self._full:
-            test_embedding = test_embedding.reshape(test_seq_len, -1)
+            try:
+                test_embedding = test_embedding.reshape(test_seq_len, -1)
+            except:
+                test_embedding = test_embedding.reshape(test_seq_len - 1, -1) # some pLMs have only one special token added
         embedding_dim = test_embedding.shape[-1]
         return embedding_dim
 
@@ -304,7 +304,10 @@ class DataMixin:
         test_embedding = emb_dict[test_seq]
         print(test_embedding.shape)
         if self._full:
-            test_embedding = test_embedding.reshape(test_seq_len, -1)
+            try:
+                test_embedding = test_embedding.reshape(test_seq_len, -1)
+            except:
+                test_embedding = test_embedding.reshape(test_seq_len - 1, -1) # some pLMs have only one special token added
         else:
             test_embedding = test_embedding.reshape(1, -1)
         embedding_dim = test_embedding.shape[-1]
