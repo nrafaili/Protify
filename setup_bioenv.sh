@@ -6,7 +6,7 @@
 # Set up error handling
 set -e  # Exit immediately if a command exits with a non-zero status
 
-echo "Setting up Python virtual environment for bioinformatics tools..."
+echo "Setting up Python virtual environment for Protify..."
 
 # Create virtual environment
 python3 -m venv ~/bioenv
