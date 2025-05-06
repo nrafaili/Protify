@@ -107,9 +107,15 @@ To get started locally
 ```console
 git clone https://@github.com/Synthyra/Protify.git
 cd Protify
-python -m pip install -r docs/requirements.txt
+python -m pip install -r requirements.txt
 git submodule update --init --remote --recursive
 cd src/protify
+```
+
+If you would like a Python virtual environment with the requirements
+```console
+chmod +x setup_bioenv.sh
+./setup_bioenv.sh
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
