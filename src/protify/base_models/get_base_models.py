@@ -77,7 +77,7 @@ def get_base_model(model_name: str):
     if 'random' in model_name.lower():
         from .random import build_random_model
         return build_random_model(model_name)
-    elif 'esm2' in model_name.lower() or 'dlm' in model_name.lower():
+    elif 'esm2' in model_name.lower() or 'dsm' in model_name.lower():
         from .esm2 import build_esm2_model
         return build_esm2_model(model_name)
     elif 'esmc' in model_name.lower():
@@ -103,7 +103,7 @@ def get_base_model(model_name: str):
 
 
 def get_base_model_for_training(model_name: str, tokenwise: bool = False, num_labels: int = None, hybrid: bool = False):
-    if 'esm2' in model_name.lower() or 'dlm' in model_name.lower():
+    if 'esm2' in model_name.lower() or 'dsm' in model_name.lower():
         from .esm2 import get_esm2_for_training
         return get_esm2_for_training(model_name, tokenwise, num_labels, hybrid)
     elif 'esmc' in model_name.lower():
@@ -129,7 +129,7 @@ def get_base_model_for_training(model_name: str, tokenwise: bool = False, num_la
 
 
 def get_tokenizer(model_name: str):
-    if 'esm2' in model_name.lower() or 'random' in model_name.lower() or 'dlm' in model_name.lower():
+    if 'esm2' in model_name.lower() or 'random' in model_name.lower() or 'dsm' in model_name.lower():
         from .esm2 import get_esm2_tokenizer
         return get_esm2_tokenizer(model_name)
     elif 'esmc' in model_name.lower():
@@ -170,7 +170,7 @@ if __name__ == '__main__':
         
     if args.list:
         try:
-            from .model_descriptions import model_descriptions
+            from resource_info import model_descriptions
             print("\n=== Currently Supported Models ===\n")
             
             max_name_len = max(len(name) for name in currently_supported_models)
