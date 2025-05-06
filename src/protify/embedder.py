@@ -163,11 +163,16 @@ class Embedder:
         # download from download_dir
         # unzip
         # move to embedding_save_dir
-        local_path = hf_hub_download(
-            repo_id=self.download_dir,
-            filename=f'embeddings/{model_name}_{self.matrix_embed}.pth.gz',
-            repo_type='dataset'
-        )
+        try:
+            local_path = hf_hub_download(
+                repo_id=self.download_dir,
+                filename=f'embeddings/{model_name}_{self.matrix_embed}.pth.gz',
+                repo_type='dataset'
+            )
+        except:
+            print(f'No embeddings found for {model_name} in {self.download_dir}')
+            return
+
         # unzip
         print_message(f'Unzipping {local_path}')
         with gzip.open(local_path, 'rb') as f_in:
