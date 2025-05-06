@@ -33,8 +33,17 @@ data_dirs: []
 
 # BaseModelArguments:
 model_names:
-  - standard
-
+  - ProtT5
+  - GLM2-150
+  - GLM2-650
+  - ANKH-Base
+  - ANKH-Large
+  - DPLM-150
+  - DPLM-650
+  - DLM-150
+  - DLM-650
+  - Random
+  - Random-Transformer
 
 # ProbeArguments:
 probe_type: transformer  # valid options: linear, transformer, retrievalnet
