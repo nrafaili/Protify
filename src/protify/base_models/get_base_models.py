@@ -158,13 +158,60 @@ def get_tokenizer(model_name: str):
 
 if __name__ == '__main__':
     # py -m src.protify.base_models.get_base_models
-    ### This will download all standard models
-    from torchinfo import summary
-    from ..utils import clear_screen
-    args = BaseModelArguments(model_names=['standard'])
-    for model_name in args.model_names:
-        model, tokenizer = get_base_model(model_name)
-        print(f'Downloaded {model_name}')
-        tokenized = tokenizer('MEKVQYLTRSAIRRASTIEMPQQARQKLQNLFINFCLILICLLLICIIVMLL', return_tensors='pt').input_ids
-        summary(model, input_data=tokenized)
-        clear_screen()
+    import sys
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Download and list supported models')
+    parser.add_argument('--download', action='store_true', help='Download all standard models')
+    parser.add_argument('--list', action='store_true', help='List all supported models with descriptions')
+    args = parser.parse_args()
+    
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)
+        
+    if args.list:
+        try:
+            from .model_descriptions import model_descriptions
+            print("\n=== Currently Supported Models ===\n")
+            
+            max_name_len = max(len(name) for name in currently_supported_models)
+            max_type_len = max(len(model_descriptions.get(name, {}).get('type', 'Unknown')) for name in currently_supported_models if name in model_descriptions)
+            max_size_len = max(len(model_descriptions.get(name, {}).get('size', 'Unknown')) for name in currently_supported_models if name in model_descriptions)
+            
+            # Print header
+            print(f"{'Model':<{max_name_len+2}}{'Type':<{max_type_len+2}}{'Size':<{max_size_len+2}}Description")
+            print("-" * (max_name_len + max_type_len + max_size_len + 50))
+            
+            for model_name in currently_supported_models:
+                if model_name in model_descriptions:
+                    model_info = model_descriptions[model_name]
+                    print(f"{model_name:<{max_name_len+2}}{model_info.get('type', 'Unknown'):<{max_type_len+2}}{model_info.get('size', 'Unknown'):<{max_size_len+2}}{model_info.get('description', 'No description available')}")
+                else:
+                    print(f"{model_name:<{max_name_len+2}}{'Unknown':<{max_type_len+2}}{'Unknown':<{max_size_len+2}}No description available")
+                    
+            print("\n=== Standard Models ===\n")
+            for model_name in standard_models:
+                print(f"- {model_name}")
+                
+        except ImportError:
+            print("Model descriptions file not found. Only listing model names.")
+            print("\n=== Currently Supported Models ===\n")
+            for model_name in currently_supported_models:
+                print(f"- {model_name}")
+                
+            print("\n=== Standard Models ===\n")
+            for model_name in standard_models:
+                print(f"- {model_name}")
+    
+    if args.download:
+        ### This will download all standard models
+        from torchinfo import summary
+        from ..utils import clear_screen
+        download_args = BaseModelArguments(model_names=['standard'])
+        for model_name in download_args.model_names:
+            model, tokenizer = get_base_model(model_name)
+            print(f'Downloaded {model_name}')
+            tokenized = tokenizer('MEKVQYLTRSAIRRASTIEMPQQARQKLQNLFINFCLILICLLLICIIVMLL', return_tensors='pt').input_ids
+            summary(model, input_data=tokenized)
+            clear_screen()
