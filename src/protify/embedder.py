@@ -360,7 +360,6 @@ if __name__ == '__main__':
     parser.add_argument('--embed_dtype', type=str, default='float16')
     parser.add_argument('--embedding_save_dir', type=str, default='embeddings')
     parser.add_argument('--download_dir', type=str, default='Synthyra/mean_pooled_embeddings')
-    parser.add_argument('--compress', default=True, action='store_true', help='Compress embeddings with gzip before uploading')
     args = parser.parse_args()
 
     if args.token is not None:
