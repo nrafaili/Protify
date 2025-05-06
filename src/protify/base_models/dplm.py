@@ -354,7 +354,7 @@ class DPLMForEmbedding(nn.Module):
             out = self.dplm(input_ids, attention_mask=attention_mask, output_attentions=output_attentions)
             return out.last_hidden_state, out.attentions
         else:
-            return self.dplm(input_ids, attention_mask=attention_mask).last_hidden_state
+            return self.dplm(input_ids, attention_mask=attention_mask)['last_hidden_state']
 
 
 def get_dplm_tokenizer(preset: str):
