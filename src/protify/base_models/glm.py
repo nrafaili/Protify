@@ -43,15 +43,13 @@ class gLM2ForEmbedding(nn.Module):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = False,
     ) -> torch.Tensor:
-        assert not output_attentions, (
-            "output_attentions=True is not supported by gLM2ForEmbedding."
+        assert not output_attentions or not output_hidden_states, (
+            "output_attentions=True and output_hidden_states=True are not supported by gLM2ForEmbedding."
         )
 
         out = self.glm2(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            output_hidden_states=output_hidden_states,
-            return_dict=True
         )
         return out.last_hidden_state
 
