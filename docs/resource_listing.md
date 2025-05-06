@@ -43,16 +43,16 @@ For a combined view of both models and datasets:
 
 ```bash
 # List both models and datasets
-python -m src.protify.list_resources --all
+python -m src.protify.resource_info --all
 
 # List only standard models and datasets
-python -m src.protify.list_resources --all --standard-only
+python -m src.protify.resource_info --all --standard-only
 
 # List only models
-python -m src.protify.list_resources --models
+python -m src.protify.resource_info --models
 
 # List only datasets
-python -m src.protify.list_resources --datasets
+python -m src.protify.resource_info --datasets
 ```
 
 ## Programmatic Access
@@ -61,7 +61,7 @@ You can also access model and dataset information programmatically:
 
 ```python
 # For models
-from src.protify.base_models.model_descriptions import model_descriptions
+from src.protify.resource_info import model_descriptions
 from src.protify.base_models.get_base_models import currently_supported_models, standard_models
 
 # Get information about a specific model
@@ -72,7 +72,7 @@ print(f"Size: {model_info.get('size', 'N/A')}")
 print(f"Type: {model_info.get('type', 'N/A')}")
 
 # For datasets
-from src.protify.data.dataset_descriptions import dataset_descriptions
+from src.protify.resource_info import dataset_descriptions
 from src.protify.data.supported_datasets import supported_datasets
 
 # Get information about a specific dataset
@@ -98,4 +98,4 @@ Datasets are categorized by their task types:
 2. **Classification**: Binary or multi-class classification tasks (e.g., DeepLoc-2, DeepLoc-10)
 3. **Regression**: Prediction of continuous values (e.g., enzyme-kcat, optimal-temperature)
 4. **Protein-Protein Interaction**: Tasks focused on protein interactions (e.g., human-ppi, gold-ppi)
-5. **Token-wise Classification/Regression**: Residue-level prediction tasks (e.g., SecondaryStructure-3) 
+5. **Token-wise Classification/Regression**: Residue-level prediction tasks (e.g., SecondaryStructure-3)

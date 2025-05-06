@@ -79,31 +79,33 @@ Protify is currently in beta. We're actively working to enhance features and doc
 <details>
   <summary>Click to expand model list</summary>
   
-  | Model Name | Description | Size | Type |
+  pLM - Protein Language Model
+
+  | Model Name | Description | Size (parameters) | Type |
   |------------|-------------|------|------|
-  | ESM2-8 | Small protein language model from Meta AI that learns evolutionary information from millions of protein sequences. | 8M parameters | Protein language model |
-  | ESM2-35 | Medium-sized protein language model trained on evolutionary data. | 35M parameters | Protein language model |
-  | ESM2-150 | Large protein language model with improved protein structure prediction capabilities. | 150M parameters | Protein language model |
-  | ESM2-650 | Very large protein language model offering state-of-the-art performance on many protein prediction tasks. | 650M parameters | Protein language model |
-  | ESM2-3B | Largest ESM2 protein language model with exceptional capability for protein structure and function prediction. | 3B parameters | Protein language model |
-  | ESMC-300 | Protein language model optimized for classification tasks. | 300M parameters | Protein language model |
-  | ESMC-600 | Larger protein language model for classification. | 600M parameters | Protein language model |
-  | ProtBert | BERT-based protein language model trained on protein sequences from UniRef. | 420M parameters | Protein language model |
-  | ProtBert-BFD | BERT-based protein language model trained on BFD database with improved performance. | 420M parameters | Protein language model |
-  | ProtT5 | T5-based protein language model capable of both encoding and generation tasks. | 3B parameters | Protein language model |
-  | ANKH-Base | Base version of the ANKH protein language model focused on protein structure understanding. | 400M parameters | Protein language model |
-  | ANKH-Large | Large version of the ANKH protein language model with improved structural predictions. | 1.2B parameters | Protein language model |
-  | ANKH2-Large | Improved second generation ANKH protein language model. | 1.5B parameters | Protein language model |
-  | GLM2-150 | Medium-sized general language model adapted for protein sequences. | 150M parameters | Protein language model |
-  | GLM2-650 | Large general language model adapted for protein sequences. | 650M parameters | Protein language model |
-  | GLM2-GAIA | Specialized GLM protein language model with GAIA architecture improvements. | 1B+ parameters | Protein language model |
-  | DPLM-150 | Deep protein language model focused on protein structure. | 150M parameters | Protein language model |
-  | DPLM-650 | Larger deep protein language model. | 650M parameters | Protein language model |
-  | DPLM-3B | Largest deep protein language model in the DPLM family. | 3B parameters | Protein language model |
-  | DLM-150 | Deep language model for proteins. | 150M parameters | Protein language model |
-  | DLM-650 | Deep language model for proteins. | 650M parameters | Protein language model |
-  | Random | Baseline model with randomly initialized weights, serving as a negative control. | Varies | Baseline control |
-  | Random-Transformer | Randomly initialized transformer model serving as a homology-based control. | Varies | Baseline control |
+  | ESM2-8 | Small pLM from Meta AI that learns evolutionary information from millions of protein sequences. | 8M | pLM |
+  | ESM2-35 | Medium-sized pLM trained on evolutionary data. | 35M | pLM |
+  | ESM2-150 | Large pLM with improved protein structure prediction capabilities. | 150M | pLM |
+  | ESM2-650 | Very large pLM offering state-of-the-art performance on many protein prediction tasks. | 650M | pLM |
+  | ESM2-3B | Largest ESM2 pLM with exceptional capability for protein structure and function prediction. | 3B | pLM |
+  | ESMC-300 | pLM optimized for classification tasks. | 300M | pLM |
+  | ESMC-600 | Larger pLM for classification. | 600M | pLM |
+  | ProtBert | BERT-based pLM trained on protein sequences from UniRef. | 420M | pLM |
+  | ProtBert-BFD | BERT-based pLM trained on BFD database with improved performance. | 420M | pLM |
+  | ProtT5 | T5-based pLM capable of both encoding and generation tasks. | 3B | pLM |
+  | ANKH-Base | Base version of the ANKH pLM focused on protein structure understanding. | 400M | pLM |
+  | ANKH-Large | Large version of the ANKH pLM with improved structural predictions. | 1.2B | pLM |
+  | ANKH2-Large | Improved second generation ANKH pLM. | 1.5B | pLM |
+  | GLM2-150 | Medium-sized general language model adapted for protein sequences. | 150M | pLM |
+  | GLM2-650 | Large general language model adapted for protein sequences. | 650M | pLM |
+  | GLM2-GAIA | Specialized GLM pLM with GAIA architecture improvements. | 650M | pLM |
+  | DPLM-150 | Diffusion pLM focused on joint sequence and structure. | 150M | pLM |
+  | DPLM-650 | Larger DPLM. | 650M parameters | pLM |
+  | DPLM-3B | Largest DPLM. | 3B | pLM |
+  | DLM-150 | Diffusion language model for proteins. | 150M | pLM |
+  | DLM-650 | Diffusion language model for proteins. | 650M | pLM |
+  | Random | Baseline model with randomly initialized weights, serving as a negative control. | Varies | Negative control |
+  | Random-Transformer | Randomly initialized transformer model serving as a homology-based control. | Varies | Homology control |
 </details>
 
 ### Currently Supported Datasets
@@ -111,33 +113,37 @@ Protify is currently in beta. We're actively working to enhance features and doc
 <details>
   <summary>Click to expand dataset list</summary>
   
-  | Dataset Name | Description | Type | Task |
-  |--------------|-------------|------|------|
-  | EC | Enzyme Commission numbers dataset for predicting enzyme function classification. | Multi-label classification | Protein function prediction |
-  | GO-CC | Gene Ontology Cellular Component dataset for predicting protein localization in cells. | Multi-label classification | Protein localization prediction |
-  | GO-BP | Gene Ontology Biological Process dataset for predicting protein involvement in biological processes. | Multi-label classification | Protein function prediction |
-  | GO-MF | Gene Ontology Molecular Function dataset for predicting protein molecular functions. | Multi-label classification | Protein function prediction |
-  | MB | Metal ion binding dataset for predicting protein-metal interactions. | Classification | Protein-metal binding prediction |
-  | DeepLoc-2 | Binary classification dataset for predicting protein localization in 2 categories. | Binary classification | Protein localization prediction |
-  | DeepLoc-10 | Multi-class classification dataset for predicting protein localization in 10 categories. | Multi-class classification | Protein localization prediction |
-  | enzyme-kcat | Dataset for predicting enzyme catalytic rate constants (kcat). | Regression | Enzyme kinetics prediction |
-  | solubility | Dataset for predicting protein solubility properties. | Binary classification | Protein solubility prediction |
-  | localization | Dataset for predicting subcellular localization of proteins. | Multi-class classification | Protein localization prediction |
-  | temperature-stability | Dataset for predicting protein stability at different temperatures. | Binary classification | Protein stability prediction |
-  | optimal-temperature | Dataset for predicting the optimal temperature for protein function. | Regression | Protein property prediction |
-  | optimal-ph | Dataset for predicting the optimal pH for protein function. | Regression | Protein property prediction |
-  | fitness-prediction | Dataset for predicting protein fitness in various environments. | Classification | Protein fitness prediction |
-  | SecondaryStructure-3 | Dataset for predicting protein secondary structure in 3 classes. | Token-wise classification | Protein structure prediction |
-  | SecondaryStructure-8 | Dataset for predicting protein secondary structure in 8 classes. | Token-wise classification | Protein structure prediction |
-  | human-ppi | Dataset for predicting human protein-protein interactions. | Protein-protein interaction | PPI prediction |
-  | human-ppi-pinui | Human protein-protein interaction dataset from PiNUI. | Protein-protein interaction | PPI prediction |
-  | yeast-ppi-pinui | Yeast protein-protein interaction dataset from PiNUI. | Protein-protein interaction | PPI prediction |
-  | peptide-HLA-MHC-affinity | Dataset for predicting peptide binding affinity to HLA/MHC complexes. | Protein-protein interaction | Binding affinity prediction |
-  | gold-ppi | Gold standard dataset for protein-protein interaction prediction. | Protein-protein interaction | PPI prediction |
-  | shs27-ppi | SHS27k dataset containing 27,000 protein-protein interactions. | Protein-protein interaction | PPI prediction |
-  | shs148-ppi | SHS148k dataset containing 148,000 protein-protein interactions. | Protein-protein interaction | PPI prediction |
-  | PPA-ppi | Protein-Protein Affinity dataset for quantitative binding predictions. | Protein-protein interaction | PPI affinity prediction |
-  | synthyra-ppi | Comprehensive protein-protein interaction dataset curated by Synthyra. | Protein-protein interaction | PPI prediction |
+  BC - Binary Classification
+  MCC - Multi-Class Classification
+  MLC - Multi-Label Classification
+  R - Regression
+
+  | Dataset Name | Description | Type | Task | Tokenwise | Dual inputs |
+  |--------------|-------------|------|------|-----------|-------------|
+  | EC | Enzyme Commission numbers dataset for predicting enzyme function classification. | MLC | Protein function prediction | No | No |
+  | GO-CC | Gene Ontology Cellular Component dataset for predicting protein localization in cells. | MLC | Protein localization prediction | No | No |
+  | GO-BP | Gene Ontology Biological Process dataset for predicting protein involvement in biological processes. | MLC | Protein function prediction | No | No |
+  | GO-MF | Gene Ontology Molecular Function dataset for predicting protein molecular functions. | MLC | Protein function prediction | No | No |
+  | MB | Metal ion binding dataset for predicting protein-metal interactions. | BC | Protein-metal binding prediction | No | No |
+  | DeepLoc-2 | Binary classification dataset for predicting protein localization in 2 categories. | BC | Protein localization prediction | No | No |
+  | DeepLoc-10 | Multi-class classification dataset for predicting protein localization in 10 categories. | MCC | Protein localization prediction | No | No |
+  | enzyme-kcat | Dataset for predicting enzyme catalytic rate constants (kcat). | R | Enzyme kinetics prediction | No | No |
+  | solubility | Dataset for predicting protein solubility properties. | BC | Protein solubility prediction | No | No |
+  | localization | Dataset for predicting subcellular localization of proteins. | MCC | Protein localization prediction | No | No |
+  | temperature-stability | Dataset for predicting protein stability at different temperatures. | BC | Protein stability prediction | No | No |
+  | optimal-temperature | Dataset for predicting the optimal temperature for protein function. | R | Protein property prediction | No | No |
+  | optimal-ph | Dataset for predicting the optimal pH for protein function. | R | Protein property prediction | No | No |
+  | fitness-prediction | Dataset for predicting protein fitness in various environments. | R | Protein fitness prediction | No | No |
+  | SecondaryStructure-3 | Dataset for predicting protein secondary structure in 3+1 classes. | MCC | Protein structure prediction | Yes | No |
+  | SecondaryStructure-8 | Dataset for predicting protein secondary structure in 8+1 classes. | MCC | Protein structure prediction | Yes | No |
+  | human-ppi | Dataset for predicting human protein-protein interactions. | BC | PPI prediction | No | Yes |
+  | human-ppi-pinui | Human protein-protein interaction dataset from PiNUI. | BC | PPI prediction | No | Yes |
+  | yeast-ppi-pinui | Yeast protein-protein interaction dataset from PiNUI. | BC | PPI prediction | No | Yes |
+  | peptide-HLA-MHC-affinity | Dataset for predicting peptide binding affinity to HLA/MHC complexes. | BC | Binding affinity prediction | No | Yes |
+  | gold-ppi | Gold standard dataset for protein-protein interaction prediction. | BC | PPI prediction | No | Yes |
+  | shs27-ppi | SHS27k dataset containing 27,000 protein-protein interactions. | MCC | PPI prediction type | No | Yes |
+  | shs148-ppi | SHS148k dataset containing 148,000 protein-protein interactions. | MCC | PPI prediction type | No | Yes |
+  | PPA-ppi | Protein-Protein Affinity dataset for quantitative binding predictions. | R | Protein-protein affinity prediction | No | Yes |
 </details>
 
 For more details about supported models and datasets, including programmatic access and command-line utilities, see the [Resource Listing Documentation](docs/resource_listing.md).
