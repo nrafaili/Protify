@@ -1,7 +1,32 @@
 import torch
 import torch.nn as nn
-from typing import Optional
-from transformers import BertModel, EsmTokenizer, BertForSequenceClassification, BertForTokenClassification
+import re
+from typing import Optional, Union, List, Dict
+from transformers import BertModel, BertTokenizer, BertForSequenceClassification, BertForTokenClassification
+
+from .base_tokenizer import BaseSequenceTokenizer
+
+
+presets = {
+    'ProtBert': 'Rostlab/prot_bert',
+    'ProtBert-BFD': 'Rostlab/prot_bert_bfd',
+}
+
+
+class BERTTokenizerWrapper(BaseSequenceTokenizer):
+    def __init__(self, tokenizer: BertTokenizer):
+        super().__init__(tokenizer)
+        
+    def __call__(self, sequences: Union[str, List[str]], **kwargs) -> Dict[str, torch.Tensor]:
+        if isinstance(sequences, str):
+            sequences = [sequences]
+        kwargs.setdefault('return_tensors', 'pt')
+        kwargs.setdefault('padding', 'longest')
+        kwargs.setdefault('add_special_tokens', True)
+        sequences = [re.sub(r"[UZOB]", "X", seq) for seq in sequences]
+        sequences = [' '.join(seq) for seq in sequences]
+        tokenized = self.tokenizer(sequences, **kwargs)
+        return tokenized
 
 
 class ProtBertForEmbedding(nn.Module):
@@ -22,16 +47,14 @@ class ProtBertForEmbedding(nn.Module):
             return self.plm(input_ids, attention_mask=attention_mask).last_hidden_state
 
 
-presets = {
-    'ProtBert': 'Rostlab/prot_bert',
-    'ProtBert-BFD': 'Rostlab/prot_bert_bfd',
-}
+def get_protbert_tokenizer(preset: str):
+    return BERTTokenizerWrapper(BertTokenizer.from_pretrained('Rostlab/prot_bert'))
 
 
 def build_protbert_model(preset: str):
     model_path = presets[preset]
     model = ProtBertForEmbedding(model_path).eval()
-    tokenizer = EsmTokenizer.from_pretrained('lhallee/no_space_protbert_tokenizer')
+    tokenizer = get_protbert_tokenizer(preset)
     return model, tokenizer
 
 
@@ -44,12 +67,13 @@ def get_protbert_for_training(preset: str, tokenwise: bool = False, num_labels: 
             model = BertForTokenClassification.from_pretrained(model_path, num_labels=num_labels).eval()
         else:
             model = BertForSequenceClassification.from_pretrained(model_path, num_labels=num_labels).eval()
-    tokenizer = model.tokenizer
+    tokenizer = get_protbert_tokenizer(preset)
     return model, tokenizer
 
 
 if __name__ == '__main__':
     # py -m src.protify.base_models.protbert
-    model, tokenizer = build_protbert_model('protbert-bfd')
+    model, tokenizer = build_protbert_model('ProtBert')
     print(model)
     print(tokenizer)
+    print(tokenizer('MEKVQYLTRSAIRRASTIEMPQQARQKLQNLFINFCLILICBBOLLICIIVMLL'))

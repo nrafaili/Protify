@@ -30,6 +30,8 @@ currently_supported_models = [
     'GLM2-150',
     'GLM2-650',
     'GLM2-GAIA',
+    'ESM-diff-150',
+    'ESM-diff-650',
 ]
 
 standard_models = [
@@ -70,7 +72,7 @@ def get_base_model(model_name: str):
     if 'random' in model_name.lower():
         from .random import build_random_model
         return build_random_model(model_name)
-    elif 'esm2' in model_name.lower():
+    elif 'esm2' in model_name.lower() or 'diff' in model_name.lower():
         from .esm2 import build_esm2_model
         return build_esm2_model(model_name)
     elif 'esmc' in model_name.lower():
@@ -93,44 +95,57 @@ def get_base_model(model_name: str):
 
 
 def get_base_model_for_training(model_name: str, tokenwise: bool = False, num_labels: int = None, hybrid: bool = False):
-    if 'esm2' in model_name.lower():
+    if 'esm2' in model_name.lower() or 'diff' in model_name.lower():
         from .esm2 import get_esm2_for_training
         return get_esm2_for_training(model_name, tokenwise, num_labels, hybrid)
     elif 'esmc' in model_name.lower():
         from .esmc import get_esmc_for_training
         return get_esmc_for_training(model_name, tokenwise, num_labels, hybrid)
+    elif 'protbert' in model_name.lower():
+        from .protbert import get_protbert_for_training
+        return get_protbert_for_training(model_name, tokenwise, num_labels, hybrid)
+    elif 'prott5' in model_name.lower():
+        from .prott5 import get_prott5_for_training
+        return get_prott5_for_training(model_name, tokenwise, num_labels, hybrid)
+    elif 'ankh' in model_name.lower():
+        from .ankh import get_ankh_for_training
+        return get_ankh_for_training(model_name, tokenwise, num_labels, hybrid)
+    elif 'glm' in model_name.lower():
+        from .glm import get_glm2_for_training
+        return get_glm2_for_training(model_name, tokenwise, num_labels, hybrid)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
 
 def get_tokenizer(model_name: str):
-    if 'esm2' in model_name.lower() or 'random' in model_name.lower():
-        from transformers import EsmTokenizer
-        return EsmTokenizer.from_pretrained('facebook/esm2_t6_8M_UR50D')
-    elif 'esmc' in model_name.lower() or 'camp' in model_name.lower() or 'esmv' in model_name.lower():
-        from .FastPLMs.modeling_esm_plusplus import EsmSequenceTokenizer
-        return EsmSequenceTokenizer()
+    if 'esm2' in model_name.lower() or 'random' in model_name.lower() or 'diff' in model_name.lower():
+        from .esm2 import get_esm2_tokenizer
+        return get_esm2_tokenizer(model_name)
+    elif 'esmc' in model_name.lower():
+        from .esmc import get_esmc_tokenizer
+        return get_esmc_tokenizer(model_name)
     elif 'protbert' in model_name.lower():
-        from transformers import EsmTokenizer
-        return EsmTokenizer.from_pretrained('lhallee/no_space_protbert_tokenizer')
+        from .protbert import get_protbert_tokenizer
+        return get_protbert_tokenizer(model_name)
     elif 'prott5' in model_name.lower():
-        from transformers import T5Tokenizer
-        return T5Tokenizer.from_pretrained('Rostlab/prot_t5_xl_half_uniref50-enc')
+        from .prott5 import get_prott5_tokenizer
+        return get_prott5_tokenizer(model_name)
     elif 'ankh' in model_name.lower():
-        from transformers import AutoTokenizer
-        return AutoTokenizer.from_pretrained('Synthyra/ANKH-Base')
+        from .ankh import get_ankh_tokenizer
+        return get_ankh_tokenizer(model_name)
     elif 'glm' in model_name.lower():
-        from transformers import AutoTokenizer
-        return AutoTokenizer.from_pretrained('tattabio/gLM2_150M')
+        from .glm import get_glm2_tokenizer
+        return get_glm2_tokenizer(model_name)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
 
 if __name__ == '__main__':
+    # py -m src.protify.base_models.get_base_models
     ### This will download all standard models
     from torchinfo import summary
     from ..utils import clear_screen
-    args = BaseModelArguments()
+    args = BaseModelArguments(model_names=['standard'])
     for model_name in args.model_names:
         model, tokenizer = get_base_model(model_name)
         print(f'Downloaded {model_name}')
