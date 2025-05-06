@@ -378,7 +378,7 @@ if __name__ == '__main__':
     # Get data    
     data_args = DataArguments(
         data_names=possible_with_vector_reps,
-        max_length=2048,
+        max_length=1024,
         trim=False
     )
     all_seqs = DataMixin(data_args).get_data()[1]
@@ -403,18 +403,14 @@ if __name__ == '__main__':
         _ = embedder(model_name)
         save_path = os.path.join(args.embedding_save_dir, f'{model_name}_False.pth')
         
-        # Compress file if requested
-        if args.compress:
-            compressed_path = f"{save_path}.gz"
-            print(f"Compressing {save_path} to {compressed_path}")
-            with open(save_path, 'rb') as f_in:
-                with gzip.open(compressed_path, 'wb') as f_out:
-                    f_out.write(f_in.read())
-            upload_path = compressed_path
-            path_in_repo = f'embeddings/{model_name}_False.pth.gz'
-        else:
-            upload_path = save_path
-            path_in_repo = f'embeddings/{model_name}_False.pth'
+        compressed_path = f"{save_path}.gz"
+        print(f"Compressing {save_path} to {compressed_path}")
+        with open(save_path, 'rb') as f_in:
+            with gzip.open(compressed_path, 'wb') as f_out:
+                f_out.write(f_in.read())
+        upload_path = compressed_path
+        path_in_repo = f'embeddings/{model_name}_False.pth.gz'
+
             
         upload_file(
             path_or_fileobj=upload_path,
