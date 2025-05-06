@@ -31,12 +31,6 @@ data_names:
   - GO-CC
   - GO-BP
   - GO-MF
-  - MB
-  - enzyme-kcat
-  - optimal-temperature
-  - optimal-ph
-  - human-ppi
-  - gold-ppi
 
 data_dirs: []
 
@@ -51,15 +45,9 @@ model_names:
   - ESM2-35
   - ESM2-150
   - ESM2-650
-  - ESM2-3B
   - ESMC-300
   - ESMC-600
-  - ProtBert
-  - ProtT5
-  - GLM2-150
-  - GLM2-650
   - ANKH-Base
-  - ANKH-Large
   - Random
   - Random-Transformer
 

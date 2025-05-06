@@ -33,8 +33,8 @@ currently_supported_models = [
     'DPLM-150',
     'DPLM-650',
     'DPLM-3B',
-    'DLM-150',
-    'DLM-650',
+    'DSM-150',
+    'DSM-650',
 ]
 
 standard_models = [
@@ -53,8 +53,8 @@ standard_models = [
     'ANKH-Large',
     'DPLM-150',
     'DPLM-650',
-    'DLM-150',
-    'DLM-650',
+    'DSM-150',
+    'DSM-650',
     'Random',
     'Random-Transformer',
 ]

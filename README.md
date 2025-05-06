@@ -102,8 +102,8 @@ Protify is currently in beta. We're actively working to enhance features and doc
   | DPLM-150 | Diffusion pLM focused on joint sequence and structure. | 150M | pLM |
   | DPLM-650 | Larger DPLM. | 650M parameters | pLM |
   | DPLM-3B | Largest DPLM. | 3B | pLM |
-  | DLM-150 | Diffusion language model for proteins. | 150M | pLM |
-  | DLM-650 | Diffusion language model for proteins. | 650M | pLM |
+  | DSM-150 | Diffusion language model for proteins. | 150M | pLM |
+  | DSM-650 | Diffusion language model for proteins. | 650M | pLM |
   | Random | Baseline model with randomly initialized weights, serving as a negative control. | Varies | Negative control |
   | Random-Transformer | Randomly initialized transformer model serving as a homology-based control. | Varies | Homology control |
 </details>

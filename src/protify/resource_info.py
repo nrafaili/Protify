@@ -139,13 +139,13 @@ model_descriptions = {
         'type': 'Protein language model',
         'citation': 'N/A'
     },
-    'DLM-150': {
+    'DSM-150': {
         'description': 'Deep language model for proteins with 150M parameters.',
         'size': '150M parameters',
         'type': 'Protein language model',
         'citation': 'N/A'
     },
-    'DLM-650': {
+    'DSM-650': {
         'description': 'Deep language model for proteins with 650M parameters.',
         'size': '650M parameters',
         'type': 'Protein language model',
