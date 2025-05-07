@@ -140,7 +140,7 @@ class TransformerForTokenClassification(PreTrainedModel):
             nn.ReLU(),
             nn.Dropout(config.classifier_dropout),
             nn.Linear(proj_dim, proj_dim),
-            nn.SiLU(),
+            nn.ReLU(),
             nn.Linear(proj_dim, config.num_labels)
         )
 

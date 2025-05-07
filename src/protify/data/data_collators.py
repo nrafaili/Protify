@@ -77,7 +77,7 @@ class StringLabelsCollator:
                     padding = torch.full((padding_size,), -100, dtype=label.dtype)
                     padded_labels = torch.cat((label, padding))
                 else:
-                    padded_labels = label
+                    padded_labels = label[:max_length]
                 padded_labels.append(padded_labels)
             
             # Stack all padded labels
@@ -100,9 +100,9 @@ class EmbedsLabelsCollator:
             labels = [ex[1] for ex in batch]
             
             # Find max sequence length for padding
-            max_len = max(embed.size(0) for embed in embeds)
+            max_length = max(embed.size(0) for embed in embeds)
             
-            embeds, attention_mask = _pad_matrix_embeds(embeds, max_len)
+            embeds, attention_mask = _pad_matrix_embeds(embeds, max_length)
             
             # Pad labels
             if self.task_type == 'tokenwise':
@@ -112,13 +112,13 @@ class EmbedsLabelsCollator:
                         label = torch.tensor(label)
 
                     label = label.flatten()
-                    padding_size = max_len - len(label)
+                    padding_size = max_length - len(label)
                     if padding_size > 0:
                         # Use -100 as padding value for labels (ignored by loss functions)
                         padding = torch.full((padding_size,), -100, dtype=label.dtype)
                         padded_label = torch.cat((label, padding))
                     else:
-                        padded_label = label[:max_len]
+                        padded_label = label[:max_length]
                     padded_labels.append(padded_label)
             else:
                 padded_labels = labels
