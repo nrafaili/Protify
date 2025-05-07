@@ -75,9 +75,9 @@ class StringLabelsCollator:
                 if padding_size > 0:
                     # Pad with -100 (ignored by loss functions)
                     padding = torch.full((padding_size,), -100, dtype=label.dtype)
-                    padded_labels = torch.cat((label.squeeze(-1), padding))
+                    padded_labels = torch.cat((label, padding))
                 else:
-                    padded_labels = label.squeeze(-1)
+                    padded_labels = label
                 padded_labels.append(padded_labels)
             
             # Stack all padded labels
@@ -112,9 +112,9 @@ class EmbedsLabelsCollator:
                     if padding_size > 0:
                         # Use -100 as padding value for labels (ignored by loss functions)
                         padding = torch.full((padding_size,), -100, dtype=label.dtype)
-                        padded_label = torch.cat((label.squeeze(-1), padding))
+                        padded_label = torch.cat((label, padding))
                     else:
-                        padded_label = label.squeeze(-1)
+                        padded_label = label
                     padded_labels.append(padded_label)
             else:
                 padded_labels = labels
