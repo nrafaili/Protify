@@ -149,6 +149,11 @@ class TrainerMixin:
         print_message(f'Final validation metrics: {valid_metrics}')
 
         y_pred, y_true, test_metrics = trainer.predict(test_dataset)
+        if isinstance(y_pred, tuple):
+            y_pred = y_pred[0]
+        if isinstance(y_true, tuple):
+            y_true = y_true[0]
+
         y_pred, y_true = y_pred.astype(np.float32), y_true.astype(np.float32)
         print_message(f'y_pred: {y_pred.shape}\ny_true: {y_true.shape}\nFinal test metrics: \n{test_metrics}\n')
 

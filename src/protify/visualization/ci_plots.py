@@ -58,12 +58,12 @@ def classification_ci_plot(y_true, y_pred, save_path, title=None):
     """
     Use pauc to display classification plot
     """
-    if y_pred.ndim == 3 and y_pred.ndim == 2:
+    if len(y_pred.shape) == 3 and len(y_true.shape) == 2:
         y_pred = y_pred.reshape(-1, y_pred.shape[-1])
         y_true = y_true.reshape(-1)
 
     ### Note: removing this gives you one plot per multilabel class
-    if y_pred.ndim == 2 and y_true.ndim == 2:
+    if len(y_pred.shape) == 2 and len(y_true.shape) == 2:
         y_pred = y_pred.flatten()
         y_true = y_true.flatten()
 
@@ -72,6 +72,8 @@ def classification_ci_plot(y_true, y_pred, save_path, title=None):
     if y_true.shape[0] > 100000:
         y_pred = y_pred[:100000]
         y_true = y_true[:100000]
+
+    print(y_true.shape, y_pred.shape)
 
     try:
         plot_roc_with_ci(y_true, y_pred, save_path, fig_title=title)
@@ -87,6 +89,6 @@ if __name__ == "__main__":
     y_pred = np.random.rand(100)
     regression_ci_plot(y_true, y_pred, "plots/test_plots/regression.png", title="Regression Plot")
 
-    y_true = np.random.randint(0, 2, (20, 584))
-    y_pred = np.random.rand(20, 584)
+    y_true = np.random.randint(0, 2, (50, 514))
+    y_pred = np.random.rand(50, 514, 4)
     classification_ci_plot(y_true, y_pred, "plots/test_plots/classification.png", title="Classification Plot")
