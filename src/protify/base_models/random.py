@@ -20,9 +20,11 @@ class RandomModel(nn.Module):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
+        self.holder_param = torch.nn.Parameter(torch.randn(1, 1, self.hidden_size))
 
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        return torch.randn(input_ids.shape[0], input_ids.shape[1], self.hidden_size)
+        device = self.holder_param.device
+        return torch.randn(input_ids.shape[0], input_ids.shape[1], self.hidden_size, device=device)
 
 
 class RandomTransformer(nn.Module):
