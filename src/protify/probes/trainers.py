@@ -162,7 +162,8 @@ class TrainerMixin:
 
         if self.trainer_args.save:
             try:
-                trainer.model.push_to_hub(self.trainer_args.model_save_dir, private=True)
+                hub_path = os.path.join(self.full_args.hf_username, f"{data_name}_{model_name}_{log_id}")
+                trainer.model.push_to_hub(hub_path, private=True)
             except Exception as e:
                 print_message(f'Error saving model: {e}')
 
