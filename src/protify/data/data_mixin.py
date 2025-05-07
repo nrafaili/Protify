@@ -212,9 +212,9 @@ class DataMixin:
                 unique_tags = set(tag for doc in train_labels for tag in doc)
                 tag2id = {tag: id for id, tag in enumerate(sorted(unique_tags))}
                 # add cls token to labels
-                train_set = train_set.map(lambda ex: {'labels': [-100] + self._encode_labels(ex['labels'], tag2id=tag2id)})
-                valid_set = valid_set.map(lambda ex: {'labels': [-100] + self._encode_labels(ex['labels'], tag2id=tag2id)})
-                test_set = test_set.map(lambda ex: {'labels': [-100] + self._encode_labels(ex['labels'], tag2id=tag2id)})
+                train_set = train_set.map(lambda ex: {'labels': [-100] + list(self._encode_labels(ex['labels'], tag2id=tag2id))})
+                valid_set = valid_set.map(lambda ex: {'labels': [-100] + list(self._encode_labels(ex['labels'], tag2id=tag2id))})
+                test_set = test_set.map(lambda ex: {'labels': [-100] + list(self._encode_labels(ex['labels'], tag2id=tag2id))})
                 label_type = 'tokenwise'
                 num_labels = len(unique_tags)
             else:
