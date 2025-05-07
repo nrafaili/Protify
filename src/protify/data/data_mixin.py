@@ -79,7 +79,7 @@ class DataMixin:
         return all(isinstance(label, (int, float)) and label == int(label) for label in labels)
 
     def _encode_labels(self, labels, tag2id):
-        return [torch.tensor([-100] + [tag2id[tag] for tag in doc], dtype=torch.long) for doc in labels]
+        return [torch.tensor([tag2id[tag] for tag in doc], dtype=torch.long) for doc in labels]
 
     def _label_type_checker(self, labels):
         ex = labels[0]

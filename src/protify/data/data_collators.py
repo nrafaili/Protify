@@ -75,10 +75,10 @@ class StringLabelsCollator:
                 if padding_size > 0:
                     # Pad with -100 (ignored by loss functions)
                     padding = torch.full((padding_size,), -100, dtype=label.dtype)
-                    padded_labels = torch.cat((label, padding))
+                    padded_label = torch.cat((label, padding))
                 else:
-                    padded_labels = label[:max_length]
-                padded_labels.append(padded_labels)
+                    padded_label = label[:max_length]
+                padded_labels.append(padded_label)
             
             # Stack all padded labels
             batch_encoding['labels'] = torch.stack(padded_labels)
