@@ -273,6 +273,8 @@ class TrainerMixin:
             ppi=False,
             log_id=None,
         ):
+        task_type = self.probe_args.task_type
+
         if ppi:
             DatasetClass = PairStringLabelDataset
             CollatorClass = PairCollator_input_ids
@@ -280,7 +282,7 @@ class TrainerMixin:
             DatasetClass = StringLabelDataset
             CollatorClass = StringLabelsCollator
 
-        data_collator = CollatorClass(tokenizer=tokenizer)
+        data_collator = CollatorClass(tokenizer=tokenizer, task_type=task_type)
 
         train_dataset = DatasetClass(hf_dataset=train_dataset, train=True)
         valid_dataset = DatasetClass(hf_dataset=valid_dataset, train=False)

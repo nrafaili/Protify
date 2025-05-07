@@ -40,19 +40,53 @@ class StringCollator:
 
 
 class StringLabelsCollator:
-    def __init__(self, tokenizer, **kwargs):
+    def __init__(self, tokenizer, task_type='tokenwise', **kwargs):
         self.tokenizer = tokenizer
-        
+        self.task_type = task_type
+
     def __call__(self, batch: List[Tuple[str, Union[float, int]]]) -> Dict[str, torch.Tensor]:
         seqs = [ex[0] for ex in batch]
-        labels = torch.stack([torch.tensor(ex[1]) for ex in batch])
-        batch = self.tokenizer(seqs,
-                          padding='longest',
-                          truncation=False,
-                          return_tensors='pt',
-                          add_special_tokens=True)
-        batch['labels'] = labels
-        return batch
+        labels = [ex[1] for ex in batch]
+
+        # Tokenize the sequences
+        batch_encoding = self.tokenizer(
+            seqs,
+            padding='longest',
+            truncation=False,
+            return_tensors='pt',
+            add_special_tokens=True
+        )
+        
+        # Handle labels based on tokenwise flag
+        if self.task_type == 'tokenwise':
+            # For token-wise labels, we need to pad to match the tokenized sequence length
+            attention_mask = batch_encoding['attention_mask']
+            lengths = [torch.sum(attention_mask[i]).item() for i in range(len(batch))]
+            max_length = max(lengths)
+
+            padded_labels = []
+            for label in labels:
+                if not isinstance(label, torch.Tensor):
+                    label = torch.tensor(label)
+
+                label_len = label.size(0)
+                padding_size = max_length - label_len
+                # Pad or truncate labels to match tokenized sequence length
+                if padding_size > 0:
+                    # Pad with -100 (ignored by loss functions)
+                    padding = torch.full((padding_size,), -100, dtype=label.dtype)
+                    padded_labels = torch.cat((label.squeeze(-1), padding))
+                else:
+                    padded_labels = label.squeeze(-1)
+                padded_labels.append(padded_labels)
+            
+            # Stack all padded labels
+            batch_encoding['labels'] = torch.stack(padded_labels)
+        else:
+            # For sequence-level labels, just stack them
+            batch_encoding['labels'] = torch.stack([torch.tensor(ex[1]) for ex in batch])
+        
+        return batch_encoding
 
 
 class EmbedsLabelsCollator:
