@@ -79,7 +79,7 @@ class DataMixin:
         return all(isinstance(label, (int, float)) and label == int(label) for label in labels)
 
     def _encode_labels(self, labels, tag2id):
-        return [torch.tensor([tag2id[tag] for tag in doc], dtype=torch.long) for doc in labels]
+        return [torch.tensor([-100] + [tag2id[tag] for tag in doc], dtype=torch.long) for doc in labels]
 
     def _label_type_checker(self, labels):
         ex = labels[0]
@@ -212,9 +212,9 @@ class DataMixin:
                 unique_tags = set(tag for doc in train_labels for tag in doc)
                 tag2id = {tag: id for id, tag in enumerate(sorted(unique_tags))}
                 # add cls token to labels
-                train_set = train_set.map(lambda ex: {'labels': [-100] + list(self._encode_labels(ex['labels'], tag2id=tag2id))})
-                valid_set = valid_set.map(lambda ex: {'labels': [-100] + list(self._encode_labels(ex['labels'], tag2id=tag2id))})
-                test_set = test_set.map(lambda ex: {'labels': [-100] + list(self._encode_labels(ex['labels'], tag2id=tag2id))})
+                train_set = train_set.map(lambda ex: {'labels': self._encode_labels(ex['labels'], tag2id=tag2id)})
+                valid_set = valid_set.map(lambda ex: {'labels': self._encode_labels(ex['labels'], tag2id=tag2id)})
+                test_set = test_set.map(lambda ex: {'labels': self._encode_labels(ex['labels'], tag2id=tag2id)})
                 label_type = 'tokenwise'
                 num_labels = len(unique_tags)
             else:
