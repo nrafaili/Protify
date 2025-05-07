@@ -104,6 +104,7 @@ class TrainerArguments:
             metric_for_best_model='eval_loss',
             greater_is_better=False,
             seed=self.seed,
+            label_names=['labels'],
             **eval_strats
         )
 
@@ -138,6 +139,7 @@ class TrainerMixin:
             compute_metrics=compute_metrics,
             callbacks=[EarlyStoppingCallback(early_stopping_patience=self.trainer_args.patience)]
         )
+        trainer.can_return_loss = True
         metrics = trainer.evaluate(test_dataset)
         print_message(f'Initial metrics: {metrics}')
 
