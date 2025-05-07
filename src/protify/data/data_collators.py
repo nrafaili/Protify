@@ -69,8 +69,8 @@ class StringLabelsCollator:
                 if not isinstance(label, torch.Tensor):
                     label = torch.tensor(label)
 
-                label_len = label.size(0)
-                padding_size = max_length - label_len
+                label = label.flatten()
+                padding_size = max_length - len(label)
                 # Pad or truncate labels to match tokenized sequence length
                 if padding_size > 0:
                     # Pad with -100 (ignored by loss functions)
@@ -108,7 +108,11 @@ class EmbedsLabelsCollator:
             if self.task_type == 'tokenwise':
                 padded_labels = []
                 for label in labels:
-                    padding_size = max_len - label.size(0)
+                    if not isinstance(label, torch.Tensor):
+                        label = torch.tensor(label)
+
+                    label = label.flatten()
+                    padding_size = max_len - len(label)
                     if padding_size > 0:
                         # Use -100 as padding value for labels (ignored by loss functions)
                         padding = torch.full((padding_size,), -100, dtype=label.dtype)
