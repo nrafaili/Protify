@@ -118,7 +118,7 @@ class EmbedsLabelsCollator:
                         padding = torch.full((padding_size,), -100, dtype=label.dtype)
                         padded_label = torch.cat((label, padding))
                     else:
-                        padded_label = label
+                        padded_label = label[:max_len]
                     padded_labels.append(padded_label)
             else:
                 padded_labels = labels
