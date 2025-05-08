@@ -38,6 +38,16 @@ MODEL_NAMES = {
     'ESMC-600': r'$ESMC_{600M}$',
     'ESM2-diff-150': r'$ESMdiff_{150M}$',
     'ESM2-diffAV-150': r'$ESMdiffAV_{150M}$',
+    'ANKH-base': r'$ANKH_{base}$',
+    'ANKH-large': r'$ANKH_{large}$',
+    'ANKH2-large': r'$ANKH2_{large}$',
+    'DSM-150': r'$DSM_{150M}$',
+    'DSM-650': r'$DSM_{650M}$',
+    'GLM2-150': r'$GLM2_{150M}$',
+    'GLM2-650': r'$GLM2_{650M}$',
+    'DPLM-150': r'$DPLM_{150M}$',
+    'DPLM-650': r'$DPLM_{650M}$',
+    'DPLM-3B': r'$DPLM_{3B}$',
 }
 
 DATASET_NAMES = {
