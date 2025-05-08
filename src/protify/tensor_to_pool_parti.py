@@ -167,7 +167,11 @@ class TokenToSequencePooler:
         total = sum(dict_importance.values())
         return {k: v / total for k, v in dict_importance.items()}
 
-def main_pooling(token_emb, attention_layers, output_dir, generate_all):
+def main_pooling(token_emb, 
+                 attention_layers, 
+                #  output_dir, 
+                #  generate_all
+                 ):
     """
     Main function to perform pooling operations on protein sequence data.
 
@@ -202,59 +206,59 @@ def main_pooling(token_emb, attention_layers, output_dir, generate_all):
     # pool_parti_dir = os.path.join(output_dir, "pool_parti")
     # os.makedirs(pool_parti_dir, exist_ok=True)
     # address = os.path.join(pool_parti_dir, file_name)
-    if not os.path.exists(address):
-        pooled = pooler.pool_parti(verbose=False, return_importance=False)
-        if pooled is not None:
-            torch.save(pooled, address)
-            print(f"Pool PaRTI embedding saved at {address}")
-        else:
-            print(f"Pool PaRTI pooling failed for {file_name}, skipping save.")
-    else:
-        print(f"Pool PaRTI embedding already exists at {address}")
+    pooled = pooler.pool_parti(verbose=False, return_importance=False)
+    return pooled
+    #     if pooled is not None:
+    #         torch.save(pooled, address)
+    #         print(f"Pool PaRTI embedding saved at {address}")
+    #     else:
+    #         print(f"Pool PaRTI pooling failed")
+    # else:
+    #     print(f"Pool PaRTI embedding already exists at {address}")
 
-    # If generate_all is True, perform additional pooling methods
-    if generate_all:
-        # CLS Pooling
-        cls_pooled_dir = os.path.join(output_dir, "cls_pooled")
-        os.makedirs(cls_pooled_dir, exist_ok=True)
-        address = os.path.join(cls_pooled_dir, file_name)
-        if not os.path.exists(address):
-            cls_pooled = pooler.cls_pooling()
-            if cls_pooled is not None:
-                torch.save(cls_pooled, address)
-                print(f"CLS-pooled embedding saved at {address}")
-            else:
-                print(f"CLS pooling failed for {file_name}, skipping save.")
-        else:
-            print(f"CLS-pooled embedding already exists at {address}")
+    # # If generate_all is True, perform additional pooling methods
+    # if generate_all:
+    #     # CLS Pooling
+    #     cls_pooled_dir = os.path.join(output_dir, "cls_pooled")
+    #     os.makedirs(cls_pooled_dir, exist_ok=True)
+    #     address = os.path.join(cls_pooled_dir, file_name)
+    #     if not os.path.exists(address):
+    #         cls_pooled = pooler.cls_pooling()
+    #         if cls_pooled is not None:
+    #             torch.save(cls_pooled, address)
+    #             print(f"CLS-pooled embedding saved at {address}")
+    #         else:
+    #             print(f"CLS pooling failed for {file_name}, skipping save.")
+    #     else:
+    #         print(f"CLS-pooled embedding already exists at {address}")
 
-        # Mean Pooling
-        mean_pooled_dir = os.path.join(output_dir, "mean_pooled")
-        os.makedirs(mean_pooled_dir, exist_ok=True)
-        address = os.path.join(mean_pooled_dir, file_name)
-        if not os.path.exists(address):
-            mean_pooled = pooler.mean_pooling()
-            if mean_pooled is not None:
-                torch.save(mean_pooled, address)
-                print(f"Mean-pooled embedding saved at {address}")
-            else:
-                print(f"Mean pooling failed for {file_name}, skipping save.")
-        else:
-            print(f"Mean-pooled embedding already exists at {address}")
+    #     # Mean Pooling
+    #     mean_pooled_dir = os.path.join(output_dir, "mean_pooled")
+    #     os.makedirs(mean_pooled_dir, exist_ok=True)
+    #     address = os.path.join(mean_pooled_dir, file_name)
+    #     if not os.path.exists(address):
+    #         mean_pooled = pooler.mean_pooling()
+    #         if mean_pooled is not None:
+    #             torch.save(mean_pooled, address)
+    #             print(f"Mean-pooled embedding saved at {address}")
+    #         else:
+    #             print(f"Mean pooling failed for {file_name}, skipping save.")
+    #     else:
+    #         print(f"Mean-pooled embedding already exists at {address}")
 
-        # Max Pooling
-        max_pooled_dir = os.path.join(output_dir, "max_pooled")
-        os.makedirs(max_pooled_dir, exist_ok=True)
-        address = os.path.join(max_pooled_dir, file_name)
-        if not os.path.exists(address):
-            max_pooled = pooler.max_pooling()
-            if max_pooled is not None:
-                torch.save(max_pooled, address)
-                print(f"Max-pooled embedding saved at {address}")
-            else:
-                print(f"Max pooling failed for {file_name}, skipping save.")
-        else:
-            print(f"Max-pooled embedding already exists at {address}")
+    #     # Max Pooling
+    #     max_pooled_dir = os.path.join(output_dir, "max_pooled")
+    #     os.makedirs(max_pooled_dir, exist_ok=True)
+    #     address = os.path.join(max_pooled_dir, file_name)
+    #     if not os.path.exists(address):
+    #         max_pooled = pooler.max_pooling()
+    #         if max_pooled is not None:
+    #             torch.save(max_pooled, address)
+    #             print(f"Max-pooled embedding saved at {address}")
+    #         else:
+    #             print(f"Max pooling failed for {file_name}, skipping save.")
+    #     else:
+    #         print(f"Max-pooled embedding already exists at {address}")
 
     print(f"Pooling operations completed for {file_name}.")
 
