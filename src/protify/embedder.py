@@ -113,20 +113,6 @@ class Pooler:
 
 def pool_parti(X: torch.Tensor, 
                attentions: Tuple[torch.Tensor]) -> torch.Tensor:
-            #    attention_mask: torch.Tensor) -> torch.Tensor:
-    # X: (bs, seq_len, d)
-    # attentions: num_layres of (bs, n_heads, seq_len, seq_len)
-    # attention_mask: (bs, seq_len)
-    # bs, seq_len, _ = X.shape
-    # attentions = torch.stack(attentions, dim=1).float() # (bs, n_layers, n_heads, seq_len, seq_len)
-    # att_mask = attention_mask[:, None, None, None, :].expand(bs, 1, 1, seq_len, seq_len)
-    # attentions = attentions * att_mask
-    # attentions = attentions.mean(dim=2) # (bs, n_layers, seq_len, seq_len)
-    # attentions = attentions.mean(dim=1) # (bs, seq_len, seq_len)
-    # attentions = attentions.mean(dim=-1) # (bs, seq_len)
-    # X = X * attentions.unsqueeze(-1)
-    # attention_mask = attention_mask.unsqueeze(-1)
-    # return (X * attention_mask).sum(dim=1) / attention_mask.sum(dim=1) # (bs, d)
     return main_pooling(token_emb= X, attention_layers= attentions)
 
 
