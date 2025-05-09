@@ -31,7 +31,6 @@ supported_datasets = {
     'shs148-ppi': 'Synthyra/SHS148k',
     'PPA-ppi': 'Synthyra/ProteinProteinAffinity',
     'synthyra-ppi': 'Synthyra/ppi_set_v5',
-    
 }
 
 internal_datasets = {
