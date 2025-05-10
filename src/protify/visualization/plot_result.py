@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 import argparse, json, math
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -35,6 +35,7 @@ MODEL_NAMES = {
     'DPLM-150': r'$DPLM_{150M}$',
     'DPLM-650': r'$DPLM_{650M}$',
     'DPLM-3B': r'$DPLM_{3B}$',
+    'ProtCLM-1b': r'$ProtCLM_{1B}$',
 }
 
 DATASET_NAMES = {
