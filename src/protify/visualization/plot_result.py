@@ -248,7 +248,16 @@ def heatmap_plot(datasets: List[str],
         vmax = None
         cbar_label = metric_name
 
-    plt.figure(figsize=(max(15, .8 * len(clean_model_names)), max(10, .5 * len(clean_dataset_names))))
+    # Calculate figure size based on content, making it just big enough for the data
+    # Use fixed cell size approach instead of scaling by data dimensions
+    cell_width = 1.0  # width per cell in inches
+    cell_height = 0.8  # height per cell in inches
+    
+    # Calculate figure dimensions
+    fig_width = max(8, cell_width * len(clean_model_names))
+    fig_height = max(6, cell_height * len(clean_dataset_names))
+    
+    plt.figure(figsize=(fig_width, fig_height))
     ax = sns.heatmap(plot_arr,  # rows: datasets, cols: models
                      xticklabels=clean_model_names,
                      yticklabels=clean_dataset_names,
@@ -258,7 +267,7 @@ def heatmap_plot(datasets: List[str],
                      vmax=vmax,
                      annot=True,
                      fmt='.2f',
-                     annot_kws={'size': 8},
+                     annot_kws={'size': 12},  # Increased font size for annotations
                      cbar_kws={'label': cbar_label})
     for i in range(plot_arr.shape[0]):
         for j in range(plot_arr.shape[1]):
@@ -272,10 +281,10 @@ def heatmap_plot(datasets: List[str],
         title = f'{cbar_label} Heatmap'
         
     plt.title(title, pad=20, fontsize=20)
-    plt.ylabel('Dataset', fontsize=18)
-    plt.xlabel('Model', fontsize=18)
+    plt.ylabel('Dataset', fontsize=16)
+    plt.xlabel('Model', fontsize=16)
     plt.xticks(rotation=45, ha='right', fontsize=12)
-    plt.yticks(rotation=45, fontsize=12)
+    plt.yticks(rotation=0, fontsize=12)  # Changed rotation to 0 for better readability
     plt.tight_layout()
     plt.savefig(outfile, dpi=450, bbox_inches='tight')
     plt.close()
