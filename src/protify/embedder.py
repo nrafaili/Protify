@@ -110,10 +110,9 @@ class Pooler:
             final_emb.append(self.pooling_options[pooling_type](emb, attention_mask)) # (b, d)
         return torch.cat(final_emb, dim=-1) # (b, n_pooling_types * d)
 
-
-def pool_parti(X: torch.Tensor, 
-               attentions: Tuple[torch.Tensor]) -> torch.Tensor:
-    return main_pooling(token_emb= X, attention_layers= attentions)
+    def pool_parti(X: torch.Tensor, 
+                attentions: Tuple[torch.Tensor]) -> torch.Tensor:
+        return main_pooling(token_emb= X, attention_layers= attentions)
 
 
 ### Dataset for Embedding
