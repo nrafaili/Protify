@@ -57,6 +57,7 @@ class Pooler:
             'std': self.std_pooling,
             'var': self.var_pooling,
             'cls': self.cls_pooling,
+            'pool_parti': self.pool_parti
         }
 
     def mean_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
