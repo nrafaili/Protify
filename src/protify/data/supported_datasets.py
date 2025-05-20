@@ -30,12 +30,11 @@ supported_datasets = {
     'shs27-ppi': 'Synthyra/SHS27k',
     'shs148-ppi': 'Synthyra/SHS148k',
     'PPA-ppi': 'Synthyra/ProteinProteinAffinity',
-    'synthyra-ppi': 'Synthyra/ppi_set_v5',
-    
+    'foldseek-fold': 'lhallee/foldseek_dataset',
+    'foldseek-inverse': 'lhallee/foldseek_dataset',
 }
 
 internal_datasets = {
-    'synthyra-ppi': 'Synthyra/ppi_set_v5',
     'plastic': 'GleghornLab/plastic_degradation_benchmark',
 }
 

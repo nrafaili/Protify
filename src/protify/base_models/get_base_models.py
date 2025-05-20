@@ -36,6 +36,10 @@ currently_supported_models = [
     'DSM-150',
     'DSM-650',
     'ProtCLM-1b'
+    'OneHot-Protein',
+    'OneHot-DNA',
+    'OneHot-RNA',
+    'OneHot-Codon',
 ]
 
 standard_models = [
@@ -102,6 +106,9 @@ def get_base_model(model_name: str):
     elif 'protclm' in model_name.lower():
         from .protCLM import build_protCLM
         return build_protCLM(model_name)
+    elif 'onehot' in model_name.lower():
+        from .one_hot import build_one_hot_model
+        return build_one_hot_model(model_name)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
@@ -160,6 +167,9 @@ def get_tokenizer(model_name: str):
     elif 'protclm' in model_name.lower():
         from .protCLM import get_protCLM_tokenizer
         return get_protCLM_tokenizer(model_name)
+    elif 'onehot' in model_name.lower():
+        from .one_hot import get_one_hot_tokenizer
+        return get_one_hot_tokenizer(model_name)
     else:
         raise ValueError(f"Model {model_name} not supported")
 

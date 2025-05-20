@@ -3,6 +3,7 @@ from typing import List
 from .linear_probe import LinearProbe, LinearProbeConfig
 from .transformer_probe import TransformerForSequenceClassification, TransformerForTokenClassification, TransformerProbeConfig
 from .retrievalnet import RetrievalNet, RetrievalNetConfig
+from .lyra_probe import LyraForSequenceClassification, LyraForTokenClassification, LyraConfig
 
 
 @dataclass
@@ -70,5 +71,11 @@ def get_probe(args: ProbeArguments):
     elif args.probe_type == 'retrievalnet' and not args.tokenwise:
         config = RetrievalNetConfig(**args.__dict__)
         return RetrievalNet(config)
+    elif args.probe_type == 'lyra' and not args.tokenwise:
+        config = LyraConfig(**args.__dict__)
+        return LyraForSequenceClassification(config)
+    elif args.probe_type == 'lyra' and args.tokenwise:
+        config = LyraConfig(**args.__dict__)
+        return LyraForTokenClassification(config)
     else:
         raise ValueError(f"Invalid combination of probe type and tokenwise: {args.probe_type} {args.tokenwise}")

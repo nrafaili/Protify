@@ -380,7 +380,7 @@ class GUI(MainProcess):
         combo_probe = ttk.Combobox(
             self.probe_tab,
             textvariable=self.settings_vars["probe_type"],
-            values=["linear", "transformer", "retrievalnet"]
+            values=["linear", "transformer", "retrievalnet", "lyra"]
         )
         combo_probe.grid(row=0, column=1, padx=10, pady=5)
         self.add_help_button(self.probe_tab, 0, 2, "Type of probe architecture to use (linear, transformer, or retrievalnet).")

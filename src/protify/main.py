@@ -330,8 +330,9 @@ def parse_arguments():
     parser.add_argument("--model_names", nargs="+", default=["ESM2-8"], help="List of model names to use.")
 
     # ----------------- ProbeArguments ----------------- #
-    parser.add_argument("--probe_type", choices=["linear", "transformer", "retrievalnet"], default="linear", help="Type of probe.")
+    parser.add_argument("--probe_type", choices=["linear", "transformer", "retrievalnet", "lyra"], default="linear", help="Type of probe.")
     parser.add_argument("--tokenwise", action="store_true", default=False, help="Tokenwise probe (default: False).")
+    ### TODO refactor to hidden_size
     parser.add_argument("--hidden_dim", type=int, default=8192, help="Hidden dimension size.")
     parser.add_argument("--dropout", type=float, default=0.2, help="Dropout rate.")
     parser.add_argument("--n_layers", type=int, default=1, help="Number of layers.")

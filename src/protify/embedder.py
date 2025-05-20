@@ -3,13 +3,39 @@ import torch
 import warnings
 import sqlite3
 import gzip
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from dataclasses import dataclass
 from typing import Optional, Callable, List, Tuple
 from huggingface_hub import hf_hub_download
+
+from data.dataset_classes import SimpleProteinDataset
 from base_models.get_base_models import get_base_model
+from pooler import Pooler
 from utils import torch_load, print_message
+
+
+def pool_parti(X: torch.Tensor, attentions: Tuple[torch.Tensor], attention_mask: torch.Tensor) -> torch.Tensor:
+    # X: (bs, seq_len, d)
+    # attentions: num_layres of (bs, n_heads, seq_len, seq_len)
+    # attention_mask: (bs, seq_len)
+    bs, seq_len, _ = X.shape
+    attentions = torch.stack(attentions, dim=1).float() # (bs, n_layers, n_heads, seq_len, seq_len)
+    att_mask = attention_mask[:, None, None, None, :].expand(bs, 1, 1, seq_len, seq_len)
+    attentions = attentions * att_mask
+    attentions = attentions.mean(dim=2) # (bs, n_layers, seq_len, seq_len)
+    attentions = attentions.mean(dim=1) # (bs, seq_len, seq_len)
+    attentions = attentions.mean(dim=-1) # (bs, seq_len)
+    X = X * attentions.unsqueeze(-1)
+    attention_mask = attention_mask.unsqueeze(-1)
+    return (X * attention_mask).sum(dim=1) / attention_mask.sum(dim=1) # (bs, d)
+
+
+def build_collator(tokenizer) -> Callable[[List[str]], tuple[torch.Tensor, torch.Tensor]]:
+    def _collate_fn(sequences: List[str]) -> tuple[torch.Tensor, torch.Tensor]:
+        """Collate function for batching sequences."""
+        return tokenizer(sequences, return_tensors="pt", padding='longest', pad_to_multiple_of=8)
+    return _collate_fn
 
 
 @dataclass
@@ -38,107 +64,6 @@ class EmbeddingArguments:
         self.embed_dtype = embed_dtype
         self.sql = sql
         self.embedding_save_dir = embedding_save_dir
-
-
-class Pooler:
-    def __init__(self, pooling_types: List[str]):
-        self.pooling_types = pooling_types
-        self.pooling_options = {
-            'mean': self.mean_pooling,
-            'max': self.max_pooling,
-            'norm': self.norm_pooling,
-            'median': self.median_pooling,
-            'std': self.std_pooling,
-            'var': self.var_pooling,
-            'cls': self.cls_pooling,
-        }
-
-    def mean_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.mean(dim=1)
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).sum(dim=1) / attention_mask.sum(dim=1)
-
-    def max_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.max(dim=1).values
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).max(dim=1).values
-
-    def norm_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.norm(dim=1, p=2)
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).norm(dim=1, p=2)
-
-    def median_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.median(dim=1).values
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).median(dim=1).values
-    
-    def std_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.std(dim=1)
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).std(dim=1)
-    
-    def var_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.var(dim=1)
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).var(dim=1)
-
-    def cls_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        return emb[:, 0, :]
-
-    def __call__(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # [mean, max]
-        final_emb = []
-        for pooling_type in self.pooling_types:
-            final_emb.append(self.pooling_options[pooling_type](emb, attention_mask)) # (b, d)
-        return torch.cat(final_emb, dim=-1) # (b, n_pooling_types * d)
-
-
-def pool_parti(X: torch.Tensor, attentions: Tuple[torch.Tensor], attention_mask: torch.Tensor) -> torch.Tensor:
-    # X: (bs, seq_len, d)
-    # attentions: num_layres of (bs, n_heads, seq_len, seq_len)
-    # attention_mask: (bs, seq_len)
-    bs, seq_len, _ = X.shape
-    attentions = torch.stack(attentions, dim=1).float() # (bs, n_layers, n_heads, seq_len, seq_len)
-    att_mask = attention_mask[:, None, None, None, :].expand(bs, 1, 1, seq_len, seq_len)
-    attentions = attentions * att_mask
-    attentions = attentions.mean(dim=2) # (bs, n_layers, seq_len, seq_len)
-    attentions = attentions.mean(dim=1) # (bs, seq_len, seq_len)
-    attentions = attentions.mean(dim=-1) # (bs, seq_len)
-    X = X * attentions.unsqueeze(-1)
-    attention_mask = attention_mask.unsqueeze(-1)
-    return (X * attention_mask).sum(dim=1) / attention_mask.sum(dim=1) # (bs, d)
-
-
-### Dataset for Embedding
-class ProteinDataset(Dataset):
-    """Simple dataset for protein sequences."""
-    def __init__(self, sequences: List[str]):
-        self.sequences = sequences
-
-    def __len__(self) -> int:
-        return len(self.sequences)
-
-    def __getitem__(self, idx: int) -> str:
-        return self.sequences[idx]
-
-
-def build_collator(tokenizer) -> Callable[[List[str]], tuple[torch.Tensor, torch.Tensor]]:
-    def _collate_fn(sequences: List[str]) -> tuple[torch.Tensor, torch.Tensor]:
-        """Collate function for batching sequences."""
-        return tokenizer(sequences, return_tensors="pt", padding='longest', pad_to_multiple_of=8)
-    return _collate_fn
 
 
 class Embedder:
@@ -280,7 +205,7 @@ class Embedder:
             else:
                 return pooler(residue_embeddings, attention_mask)
 
-        dataset = ProteinDataset(to_embed)
+        dataset = SimpleProteinDataset(to_embed)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=collate_fn, shuffle=False)
 
         if self.sql:
