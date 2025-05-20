@@ -35,6 +35,7 @@ currently_supported_models = [
     'DPLM-3B',
     'DSM-150',
     'DSM-650',
+    'ProtCLM-1b'
     'OneHot-Protein',
     'OneHot-DNA',
     'OneHot-RNA',
@@ -102,6 +103,9 @@ def get_base_model(model_name: str):
     elif 'dplm' in model_name.lower():
         from .dplm import build_dplm_model
         return build_dplm_model(model_name)
+    elif 'protclm' in model_name.lower():
+        from .protCLM import build_protCLM
+        return build_protCLM(model_name)
     elif 'onehot' in model_name.lower():
         from .one_hot import build_one_hot_model
         return build_one_hot_model(model_name)
@@ -131,6 +135,9 @@ def get_base_model_for_training(model_name: str, tokenwise: bool = False, num_la
     elif 'dplm' in model_name.lower():
         from .dplm import get_dplm_for_training
         return get_dplm_for_training(model_name, tokenwise, num_labels, hybrid)
+    elif 'protclm' in model_name.lower():
+        from .protCLM import get_protCLM_for_training
+        return get_protCLM_for_training(model_name, tokenwise, num_labels, hybrid)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
@@ -157,6 +164,9 @@ def get_tokenizer(model_name: str):
     elif 'dplm' in model_name.lower():
         from .dplm import get_dplm_tokenizer
         return get_dplm_tokenizer(model_name)
+    elif 'protclm' in model_name.lower():
+        from .protCLM import get_protCLM_tokenizer
+        return get_protCLM_tokenizer(model_name)
     elif 'onehot' in model_name.lower():
         from .one_hot import get_one_hot_tokenizer
         return get_one_hot_tokenizer(model_name)
