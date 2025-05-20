@@ -239,24 +239,20 @@ class OneHotCollator:
         # Add X for unknown amino acids, and special CLS and EOS tokens
         alphabet = alphabet + "X"
         alphabet = list(alphabet)
-        alphabet.append('cls')
-        alphabet.append('eos')
         self.mapping = {token: idx for idx, token in enumerate(alphabet)}
         
     def __call__(self, batch):
         seqs = [ex[0] for ex in batch]
         labels = torch.stack([torch.tensor(ex[1]) for ex in batch])
         
-        # Find the longest sequence in the batch (plus 2 for CLS and EOS)
-        max_len = max(len(seq) for seq in seqs) + 2
+        # Find the longest sequence in the batch
+        max_len = max(len(seq) for seq in seqs)
         
         # One-hot encode and pad each sequence
-        batch_size = len(seqs)
-        one_hot_tensors = []
-        attention_masks = []
+        one_hot_tensors, attention_masks = [], []
         
         for seq in seqs:
-            seq = ['cls'] + list(seq) + ['eos']
+            seq = list(seq)
             # Create one-hot encoding for each sequence (including CLS and EOS)
             seq_len = len(seq)
             one_hot = torch.zeros(seq_len, len(self.alphabet))

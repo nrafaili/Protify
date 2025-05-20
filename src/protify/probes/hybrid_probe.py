@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from transformers import PreTrainedModel, PretrainedConfig
 from typing import List, Optional
-from embedder import Pooler
+from pooler import Pooler
 
 
 class HybridProbeConfig(PretrainedConfig):

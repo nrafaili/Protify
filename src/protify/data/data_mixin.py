@@ -12,10 +12,10 @@ from utils import print_message
 from .supported_datasets import supported_datasets, standard_data_benchmark
 
 
-AMINO_ACIDS = set('LAGVSERTIPDKQNFYMHWCXBUOZ* ')
-CODONS = set('aA@bB#$%rRnNdDcCeEqQ^G&ghHiIj+MmlJLkK(fFpPoO=szZwSXTtxWyYuvUV]}) ')
-DNA = set('ATCG ')
-RNA = set('AUCG ')
+AMINO_ACIDS = set('LAGVSERTIPDKQNFYMHWCXBUOZ*')
+CODONS = set('aA@bB#$%rRnNdDcCeEqQ^G&ghHiIj+MmlJLkK(fFpPoO=szZwSXTtxWyYuvUV]})')
+DNA = set('ATCG')
+RNA = set('AUCG')
 
 
 @dataclass
@@ -245,6 +245,8 @@ class DataMixin:
             data_name = data_path.split('/')[-1]
             print_message(f'Loading {data_name}')
             dataset = load_dataset(data_path)
+            if 'inverse' in data_name.lower():
+                dataset = dataset.rename_columns({'seqs': 'labels', 'labels': 'seqs'})
             ppi = 'SeqA' in dataset['train'].column_names
             print_message(f'PPI: {ppi}')
             try:

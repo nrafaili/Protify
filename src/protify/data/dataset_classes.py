@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset as TorchDataset
 from utils import print_message
 from tqdm.auto import tqdm
+from typing import List
 
 
 class PairEmbedsLabelsDatasetFromDisk(TorchDataset):
@@ -317,3 +318,15 @@ class PairStringLabelDataset(TorchDataset):
             seq_a, seq_b = seq_b, seq_a
         return seq_a, seq_b, self.labels[idx]
 
+
+class SimpleProteinDataset(TorchDataset):
+    """Simple dataset for protein sequences."""
+    def __init__(self, sequences: List[str]):
+        self.sequences = sequences
+
+    def __len__(self) -> int:
+        return len(self.sequences)
+
+    def __getitem__(self, idx: int) -> str:
+        return self.sequences[idx]
+    
