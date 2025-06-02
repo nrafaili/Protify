@@ -32,6 +32,7 @@ supported_datasets = {
     'PPA-ppi': 'Synthyra/ProteinProteinAffinity',
     'foldseek-fold': 'lhallee/foldseek_dataset',
     'foldseek-inverse': 'lhallee/foldseek_dataset',
+    'ec-active': 'lhallee/ec_active'
 }
 
 internal_datasets = {

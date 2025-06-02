@@ -5,7 +5,7 @@ from transformers import PreTrainedModel, PretrainedConfig
 from transformers.modeling_outputs import SequenceClassifierOutput
 
 from model_components.attention import AttentionPooler
-from model_components.transformer import Transformer
+from model_components.transformer import PTransformer
 from .losses import get_loss_fct
 
 
@@ -40,7 +40,7 @@ class RetrievalNet(PreTrainedModel):
     def __init__(self, config: RetrievalNetConfig):
         super().__init__(config)
         self.input_proj = nn.Linear(config.input_dim, config.hidden_dim)
-        self.transformer = Transformer(
+        self.transformer = PTransformer(
             hidden_size=config.hidden_dim,
             n_heads=config.n_heads,
             n_layers=config.n_layers,
@@ -66,12 +66,7 @@ class RetrievalNet(PreTrainedModel):
             output_attentions: Optional[bool] = False,
     ) -> SequenceClassifierOutput:
         x = self.input_proj(embeddings) # (bs, seq_len, hidden_dim)
-        batch_size, seq_len, _ = x.shape
-        
-        x = self.transformer(x, attention_mask) # (bs, seq_len, hidden_dim)
-        
-        if attention_mask is not None and attention_mask.ndim == 2:
-            attention_mask = attention_mask[:, None, None, :].expand(batch_size, 1, self.num_labels, seq_len).bool()
+        x, attentions = self.transformer(x, attention_mask) # (bs, seq_len, hidden_dim)
         x = self.pooler(x, attention_mask, output_attentions) # (bs, num_labels, hidden_dim)
         logits = self.output_proj(x).squeeze(-1) # (bs, num_labels)
         loss = None
@@ -87,5 +82,5 @@ class RetrievalNet(PreTrainedModel):
             loss=loss,
             logits=logits,
             hidden_states=None,
-            attentions=None
+            attentions=attentions
         )
