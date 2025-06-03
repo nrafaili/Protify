@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import List
 from .linear_probe import LinearProbe, LinearProbeConfig
 from .transformer_probe import TransformerForSequenceClassification, TransformerForTokenClassification, TransformerProbeConfig
-from .retrievalnet import RetrievalNet, RetrievalNetConfig
+from .retrievalnet import RetrievalNetForSequenceClassification, RetrievalNetForTokenClassification, RetrievalNetConfig
 from .lyra_probe import LyraForSequenceClassification, LyraForTokenClassification, LyraConfig
 
 
@@ -70,7 +70,10 @@ def get_probe(args: ProbeArguments):
         return TransformerForTokenClassification(config)
     elif args.probe_type == 'retrievalnet' and not args.tokenwise:
         config = RetrievalNetConfig(**args.__dict__)
-        return RetrievalNet(config)
+        return RetrievalNetForSequenceClassification(config)
+    elif args.probe_type == 'retrievalnet' and args.tokenwise:
+        config = RetrievalNetConfig(**args.__dict__)
+        return RetrievalNetForTokenClassification(config)
     elif args.probe_type == 'lyra' and not args.tokenwise:
         config = LyraConfig(**args.__dict__)
         return LyraForSequenceClassification(config)

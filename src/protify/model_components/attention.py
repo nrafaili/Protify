@@ -232,7 +232,6 @@ class AttentionPooler(nn.Module):
     def __init__(self, hidden_size: int, n_tokens: int = 1):
         super(AttentionPooler, self).__init__()
         self.Pq = nn.Parameter(torch.randn(1, n_tokens, hidden_size))
-        self.Wq = Linear(hidden_size, hidden_size)
         self.Wv = Linear(hidden_size, hidden_size)
         self.Wk = Linear(hidden_size, hidden_size)
         self.scale = 1.0 / math.sqrt(hidden_size)

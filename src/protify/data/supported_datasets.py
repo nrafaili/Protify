@@ -71,6 +71,7 @@ possible_with_vector_reps = [
 ]
 
 standard_data_benchmark = [
+    'ec-active',
     'EC',
     'GO-CC',
     'GO-BP',
