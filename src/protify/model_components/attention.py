@@ -225,47 +225,54 @@ class PAttention(nn.Module):
         return self.dropout(out)
 
 
-class AttentionPooler(nn.Module):
+class AttentionLogitsSequence(nn.Module):
     """
-    Cross-attention mechanism for token-parameter-attention (b, L, d) -> (b, n_tokens, L) -> (b, n_tokens, d)
+    Cross-attention mechanism for token-parameter-attention (b, L, d) -> (b, L, num_labels) -> (b, num_labels)
     """
-    def __init__(self, hidden_size: int, n_tokens: int = 1):
-        super(AttentionPooler, self).__init__()
-        self.Pq = nn.Parameter(torch.randn(1, n_tokens, hidden_size))
-        self.Wv = Linear(hidden_size, hidden_size)
-        self.Wk = Linear(hidden_size, hidden_size)
-        self.scale = 1.0 / math.sqrt(hidden_size)
+    def __init__(self, hidden_size: int, num_labels: int = 1):
+        super(AttentionLogitsSequence, self).__init__()
+        self.num_labels = num_labels
+        self.Wp = nn.Parameter(torch.randn(1, hidden_size, num_labels))
+        self.Wx = Linear(hidden_size, hidden_size)
 
     def forward(
         self,
         x: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
-        output_attentions: Optional[bool] = False,
+        **kwargs,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        eps = 1e-5
         b, L, d = x.size()
-        q = self.Pq # (b, n_tokens, d)
-        v = self.Wv(x)  # (b, L, d)
-        k = self.Wk(x)  # (b, L, d)
-        
-        if attention_mask is not None:
-            attention_mask = attention_mask[:, :, None].expand(b, L, self.n_tokens).bool()
-        
-        attention_probs = None
-        if output_attentions:
-            attn_bias = torch.ones(L, self.n_tokens, device=x.device)
-            if attention_mask is not None:
-                attn_bias = attn_bias.masked_fill(attention_mask, float("-inf"))
-            else:
-                attn_bias = attention_mask + attn_bias
+        p = self.Wp.expand(b, -1, -1) # (b, num_labels, d)
+        x = self.Wx(x) # (b, L, d)
 
-            scores = torch.matmul(q, k.transpose(-1, -2)) * self.scale  # (b, n_tokens, L)
-            scores += attn_bias
-            attention_probs = F.softmax(scores, dim=-1)
-            output = torch.matmul(attention_probs, v)  # (b, n_tokens, d)
-            return output, attention_probs
-        else:
-            output = F.scaled_dot_product_attention(q, k, v, attn_mask=attention_mask, is_causal=False) # (b, n_tokens, d)
-            return output, attention_probs
+        if attention_mask is not None:
+            attention_mask = attention_mask[:, :, None].expand(b, L, self.num_labels)
+
+        scores = torch.matmul(x, p) # (b, L, num_labels)
+        scores = (scores * attention_mask) + eps
+        probs = scores.softmax(dim=-1) # (b, L, num_labels)
+        logits = probs.mean(dim=1) # (b, num_labels)
+        return logits, probs
+
+
+class AttentionLogitsToken(nn.Module):
+    """
+    Cross-attention mechanism for token-parameter-attention (b, L, d) -> (b, L, num_labels)
+    """
+    def __init__(self, hidden_size: int, num_labels: int = 1):
+        super(AttentionLogitsToken, self).__init__()
+        self.num_labels = num_labels
+        self.Wp = nn.Parameter(torch.randn(1, hidden_size, num_labels))
+        self.Wx = Linear(hidden_size, hidden_size)
+        self.out_proj = Linear(hidden_size, 1)
+
+    def forward(self, x: torch.Tensor, **kwargs) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        b, L, d = x.size()
+        p = self.Wp.expand(b, -1, -1) # (b, num_labels, d)
+        x = self.Wx(x) # (b, L, d)
+        logits = torch.matmul(x, p) # (b, L, num_labels)
+        return logits
 
 
 class MultiHeadPAttention(nn.Module):
