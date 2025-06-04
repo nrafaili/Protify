@@ -5,7 +5,7 @@ from transformers import PreTrainedModel, PretrainedConfig
 from transformers.modeling_outputs import SequenceClassifierOutput
 
 from model_components.attention import AttentionLogitsSequence, AttentionLogitsToken, Linear
-from model_components.transformer import PTransformer
+from model_components.transformer import PTransformer, Transformer
 from .losses import get_loss_fct
 
 
@@ -40,13 +40,21 @@ class RetrievalNetForSequenceClassification(PreTrainedModel):
     def __init__(self, config: RetrievalNetConfig):
         super().__init__(config)
         self.input_proj = nn.Linear(config.input_dim, config.hidden_dim)
-        self.transformer = PTransformer(
+        #self.transformer = PTransformer(
+        #    hidden_size=config.hidden_dim,
+        #    n_heads=config.n_heads,
+        #    n_layers=config.n_layers,
+        #    expansion_ratio=config.expansion_ratio,
+        #    dropout=config.dropout,
+        #    rotary=True,
+        #)
+        self.transformer = Transformer(
             hidden_size=config.hidden_dim,
             n_heads=config.n_heads,
             n_layers=config.n_layers,
             expansion_ratio=config.expansion_ratio,
             dropout=config.dropout,
-            rotary=config.rotary,
+            rotary=True,
         )
         self.get_logits = AttentionLogitsSequence(hidden_size=config.hidden_dim, num_labels=config.num_labels)
         self.num_labels = config.num_labels
