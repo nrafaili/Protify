@@ -104,6 +104,7 @@ class TrainerArguments:
             metric_for_best_model='eval_loss',
             greater_is_better=False,
             seed=self.seed,
+            label_names=['labels'],
             **eval_strats
         )
 
@@ -138,6 +139,7 @@ class TrainerMixin:
             compute_metrics=compute_metrics,
             callbacks=[EarlyStoppingCallback(early_stopping_patience=self.trainer_args.patience)]
         )
+        trainer.can_return_loss = True
         metrics = trainer.evaluate(test_dataset)
         print_message(f'Initial metrics: {metrics}')
 
@@ -147,6 +149,11 @@ class TrainerMixin:
         print_message(f'Final validation metrics: {valid_metrics}')
 
         y_pred, y_true, test_metrics = trainer.predict(test_dataset)
+        if isinstance(y_pred, tuple):
+            y_pred = y_pred[0]
+        if isinstance(y_true, tuple):
+            y_true = y_true[0]
+
         y_pred, y_true = y_pred.astype(np.float32), y_true.astype(np.float32)
         print_message(f'y_pred: {y_pred.shape}\ny_true: {y_true.shape}\nFinal test metrics: \n{test_metrics}\n')
 
@@ -162,7 +169,8 @@ class TrainerMixin:
 
         if self.trainer_args.save:
             try:
-                trainer.model.push_to_hub(self.trainer_args.model_save_dir, private=True)
+                hub_path = os.path.join(self.full_args.hf_username, f"{data_name}_{model_name}_{log_id}")
+                trainer.model.push_to_hub(hub_path, private=True)
             except Exception as e:
                 print_message(f'Error saving model: {e}')
 
@@ -272,6 +280,8 @@ class TrainerMixin:
             ppi=False,
             log_id=None,
         ):
+        task_type = self.probe_args.task_type
+
         if ppi:
             DatasetClass = PairStringLabelDataset
             CollatorClass = PairCollator_input_ids
@@ -279,7 +289,7 @@ class TrainerMixin:
             DatasetClass = StringLabelDataset
             CollatorClass = StringLabelsCollator
 
-        data_collator = CollatorClass(tokenizer=tokenizer)
+        data_collator = CollatorClass(tokenizer=tokenizer, task_type=task_type)
 
         train_dataset = DatasetClass(hf_dataset=train_dataset, train=True)
         valid_dataset = DatasetClass(hf_dataset=valid_dataset, train=False)

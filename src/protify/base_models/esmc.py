@@ -3,8 +3,35 @@ We use the ESM++ implementation of ESMC, which is exactly equivalent but offers 
 """
 import torch
 import torch.nn as nn
-from typing import Optional
-from .FastPLMs.modeling_esm_plusplus import ESMplusplusModel, ESMplusplusForSequenceClassification, ESMplusplusForTokenClassification
+from typing import Optional, Union, List, Dict
+
+from .FastPLMs.modeling_esm_plusplus import (
+    ESMplusplusModel,
+    ESMplusplusForSequenceClassification,
+    ESMplusplusForTokenClassification,
+    EsmSequenceTokenizer
+)
+from .base_tokenizer import BaseSequenceTokenizer
+
+
+presets = {
+    'ESMC-300': 'Synthyra/ESMplusplus_small',
+    'ESMC-600': 'Synthyra/ESMplusplus_large',
+}
+
+
+class ESMTokenizerWrapper(BaseSequenceTokenizer):
+    def __init__(self, tokenizer: EsmSequenceTokenizer):
+        super().__init__(tokenizer)
+
+    def __call__(self, sequences: Union[str, List[str]], **kwargs) -> Dict[str, torch.Tensor]:
+        if isinstance(sequences, str):
+            sequences = [sequences]
+        kwargs.setdefault('return_tensors', 'pt')
+        kwargs.setdefault('padding', 'longest')
+        kwargs.setdefault('add_special_tokens', True)
+        tokenized = self.tokenizer(sequences, **kwargs)
+        return tokenized
 
 
 class ESMplusplusForEmbedding(nn.Module):
@@ -24,15 +51,15 @@ class ESMplusplusForEmbedding(nn.Module):
         else:
             return self.esm(input_ids, attention_mask=attention_mask).last_hidden_state
 
-presets = {
-    'ESMC-300': 'Synthyra/ESMplusplus_small',
-    'ESMC-600': 'Synthyra/ESMplusplus_large',
-}
+
+def get_esmc_tokenizer(preset: str):
+    tokenizer = EsmSequenceTokenizer()
+    return ESMTokenizerWrapper(tokenizer)
 
 
 def build_esmc_model(preset: str):
     model = ESMplusplusForEmbedding(presets[preset]).eval()
-    tokenizer = model.esm.tokenizer
+    tokenizer = get_esmc_tokenizer(preset)
     return model, tokenizer
 
 
@@ -45,11 +72,13 @@ def get_esmc_for_training(preset: str, tokenwise: bool = False, num_labels: int 
             model = ESMplusplusForTokenClassification.from_pretrained(model_path, num_labels=num_labels).eval()
         else:
             model = ESMplusplusForSequenceClassification.from_pretrained(model_path, num_labels=num_labels).eval()
-    tokenizer = model.tokenizer
+    tokenizer = get_esmc_tokenizer(preset)
     return model, tokenizer
 
 
 if __name__ == '__main__':
+    # py -m src.protify.base_models.esmc
     model, tokenizer = build_esmc_model('ESMC-300')
     print(model)
     print(tokenizer)
+    print(tokenizer('MEKVQYLTRSAIRRASTIEMPQQARQKLQNLFINFCLILICBBOLLICIIVMLL'))

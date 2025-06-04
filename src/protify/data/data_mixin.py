@@ -12,10 +12,10 @@ from utils import print_message
 from .supported_datasets import supported_datasets, standard_data_benchmark
 
 
-AMINO_ACIDS = set('LAGVSERTIPDKQNFYMHWCXBUOZ* ')
-CODONS = set('aA@bB#$%rRnNdDcCeEqQ^G&ghHiIj+MmlJLkK(fFpPoO=szZwSXTtxWyYuvUV]}) ')
-DNA = set('ATCG ')
-RNA = set('AUCG ')
+AMINO_ACIDS = set('LAGVSERTIPDKQNFYMHWCXBUOZ*')
+CODONS = set('aA@bB#$%rRnNdDcCeEqQ^G&ghHiIj+MmlJLkK(fFpPoO=szZwSXTtxWyYuvUV]})')
+DNA = set('ATCG')
+RNA = set('AUCG')
 
 
 @dataclass
@@ -139,7 +139,8 @@ class DataMixin:
     def process_datasets(
             self,
             hf_datasets: List[Tuple[Dataset, Dataset, Dataset, bool]],
-            data_names: List[str])-> Tuple[Dict[str, Tuple[Dataset, Dataset, Dataset, int, str, bool]], List[str]]:
+            data_names: List[str],
+        )-> Tuple[Dict[str, Tuple[Dataset, Dataset, Dataset, int, str, bool]], List[str]]:
         max_length = self._max_length
         datasets, all_seqs = {}, set()
         for dataset, data_name in zip(hf_datasets, data_names):
@@ -210,6 +211,7 @@ class DataMixin:
                 train_labels = train_set['labels']
                 unique_tags = set(tag for doc in train_labels for tag in doc)
                 tag2id = {tag: id for id, tag in enumerate(sorted(unique_tags))}
+                # add cls token to labels
                 train_set = train_set.map(lambda ex: {'labels': self._encode_labels(ex['labels'], tag2id=tag2id)})
                 valid_set = valid_set.map(lambda ex: {'labels': self._encode_labels(ex['labels'], tag2id=tag2id)})
                 test_set = test_set.map(lambda ex: {'labels': self._encode_labels(ex['labels'], tag2id=tag2id)})
@@ -243,6 +245,8 @@ class DataMixin:
             data_name = data_path.split('/')[-1]
             print_message(f'Loading {data_name}')
             dataset = load_dataset(data_path)
+            if 'inverse' in data_name.lower():
+                dataset = dataset.rename_columns({'seqs': 'labels', 'labels': 'seqs'})
             ppi = 'SeqA' in dataset['train'].column_names
             print_message(f'PPI: {ppi}')
             try:
@@ -282,10 +286,7 @@ class DataMixin:
 
     def get_embedding_dim_sql(self, save_path, test_seq):
         import sqlite3
-        if len(test_seq) > self._max_length:
-            test_seq_len = self._max_length + 2
-        else:
-            test_seq_len = len(test_seq)
+        test_seq_len = len(test_seq) + 2
         
         with sqlite3.connect(save_path) as conn:
             c = conn.cursor()
@@ -293,19 +294,23 @@ class DataMixin:
             test_embedding = c.fetchone()[0]
             test_embedding = torch.tensor(np.frombuffer(test_embedding, dtype=np.float32).reshape(1, -1))
         if self._full:
-            test_embedding = test_embedding.reshape(test_seq_len, -1)
+            try:
+                test_embedding = test_embedding.reshape(test_seq_len, -1)
+            except:
+                test_embedding = test_embedding.reshape(test_seq_len - 1, -1) # some pLMs have only one special token added
         embedding_dim = test_embedding.shape[-1]
         return embedding_dim
 
     def get_embedding_dim_pth(self, emb_dict, test_seq):
-        if len(test_seq) >= self._max_length:
-            test_seq_len = len(test_seq) + 2
-        else:
-            test_seq_len = len(test_seq)
+        test_seq_len = len(test_seq) + 2
 
         test_embedding = emb_dict[test_seq]
+        print(test_embedding.shape)
         if self._full:
-            test_embedding = test_embedding.reshape(test_seq_len, -1)
+            try:
+                test_embedding = test_embedding.reshape(test_seq_len, -1)
+            except:
+                test_embedding = test_embedding.reshape(test_seq_len - 1, -1) # some pLMs have only one special token added
         else:
             test_embedding = test_embedding.reshape(1, -1)
         embedding_dim = test_embedding.shape[-1]

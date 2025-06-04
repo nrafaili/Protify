@@ -1,25 +1,12 @@
 #!/usr/bin/env python3
-"""
-Create radar and bar plots for *all* datasets in a TSV.
-
-Rules
------
-* Classification datasets → plot **MCC**  (fallback: F1, Accuracy)
-* Regression    datasets → plot **R²**   (fallback: Spearman, Pearson)
-
-The final plots therefore mix task types on the same axes.
-Titles explicitly state that rule so readers know how to interpret numbers.
-"""
-
 from __future__ import annotations
-import argparse, json, math, os
-from pathlib import Path
-from typing import Dict, List, Tuple
-
+import argparse, json, math
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 
 MODEL_NAMES = {
@@ -36,53 +23,65 @@ MODEL_NAMES = {
     'ESM2-3B': r'$ESM2_{3B}$',
     'ESMC-300': r'$ESMC_{300M}$',
     'ESMC-600': r'$ESMC_{600M}$',
-    'ESM2-diff-150': r'$ESMdiff_{150M}$',
-    'ESM2-diffAV-150': r'$ESMdiffAV_{150M}$',
+    'ProtBert': r'$ProtBert_{420M}$',
+    'ProtT5': r'ProtT5-enc$_{2.8B}$',
+    'ProtT5-100M': r'$ProtT5_{100M}$',
+    'ANKH-Base': r'ANKH-enc$_{453M}$',
+    'ANKH-Large': r'ANKH-enc$_{1.2B}$',
+    'ANKH2-Large': r'ANKH2-enc$_{1.2B}$',
+    'DSM-150': r'$DSM_{150M}$',
+    'DSM-650': r'$DSM_{650M}$',
+    'GLM2-150': r'$GLM2_{150M}$',
+    'GLM2-650': r'$GLM2_{650M}$',
+    'DPLM-150': r'$DPLM_{150M}$',
+    'DPLM-650': r'$DPLM_{650M}$',
+    'DPLM-3B': r'$DPLM_{3B}$',
+    'ProtCLM-1b': r'$ProtCLM_{1B}$',
 }
 
 DATASET_NAMES = {
-    'EC': 'EC',
-    'GO-CC': r'$GO_{CC}$',
-    'GO-BP': r'$GO_{BP}$',
-    'GO-MF': r'$GO_{MF}$',
-    'MB': 'MB',
-    'DeepLoc-2': r'$DeepLoc_{2}$',
-    'DeepLoc-10': r'$DeepLoc_{10}$',
-    'enzyme-kcat': r'kcat',
-    'solubility': 'solubility',
-    'localization': 'localization',
-    'temperature-stability': 'temperature stability',
-    'peptide-HLA-MHC-affinity': 'peptide HLA MHC affinity',
-    'optimal-temperature': 'optimal temperature',
-    'optimal-ph': 'optimal pH',
-    'material-production': 'material production',
-    'fitness-prediction': 'fitness',
-    'number-of-folds': 'folds',
-    'cloning-clf': 'cloning',
-    'stability-prediction': 'stability',
-    'human-ppi': r'human PPI_{saprot}',
-    'human-ppi-pinui': r'human PPI_{pinui}',
-    'yest-ppi-pinui': r'yest PPI_{pinui}',
-    'shs27-ppi': 'SHS27k',
-    'shs148-ppi': 'SHS148k',
-    'PPA-ppi': r'PPI affinity_{bindwell}',
-    'synthyra-ppi': r'synthyra PPI_{bindwell}',
-    'SecondaryStructure-3': r'SS_{3}',
-    'SecondaryStructure-8': r'SS_{8}',
-    'fluorescence-prediction': 'fluorescence',
-    'plastic': 'plastic degradation',
-    'gold-ppi': r'bernett_{PPI}',
+    'EC_reg': 'EC',
+    'CC_reg': r'$GO_{CC}$',
+    'BP_reg': r'$GO_{BP}$',
+    'MF_reg': r'$GO_{MF}$',
+    'MB_reg': 'MB',
+    'DL2_reg': r'$DL_{2}$',
+    'DL10_reg': r'$DL_{10}$',
+    'enzyme_kcat': r'kcat',
+    'solubility_prediction': 'solubility',
+    'localization_prediction': 'localization',
+    'temperature_stability': 'temperature stability',
+    'peptide_HLA_MHC_affinity_ppi': 'peptide HLA MHC affinity',
+    'optimal_temperature': 'optimal temperature',
+    'optimal_ph': 'optimal pH',
+    'material_production': 'material production',
+    'fitness_prediction': 'fitness',
+    'fold_prediction': 'folds',
+    'cloning_clf': 'cloning',
+    'stability_prediction': 'stability',
+    'HPPI': 'Human-PPI',
+    'HPPI_PiNUI': r'$Human-PPI_{pinui}$',
+    'YPPI_PiNUI': r'$Yeast-PPI_{pinui}$',
+    'SHS27k': r'$SHS_{27k}$',
+    'SHS148k': r'$SHS_{148k}$',
+    'ProteinProteinAffinity': r'$PPI affinity_{bindwell}$',
+    'ppi_set_v5': r'$PPI_{synthyra}$',
+    'SS3': r'$SS_{3}$',
+    'SS8': r'$SS_{8}$',
+    'fluorescence_prediction': 'fluorescence',
+    'plastic_degradation_benchmark': r'$plastic degradation_{benchmark}$',
+    'bernett_gold_ppi': r'$Human PPI_{bernett}$',
 }
 
 
 CLS_PREFS: List[Tuple[str, str]] = [
-    ("mcc",       "MCC"),
     ("f1",        "F1"),
+    ("mcc",       "MCC"),
     ("accuracy",  "Accuracy"),
 ]
 REG_PREFS: List[Tuple[str, str]] = [
+    ("spearman",  "Spearman rho"),
     ("r_squared", "R²"),
-    ("spearman",  "Spearman ρ"),
     ("pearson",   "Pearson r"),
 ]
 
@@ -181,7 +180,7 @@ def bar_plot(datasets: List[str],
     dfp = pd.DataFrame(rows)
     plt.figure(figsize=(max(12, .8 * len(datasets)), 8))
     sns.barplot(dfp, x="Dataset", y="Score", hue="Model")
-    plt.title(f"{metric_name} across datasets (Cls→MCC, Reg→R²)")
+    plt.title(f"{metric_name} across datasets (Cls→F1, Reg→Spearman)")
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
     plt.savefig(outfile, dpi=450, bbox_inches="tight")
@@ -249,7 +248,16 @@ def heatmap_plot(datasets: List[str],
         vmax = None
         cbar_label = metric_name
 
-    plt.figure(figsize=(max(15, .8 * len(clean_model_names)), max(10, .5 * len(clean_dataset_names))))
+    # Calculate figure size based on content, making it just big enough for the data
+    # Use fixed cell size approach instead of scaling by data dimensions
+    cell_width = 1.0  # width per cell in inches
+    cell_height = 0.8  # height per cell in inches
+    
+    # Calculate figure dimensions
+    fig_width = max(8, cell_width * len(clean_model_names))
+    fig_height = max(6, cell_height * len(clean_dataset_names))
+    
+    plt.figure(figsize=(fig_width, fig_height))
     ax = sns.heatmap(plot_arr,  # rows: datasets, cols: models
                      xticklabels=clean_model_names,
                      yticklabels=clean_dataset_names,
@@ -259,16 +267,24 @@ def heatmap_plot(datasets: List[str],
                      vmax=vmax,
                      annot=True,
                      fmt='.2f',
-                     annot_kws={'size': 8},
+                     annot_kws={'size': 12},  # Increased font size for annotations
                      cbar_kws={'label': cbar_label})
     for i in range(plot_arr.shape[0]):
         for j in range(plot_arr.shape[1]):
             if mask[i, j]:
                 ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor='black', lw=2))
-    plt.title(f'{cbar_label} heatmap (Cls→MCC, Reg→R²)', pad=20)
-    plt.ylabel('Dataset')
-    plt.xlabel('Model')
-    plt.xticks(rotation=45, ha='right')
+    
+    # Set appropriate title based on the metric name
+    if "F1 / Spearman" in metric_name:
+        title = f'{cbar_label} Heatmap (Cls→F1, Reg→Spearman)'
+    else:
+        title = f'{cbar_label} Heatmap'
+        
+    plt.title(title, pad=20, fontsize=20)
+    plt.ylabel('Dataset', fontsize=16)
+    plt.xlabel('Model', fontsize=16)
+    plt.xticks(rotation=45, ha='right', fontsize=12)
+    plt.yticks(rotation=0, fontsize=12)  # Changed rotation to 0 for better readability
     plt.tight_layout()
     plt.savefig(outfile, dpi=450, bbox_inches='tight')
     plt.close()
@@ -291,11 +307,13 @@ def create_plots(tsv: str, outdir: str):
 
     # Resolve metric per-dataset (MCC or R², w/ fallbacks).
     datasets, scores_by_model = [], {m: [] for m in models}
+    dataset_types = []  # Track which type each dataset is
 
     for _, row in df.iterrows():
         name = row["dataset"]
         metrics0 = row[models[0]]
         task = "regression" if is_regression(metrics0) else "classification"
+        dataset_types.append(task)
         prefs = REG_PREFS if task == "regression" else CLS_PREFS
 
         try:
@@ -311,6 +329,38 @@ def create_plots(tsv: str, outdir: str):
 
     if not datasets:
         raise RuntimeError("No plottable datasets found.")
+
+    # Check if we have only one type of dataset
+    only_classification = all(t == "classification" for t in dataset_types)
+    only_regression = all(t == "regression" for t in dataset_types)
+
+    # Order datasets according to DATASET_NAMES keys
+    ordered_datasets = []
+    ordered_scores = {m: [] for m in models}
+    ordered_types = []  # Keep track of ordered dataset types
+    
+    # First add datasets that are in DATASET_NAMES in their defined order
+    for ds in DATASET_NAMES.keys():
+        if ds in datasets:
+            idx = datasets.index(ds)
+            ordered_datasets.append(ds)
+            ordered_types.append(dataset_types[idx])
+            for m in models:
+                ordered_scores[m].append(scores_by_model[m][idx])
+    
+    # Then add any remaining datasets that weren't in DATASET_NAMES
+    for ds in datasets:
+        if ds not in ordered_datasets:
+            ordered_datasets.append(ds)
+            idx = datasets.index(ds)
+            ordered_types.append(dataset_types[idx])
+            for m in models:
+                ordered_scores[m].append(scores_by_model[m][idx])
+    
+    # Replace original lists with ordered ones
+    datasets = ordered_datasets
+    scores_by_model = ordered_scores
+    dataset_types = ordered_types
 
     # assemble lists in model order
     plot_matrix = [scores_by_model[m] for m in models]
@@ -333,7 +383,17 @@ def create_plots(tsv: str, outdir: str):
     heatmap_path = outdir / f"{fig_tag}_heatmap_all.png"
     heatmap_path_norm = outdir / f"{fig_tag}_heatmap_all_normalized.png"
 
-    subtitle = "Classification datasets plot MCC; Regression datasets plot R²"
+    # Set subtitle and metric name based on dataset types
+    if only_classification:
+        subtitle = "Classification datasets plot F1"
+        metric_name = "F1"
+    elif only_regression:
+        subtitle = "Regression datasets plot Spearman rho"
+        metric_name = "Spearman rho"
+    else:
+        subtitle = "Classification datasets plot F1; Regression datasets plot Spearman rho"
+        metric_name = "F1 / Spearman rho"
+    
     # Radar plot keeps original order
     plot_radar(categories=datasets,
                models=models,
@@ -348,16 +408,16 @@ def create_plots(tsv: str, outdir: str):
                outfile=radar_path_norm,
                normalize=True)
     # Bar and heatmap use sorted order
-    bar_plot(datasets, sorted_models, sorted_plot_matrix, "Score (MCC / R²)", bar_path)
+    bar_plot(datasets, sorted_models, sorted_plot_matrix, metric_name, bar_path)
     # Normalized bar plot
     # For bar plot normalization, use min-max per dataset (column-wise normalization)
     arr = np.asarray(sorted_plot_matrix)
     rng = np.where(arr.ptp(0) == 0, 1, arr.ptp(0))
     arr_norm = (arr - arr.min(0)) / rng
-    bar_plot(datasets, sorted_models, arr_norm.tolist(), "Score (MCC / R²) (Normalized)", bar_path_norm)
+    bar_plot(datasets, sorted_models, arr_norm.tolist(), metric_name + " (Normalized)", bar_path_norm)
     # Heatmap
-    heatmap_plot(datasets, sorted_models, sorted_plot_matrix, "Score (MCC / R²)", heatmap_path, normalize=False)
-    heatmap_plot(datasets, sorted_models, sorted_plot_matrix, "Score (MCC / R²)", heatmap_path_norm, normalize=True)
+    heatmap_plot(datasets, sorted_models, sorted_plot_matrix, metric_name, heatmap_path, normalize=False)
+    heatmap_plot(datasets, sorted_models, sorted_plot_matrix, metric_name, heatmap_path_norm, normalize=True)
 
     print(f"Radar saved to {radar_path}")
     print(f"Radar (normalized) saved to {radar_path_norm}")

@@ -40,19 +40,58 @@ class StringCollator:
 
 
 class StringLabelsCollator:
-    def __init__(self, tokenizer, **kwargs):
+    def __init__(self, tokenizer, task_type='tokenwise', **kwargs):
         self.tokenizer = tokenizer
-        
+        self.task_type = task_type
+
     def __call__(self, batch: List[Tuple[str, Union[float, int]]]) -> Dict[str, torch.Tensor]:
         seqs = [ex[0] for ex in batch]
-        labels = torch.stack([torch.tensor(ex[1]) for ex in batch])
-        batch = self.tokenizer(seqs,
-                          padding='longest',
-                          truncation=False,
-                          return_tensors='pt',
-                          add_special_tokens=True)
-        batch['labels'] = labels
-        return batch
+        labels = [ex[1] for ex in batch]
+
+        # Tokenize the sequences
+        batch_encoding = self.tokenizer(
+            seqs,
+            padding='longest',
+            truncation=False,
+            return_tensors='pt',
+            add_special_tokens=True
+        )
+        
+        # Handle labels based on tokenwise flag
+        if self.task_type == 'tokenwise':
+            # For token-wise labels, we need to pad to match the tokenized sequence length
+            attention_mask = batch_encoding['attention_mask']
+            lengths = [torch.sum(attention_mask[i]).item() for i in range(len(batch))]
+            max_length = max(lengths)
+
+            padded_labels = []
+            for label in labels:
+                if not isinstance(label, torch.Tensor):
+                    label = torch.tensor(label)
+
+                label = label.flatten()
+                padding_size = max_length - len(label)
+                # Pad or truncate labels to match tokenized sequence length
+                if padding_size > 0:
+                    # Pad with -100 (ignored by loss functions)
+                    padding = torch.full((padding_size,), -100, dtype=label.dtype)
+                    padded_label = torch.cat((label, padding))
+                else:
+                    padded_label = label[:max_length]
+                padded_labels.append(padded_label)
+            
+            # Stack all padded labels
+            batch_encoding['labels'] = torch.stack(padded_labels)
+        else:
+            # For sequence-level labels, just stack them
+            batch_encoding['labels'] = torch.stack([torch.tensor(ex[1]) for ex in batch])
+
+        if self.task_type == 'multilabel':
+            batch_encoding['labels'] = batch_encoding['labels'].float()
+        else:
+            batch_encoding['labels'] = batch_encoding['labels'].long()
+        
+        return batch_encoding
 
 
 class EmbedsLabelsCollator:
@@ -66,25 +105,36 @@ class EmbedsLabelsCollator:
             labels = [ex[1] for ex in batch]
             
             # Find max sequence length for padding
-            max_len = max(embed.size(0) for embed in embeds)
+            max_length = max(embed.size(0) for embed in embeds)
             
-            embeds, attention_mask = _pad_matrix_embeds(embeds, max_len)
+            embeds, attention_mask = _pad_matrix_embeds(embeds, max_length)
             
             # Pad labels
             if self.task_type == 'tokenwise':
                 padded_labels = []
                 for label in labels:
-                    padding_size = max_len - label.size(0)
+                    if not isinstance(label, torch.Tensor):
+                        label = torch.tensor(label)
+
+                    label = label.flatten()
+                    padding_size = max_length - len(label)
                     if padding_size > 0:
                         # Use -100 as padding value for labels (ignored by loss functions)
                         padding = torch.full((padding_size,), -100, dtype=label.dtype)
-                        padded_label = torch.cat((label.squeeze(-1), padding))
+                        padded_label = torch.cat((label, padding))
                     else:
-                        padded_label = label.squeeze(-1)
+                        padded_label = label[:max_length]
                     padded_labels.append(padded_label)
+            else:
+                padded_labels = labels
             
             labels = torch.stack(padded_labels)
-            
+
+            if self.task_type == 'multilabel':
+                labels = labels.float()
+            else:
+                labels = labels.long()
+
             return {
                 'embeddings': embeds,
                 'attention_mask': attention_mask,
@@ -93,7 +143,12 @@ class EmbedsLabelsCollator:
         else:
             embeds = torch.stack([ex[0] for ex in batch])
             labels = torch.stack([ex[1] for ex in batch])
-        
+
+            if self.task_type == 'multilabel':
+                labels = labels.float()
+            else:
+                labels = labels.long()
+
             return {
                 'embeddings': embeds,
                 'labels': labels
@@ -184,24 +239,20 @@ class OneHotCollator:
         # Add X for unknown amino acids, and special CLS and EOS tokens
         alphabet = alphabet + "X"
         alphabet = list(alphabet)
-        alphabet.append('cls')
-        alphabet.append('eos')
         self.mapping = {token: idx for idx, token in enumerate(alphabet)}
         
     def __call__(self, batch):
         seqs = [ex[0] for ex in batch]
         labels = torch.stack([torch.tensor(ex[1]) for ex in batch])
         
-        # Find the longest sequence in the batch (plus 2 for CLS and EOS)
-        max_len = max(len(seq) for seq in seqs) + 2
+        # Find the longest sequence in the batch
+        max_len = max(len(seq) for seq in seqs)
         
         # One-hot encode and pad each sequence
-        batch_size = len(seqs)
-        one_hot_tensors = []
-        attention_masks = []
+        one_hot_tensors, attention_masks = [], []
         
         for seq in seqs:
-            seq = ['cls'] + list(seq) + ['eos']
+            seq = list(seq)
             # Create one-hot encoding for each sequence (including CLS and EOS)
             seq_len = len(seq)
             one_hot = torch.zeros(seq_len, len(self.alphabet))

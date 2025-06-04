@@ -16,12 +16,12 @@ from main import MainProcess
 from concurrent.futures import ThreadPoolExecutor
 from data.data_mixin import DataArguments
 from probes.scikit_classes import ScikitArguments
-from logger import log_method_calls
 from utils import print_message, print_done, print_title
 from visualization.plot_result import create_plots
 
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 
 class BackgroundTask:
@@ -55,7 +55,7 @@ class GUI(MainProcess):
         self.master.title("Settings GUI")
         self.master.geometry("600x800")
 
-        icon = tk.PhotoImage(file="Protify_logo.png")
+        icon = tk.PhotoImage(file="protify_logo.png")
         # Set the window icon
         self.master.iconphoto(True, icon)
 
@@ -256,7 +256,7 @@ class GUI(MainProcess):
     def build_model_tab(self):
         ttk.Label(self.model_tab, text="Model Names:").grid(row=0, column=0, padx=10, pady=5, sticky="nw")
 
-        self.model_listbox = tk.Listbox(self.model_tab, selectmode="extended", height=10)
+        self.model_listbox = tk.Listbox(self.model_tab, selectmode="extended", height=30)
         for model_name in standard_models:
             self.model_listbox.insert(tk.END, model_name)
         self.model_listbox.grid(row=0, column=1, padx=10, pady=5, sticky="nw")
@@ -380,10 +380,10 @@ class GUI(MainProcess):
         combo_probe = ttk.Combobox(
             self.probe_tab,
             textvariable=self.settings_vars["probe_type"],
-            values=["linear", "transformer", "crossconv"]
+            values=["linear", "transformer", "retrievalnet", "lyra"]
         )
         combo_probe.grid(row=0, column=1, padx=10, pady=5)
-        self.add_help_button(self.probe_tab, 0, 2, "Type of probe architecture to use (linear, transformer, or crossconv).")
+        self.add_help_button(self.probe_tab, 0, 2, "Type of probe architecture to use (linear, transformer, or retrievalnet).")
 
         # Tokenwise
         ttk.Label(self.probe_tab, text="Tokenwise:").grid(row=1, column=0, padx=10, pady=5, sticky="w")

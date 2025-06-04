@@ -4,6 +4,28 @@ import yaml
 import torch
 from torchinfo import summary
 from types import SimpleNamespace
+
+# Needs to happen before any HF imports
+set_hf_home = input("Set HF home? (y/n): ")
+if set_hf_home.lower().strip() == 'y':
+    import pathlib
+    base_path = input("Enter base path: ")
+    cache_root = f"{base_path}/hf_cache"
+    tmp_root   = f"{base_path}/tmp"
+    pathlib.Path(cache_root).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(tmp_root).mkdir(parents=True, exist_ok=True)
+
+    os.environ["HF_HOME"]            = cache_root
+    os.environ["HF_DATASETS_CACHE"]  = f"{cache_root}/datasets"
+    os.environ["TRANSFORMERS_CACHE"] = f"{cache_root}/transformers" # this is deprecated, but does not hurt anything
+    os.environ["HF_HUB_CACHE"]       = f"{cache_root}/hub"
+    print(f"HF_HOME: {os.environ['HF_HOME']}")
+    print(f"HF_DATASETS_CACHE: {os.environ['HF_DATASETS_CACHE']}")
+    print(f"TRANSFORMERS_CACHE: {os.environ['TRANSFORMERS_CACHE']}")
+    print(f"HF_HUB_CACHE: {os.environ['HF_HUB_CACHE']}")
+else:
+    print("HF home not set, continuing with default settings")
+
 from probes.get_probe import ProbeArguments, get_probe
 from base_models.get_base_models import BaseModelArguments, get_tokenizer, get_base_model_for_training
 from base_models.utils import wrap_lora
@@ -14,6 +36,10 @@ from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
 from utils import torch_load, print_message
 from visualization.plot_result import create_plots
+
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 
 class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
@@ -224,6 +250,8 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
                 emb_dict = torch_load(save_path)
                 input_dim = self.get_embedding_dim_pth(emb_dict, test_seq)
 
+            print(f'Input dim: {input_dim}')
+
             # get tokenizer
             tokenizer = get_tokenizer(model_name)
 
@@ -324,8 +352,9 @@ def parse_arguments():
     parser.add_argument("--model_names", nargs="+", default=["ESM2-8"], help="List of model names to use.")
 
     # ----------------- ProbeArguments ----------------- #
-    parser.add_argument("--probe_type", choices=["linear", "transformer", "crossconv"], default="linear", help="Type of probe.")
+    parser.add_argument("--probe_type", choices=["linear", "transformer", "retrievalnet", "lyra"], default="linear", help="Type of probe.")
     parser.add_argument("--tokenwise", action="store_true", default=False, help="Tokenwise probe (default: False).")
+    ### TODO refactor to hidden_size
     parser.add_argument("--hidden_dim", type=int, default=8192, help="Hidden dimension size.")
     parser.add_argument("--dropout", type=float, default=0.2, help="Dropout rate.")
     parser.add_argument("--n_layers", type=int, default=1, help="Number of layers.")
@@ -370,6 +399,11 @@ def parse_arguments():
     parser.add_argument("--probe_grad_accum", type=int, default=1, help='Gradient accumulation steps for probe training.')
     parser.add_argument("--base_grad_accum", type=int, default=8, help='Gradient accumulation steps for base model training.')
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate.")
+    ### TODO integrate
+    #parser.add_argument("--probe_lr", type=float, default=1e-4, help="Learning rate for probe training.")
+    #parser.add_argument("--base_lr", type=float, default=1e-5, help="Learning rate for base model training.")
+    #parser.add_argument("--lr_scheduler", type=str, default='cosine', help='Learning rate scheduler.')
+    #parser.add_argument("--optimizer", type=str, default='adamw', help='Optimizer.')
     parser.add_argument("--weight_decay", type=float, default=0.00, help="Weight decay.")
     parser.add_argument("--patience", type=int, default=1, help="Patience for early stopping.")
     parser.add_argument("--seed", type=int, default=42, help="Seed for random number generation.")

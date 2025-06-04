@@ -3,8 +3,36 @@ We use the FastESM2 implementation of ESM2, which is exactly equivalent but uses
 """
 import torch
 import torch.nn as nn
-from typing import Optional
+from typing import Optional, Union, List, Dict
+from transformers import EsmTokenizer
+
 from .FastPLMs.modeling_fastesm import FastEsmModel, FastEsmForSequenceClassification, FastEsmForTokenClassification
+from .base_tokenizer import BaseSequenceTokenizer
+
+
+presets = {
+    'ESM2-8': 'Synthyra/ESM2-8M',
+    'ESM2-35': 'Synthyra/ESM2-35M',
+    'ESM2-150': 'Synthyra/ESM2-150M',
+    'ESM2-650': 'Synthyra/ESM2-650M',
+    'ESM2-3B': 'Synthyra/ESM2-3B',
+    'DSM-150': 'GleghornLab/ESM_diff_150',
+    'DSM-650': 'GleghornLab/ESM_diff_650',
+}
+
+
+class ESM2TokenizerWrapper(BaseSequenceTokenizer):
+    def __init__(self, tokenizer: EsmTokenizer):
+        super().__init__(tokenizer)
+
+    def __call__(self, sequences: Union[str, List[str]], **kwargs) -> Dict[str, torch.Tensor]:
+        if isinstance(sequences, str):
+            sequences = [sequences]
+        kwargs.setdefault('return_tensors', 'pt')
+        kwargs.setdefault('padding', 'longest')
+        kwargs.setdefault('add_special_tokens', True)
+        tokenized = self.tokenizer(sequences, **kwargs)
+        return tokenized
 
 
 class FastEsmForEmbedding(nn.Module):
@@ -25,20 +53,13 @@ class FastEsmForEmbedding(nn.Module):
             return self.esm(input_ids, attention_mask=attention_mask).last_hidden_state
 
 
-presets = {
-    'ESM2-8': 'Synthyra/ESM2-8M',
-    'ESM2-35': 'Synthyra/ESM2-35M',
-    'ESM2-150': 'Synthyra/ESM2-150M',
-    'ESM2-650': 'Synthyra/ESM2-650M',
-    'ESM2-3B': 'Synthyra/ESM2-3B',
-    'ESM2-diff-150': 'Synthyra/esm_diff_150',
-    'ESM2-diffAV-150': 'Synthyra/esm_diff_av_150_41000'
-}
+def get_esm2_tokenizer(preset: str):
+    return ESM2TokenizerWrapper(EsmTokenizer.from_pretrained('facebook/esm2_t6_8M_UR50D'))
 
 
 def build_esm2_model(preset: str):
     model = FastEsmForEmbedding(presets[preset]).eval()
-    tokenizer = model.esm.tokenizer
+    tokenizer = get_esm2_tokenizer(preset)
     return model, tokenizer
 
 
@@ -51,11 +72,13 @@ def get_esm2_for_training(preset: str, tokenwise: bool = False, num_labels: int 
             model = FastEsmForTokenClassification.from_pretrained(model_path, num_labels=num_labels).eval()
         else:
             model = FastEsmForSequenceClassification.from_pretrained(model_path, num_labels=num_labels).eval()
-    tokenizer = model.tokenizer
+    tokenizer = get_esm2_tokenizer(preset)
     return model, tokenizer
 
 
 if __name__ == '__main__':
+    # py -m src.protify.base_models.esm2
     model, tokenizer = build_esm2_model('ESM2-8')
     print(model)
     print(tokenizer)
+    print(tokenizer('MEKVQYLTRSAIRRASTIEMPQQARQKLQNLFINFCLILICBBOLLICIIVMLL'))

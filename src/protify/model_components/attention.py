@@ -1,12 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 from functools import partial
 from einops import rearrange, repeat
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 
 Linear = partial(nn.Linear, bias=False)
+LayerNorm = partial(nn.LayerNorm, bias=False)
 
 
 def rotate_half(x, interleaved=False):
@@ -163,11 +165,11 @@ class MultiHeadAttention(nn.Module):
         self.n_heads = n_heads
         self.d_head = self.hidden_size // self.n_heads
         self.layernorm_qkv = nn.Sequential(
-            nn.LayerNorm(hidden_size), Linear(hidden_size, hidden_size * 3)
+            LayerNorm(hidden_size), Linear(hidden_size, hidden_size * 3)
         )
         self.out_proj = Linear(hidden_size, hidden_size)
-        self.q_ln = nn.LayerNorm(hidden_size, bias=False)
-        self.k_ln = nn.LayerNorm(hidden_size, bias=False)
+        self.q_ln = LayerNorm(hidden_size, bias=False)
+        self.k_ln = LayerNorm(hidden_size, bias=False)
         self.reshaper = partial(rearrange, pattern="b s (h d) -> b h s d", h=n_heads)
         self.rotary = RotaryEmbedding(hidden_size // n_heads) if rotary else None
 
@@ -192,38 +194,131 @@ class MultiHeadAttention(nn.Module):
         return self.out_proj(a) # (bs, seq_len, hidden_size)
 
 
-class AttentionPooler(nn.Module):
+class PAttention(nn.Module):
     """
-    Cross-attention mechanism for pooling (b, L, d) -> (b, n_tokens, d_pooled)
+    Cross-attention mechanism for token-parameter-attention (b, L, d) -> (b, L, n_tokens) ->  (b, L, d)
     """
     def __init__(
             self,
             hidden_size: int,
-            n_tokens: int = 1,
-            n_heads: int = 16,
+            n_tokens: int,
+            dropout: float = 0.2,
     ):
-        super(AttentionPooler, self).__init__()
-        assert hidden_size % n_heads == 0, "hidden_size must be divisible by n_heads"
-        self.d_head = hidden_size // n_heads
-        self.Q = nn.Parameter(torch.randn(1, n_tokens, hidden_size))
+        super(PAttention, self).__init__()
+        self.n_tokens = n_tokens
         self.Wq = Linear(hidden_size, hidden_size)
-        self.Wv = Linear(hidden_size, hidden_size)
-        self.Wk = Linear(hidden_size, hidden_size)
-        self.Wo = Linear(hidden_size, hidden_size)
-        self.reshaper = partial(rearrange, pattern="b s (h d) -> b h s d", h=n_heads)
+        self.Pk = nn.Parameter(torch.randn(1, n_tokens, hidden_size))
+        self.Pv = nn.Parameter(torch.randn(1, n_tokens, hidden_size))
+        self.dropout = nn.Dropout(dropout)
 
     def forward(
         self,
         x: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        q = self.Wq(self.Q).expand(x.size(0), -1, -1)  # (b, n_tokens, d)
-        v = self.Wv(x)  # (b, L, d)
-        k = self.Wk(x)  # (b, L, d)
-        q, k, v = map(self.reshaper, (q, k, v))  # (b, n_heads, n_tokens, d_head) (b, n_heads, L, d_head)
-        attn = F.scaled_dot_product_attention(
-            q, k, v, attn_mask=attention_mask, is_causal=False
-        ) # (b, n_heads, n_tokens, d_head)
-        attn = rearrange(attn, "b h s d -> b s (h d)")  # (b, n_tokens, n_heads * d_head)
-        return self.Wo(attn)  # (b, n_tokens, d_pooled)
-    
+        b, L, _ = x.size()
+        if attention_mask is not None:
+            attention_mask = attention_mask[:, None, :].expand(b, self.n_token, self.L).bool()
+        
+        q = self.Wq(x) # (b, L, d)
+        out = F.scaled_dot_product_attention(q, self.Pk, self.Pv, attn_mask=attention_mask, is_causal=False) # (b, L, d)
+        return self.dropout(out)
+
+
+class AttentionLogitsSequence(nn.Module):
+    """
+    Cross-attention mechanism for token-parameter-attention (b, L, d) -> (b, L, num_labels) -> (b, num_labels)
+    """
+    def __init__(self, hidden_size: int, num_labels: int = 1):
+        super(AttentionLogitsSequence, self).__init__()
+        self.num_labels = num_labels
+        self.Wp = nn.Parameter(torch.randn(1, hidden_size, num_labels))
+        self.Wx = Linear(hidden_size, hidden_size)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        **kwargs,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        eps = 1e-5
+        b, L, d = x.size()
+        p = self.Wp.expand(b, -1, -1) # (b, num_labels, d)
+        x = self.Wx(x) # (b, L, d)
+
+        if attention_mask is not None:
+            attention_mask = attention_mask[:, :, None].expand(b, L, self.num_labels)
+
+        scores = torch.matmul(x, p) # (b, L, num_labels)
+        scores = (scores * attention_mask) + eps
+        probs = scores.softmax(dim=-1) # (b, L, num_labels)
+        logits = probs.mean(dim=1) # (b, num_labels)
+        return logits, probs
+
+
+class AttentionLogitsToken(nn.Module):
+    """
+    Cross-attention mechanism for token-parameter-attention (b, L, d) -> (b, L, num_labels)
+    """
+    def __init__(self, hidden_size: int, num_labels: int = 1):
+        super(AttentionLogitsToken, self).__init__()
+        self.num_labels = num_labels
+        self.Wp = nn.Parameter(torch.randn(1, hidden_size, num_labels))
+        self.Wx = Linear(hidden_size, hidden_size)
+        self.out_proj = Linear(hidden_size, 1)
+
+    def forward(self, x: torch.Tensor, **kwargs) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        b, L, d = x.size()
+        p = self.Wp.expand(b, -1, -1) # (b, num_labels, d)
+        x = self.Wx(x) # (b, L, d)
+        logits = torch.matmul(x, p) # (b, L, num_labels)
+        return logits
+
+
+class MultiHeadPAttention(nn.Module):
+    def __init__(
+            self,
+            hidden_size: int,
+            n_heads: int,
+            n_tokens: int,
+            dropout: float = 0.2,
+            rotary: bool = True,
+            causal: bool = False,
+    ):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.n_heads = n_heads
+        self.d_head = self.hidden_size // self.n_heads
+        self.Wq = PAttention(hidden_size, n_tokens=n_tokens, dropout=dropout)
+        self.Wk = PAttention(hidden_size, n_tokens=n_tokens, dropout=dropout)
+        self.Wv = PAttention(hidden_size, n_tokens=n_tokens, dropout=dropout)
+        self.out_proj = Linear((hidden_size // n_heads) * n_heads, hidden_size)
+        self.q_ln = LayerNorm(hidden_size)
+        self.k_ln = LayerNorm(hidden_size)
+        self.reshaper = partial(rearrange, pattern="b s (h d) -> b h s d", h=n_heads)
+        self.rotary = RotaryEmbedding(hidden_size // n_heads) if rotary else None
+        self.causal = causal
+
+    def _apply_rotary(self, q: torch.Tensor, k: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        q = q.unflatten(-1, (self.n_heads, self.d_head))
+        k = k.unflatten(-1, (self.n_heads, self.d_head))
+        q, k = self.rotary(q, k)
+        q = q.flatten(-2, -1)
+        k = k.flatten(-2, -1)
+        return q, k
+
+    def forward(self, x: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        # attention mask already prepped for sdpa shape (bs, 1, seq_len, seq_len)
+        b, L, _ = x.shape
+        if attention_mask is not None and attention_mask.dim() == 2:
+            attention_mask = attention_mask[:, None, None, :].expand(b, 1, L, L).bool()
+        q = self.Wq(x)
+        k = self.Wk(x)
+        v = self.Wv(x)
+        q, k = self.q_ln(q).to(q.dtype), self.k_ln(k).to(q.dtype)
+        if self.rotary:
+            q, k = self._apply_rotary(q, k)
+        q, k, v = map(self.reshaper, (q, k, v)) # (bs, n_heads, seq_len, d_head)
+        a = F.scaled_dot_product_attention(q, k, v, attention_mask if not self.causal else None, is_causal=self.causal) # (bs, n_heads, seq_len, d_head)
+        a = rearrange(a, "b h s d -> b s (h d)") # (bs, seq_len, n_heads * d_head)
+        return self.out_proj(a) # (bs, seq_len, hidden_size)
