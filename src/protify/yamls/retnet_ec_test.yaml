@@ -16,13 +16,15 @@ plots_dir: plots
 replay_path: null
 pretrained_probe_path: null
 
+hf_home: /mnt/batch/tasks/shared/LS_root/mounts/clusters/lhallee-misc/code/
+
 # DataArgum
 ents:
 delimiter: ','
 col_names:
   - seqs
   - labels
-max_length: !!int 2048
+max_length: !!int 512
 trim: !!bool false
 data_names:
   - ec-active
