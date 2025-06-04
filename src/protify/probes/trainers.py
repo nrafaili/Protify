@@ -45,6 +45,7 @@ class TrainerArguments:
             plots_dir: str = None,
             full_finetuning: bool = False,
             hybrid_probe: bool = False,
+            num_workers: int = 0,
             **kwargs
     ):
         self.model_save_dir = model_save_dir
@@ -64,6 +65,7 @@ class TrainerArguments:
         self.plots_dir = plots_dir
         self.full_finetuning = full_finetuning
         self.hybrid_probe = hybrid_probe
+        self.num_workers = num_workers
 
     def __call__(self, probe: Optional[bool] = True):
         if self.train_data_size > 50000:
@@ -105,6 +107,7 @@ class TrainerArguments:
             greater_is_better=False,
             seed=self.seed,
             label_names=['labels'],
+            dataloader_num_workers=self.num_workers,
             **eval_strats
         )
 

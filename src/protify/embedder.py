@@ -6,29 +6,13 @@ import gzip
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from dataclasses import dataclass
-from typing import Optional, Callable, List, Tuple
+from typing import Optional, Callable, List
 from huggingface_hub import hf_hub_download
 
 from data.dataset_classes import SimpleProteinDataset
 from base_models.get_base_models import get_base_model
 from pooler import Pooler
 from utils import torch_load, print_message
-
-
-def pool_parti(X: torch.Tensor, attentions: Tuple[torch.Tensor], attention_mask: torch.Tensor) -> torch.Tensor:
-    # X: (bs, seq_len, d)
-    # attentions: num_layres of (bs, n_heads, seq_len, seq_len)
-    # attention_mask: (bs, seq_len)
-    bs, seq_len, _ = X.shape
-    attentions = torch.stack(attentions, dim=1).float() # (bs, n_layers, n_heads, seq_len, seq_len)
-    att_mask = attention_mask[:, None, None, None, :].expand(bs, 1, 1, seq_len, seq_len)
-    attentions = attentions * att_mask
-    attentions = attentions.mean(dim=2) # (bs, n_layers, seq_len, seq_len)
-    attentions = attentions.mean(dim=1) # (bs, seq_len, seq_len)
-    attentions = attentions.mean(dim=-1) # (bs, seq_len)
-    X = X * attentions.unsqueeze(-1)
-    attention_mask = attention_mask.unsqueeze(-1)
-    return (X * attention_mask).sum(dim=1) / attention_mask.sum(dim=1) # (bs, d)
 
 
 def build_collator(tokenizer) -> Callable[[List[str]], tuple[torch.Tensor, torch.Tensor]]:
@@ -192,18 +176,20 @@ class Embedder:
         device = self.device
         collate_fn = build_collator(tokenizer)
         print_message(f'Pooling types: {self.pooling_types}')
-        if self.pooling_types[0] == 'parti':
-            pooler = pool_parti
-        elif not self.matrix_embed:
-            pooler = Pooler(self.pooling_types)
-        else:
+        if self.matrix_embed:
             pooler = None
+        else:
+            pooler = Pooler(self.pooling_types)
 
-        def _get_embeddings(residue_embeddings: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        def _get_embeddings(
+                residue_embeddings: torch.Tensor,
+                attention_mask: Optional[torch.Tensor] = None,
+                attentions: Optional[torch.Tensor] = None
+            ) -> torch.Tensor:
             if residue_embeddings.ndim == 2 or self.matrix_embed: # sometimes already vector emb
                 return residue_embeddings
             else:
-                return pooler(residue_embeddings, attention_mask)
+                return pooler(emb=residue_embeddings, attention_mask=attention_mask, attentions=attentions)
 
         dataset = SimpleProteinDataset(to_embed)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=collate_fn, shuffle=False)
@@ -217,19 +203,19 @@ class Embedder:
             for i, batch in tqdm(enumerate(dataloader), total=len(dataloader), desc='Embedding batches'):
                 seqs = to_embed[i * self.batch_size:(i + 1) * self.batch_size]
                 input_ids, attention_mask = batch['input_ids'].to(device), batch['attention_mask'].to(device)
-                if self.pooling_types[0] == 'parti':
+                if 'parti' in self.pooling_types:
                     try:
                         residue_embeddings, attentions = model(input_ids, attention_mask, output_attentions=True)
-                        embeddings = pooler(residue_embeddings, attentions, attention_mask).cpu()
+                        embeddings = _get_embeddings(residue_embeddings, attention_mask=attention_mask, attentions=attentions).cpu()
                     except Exception as e:
                         print_message(f"Error in parti pooling: {e}\nDefaulting to mean pooling")
                         self.pooling_types = ['mean']
                         pooler = Pooler(self.pooling_types)
                         residue_embeddings = model(input_ids, attention_mask)
-                        embeddings = pooler(residue_embeddings, attention_mask).cpu()
+                        embeddings = _get_embeddings(residue_embeddings, attention_mask=attention_mask).cpu()
                 else:
                     residue_embeddings = model(input_ids, attention_mask)
-                    embeddings = _get_embeddings(residue_embeddings, attention_mask).cpu()
+                    embeddings = _get_embeddings(residue_embeddings, attention_mask=attention_mask).cpu()
 
                 for seq, emb, mask in zip(seqs, embeddings, attention_mask.cpu()):
                     if self.matrix_embed:
