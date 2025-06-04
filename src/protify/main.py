@@ -4,6 +4,28 @@ import yaml
 import torch
 from torchinfo import summary
 from types import SimpleNamespace
+
+# Needs to happen before any HF imports
+set_hf_home = input("Set HF home? (y/n): ")
+if set_hf_home.lower().strip() == 'y':
+    import pathlib
+    base_path = input("Enter base path: ")
+    cache_root = f"{base_path}/hf_cache"
+    tmp_root   = f"{base_path}/tmp"
+    pathlib.Path(cache_root).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(tmp_root).mkdir(parents=True, exist_ok=True)
+
+    os.environ["HF_HOME"]            = cache_root
+    os.environ["HF_DATASETS_CACHE"]  = f"{cache_root}/datasets"
+    os.environ["TRANSFORMERS_CACHE"] = f"{cache_root}/transformers" # this is deprecated, but does not hurt anything
+    os.environ["HF_HUB_CACHE"]       = f"{cache_root}/hub"
+    print(f"HF_HOME: {os.environ['HF_HOME']}")
+    print(f"HF_DATASETS_CACHE: {os.environ['HF_DATASETS_CACHE']}")
+    print(f"TRANSFORMERS_CACHE: {os.environ['TRANSFORMERS_CACHE']}")
+    print(f"HF_HUB_CACHE: {os.environ['HF_HUB_CACHE']}")
+else:
+    print("HF home not set, continuing with default settings")
+
 from probes.get_probe import ProbeArguments, get_probe
 from base_models.get_base_models import BaseModelArguments, get_tokenizer, get_base_model_for_training
 from base_models.utils import wrap_lora

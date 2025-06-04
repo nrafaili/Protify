@@ -16,8 +16,8 @@ plots_dir: plots
 replay_path: null
 pretrained_probe_path: null
 
-
-# DataArguments:
+# DataArgum
+ents:
 delimiter: ','
 col_names:
   - seqs
@@ -25,30 +25,16 @@ col_names:
 max_length: !!int 1024
 trim: !!bool false
 data_names:
-  - DeepLoc-2
-  - DeepLoc-10
-  - EC
-  - GO-CC
-  - GO-BP
-  - GO-MF
-  - MB
-  - enzyme-kcat
-  - optimal-temperature
-  - optimal-ph
+  - standard_benchmark
+
 
 data_dirs: []
 
 
 # BaseModelArguments:
 model_names:
-  - ESM2-8
   - ESM2-35
-  - ESM2-150
   - ESM2-650
-  - ESMC-300
-  - ESMC-600
-  - Random
-  - Random-Transformer
 
 
 # ProbeArguments:
