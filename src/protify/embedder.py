@@ -3,20 +3,24 @@ import torch
 import warnings
 import sqlite3
 import gzip
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from dataclasses import dataclass
 from typing import Optional, Callable, List, Tuple
 from huggingface_hub import hf_hub_download
+
+from data.dataset_classes import SimpleProteinDataset
 from base_models.get_base_models import get_base_model
+from pooler import Pooler
 from utils import torch_load, print_message
-from tensor_to_pool_parti import main_pooling, TokenToSequencePooler
-import esm
-import re
-from Bio import SeqIO
-import networkx as nx
-import numpy as np
-import gc
+
+
+def build_collator(tokenizer) -> Callable[[List[str]], tuple[torch.Tensor, torch.Tensor]]:
+    def _collate_fn(sequences: List[str]) -> tuple[torch.Tensor, torch.Tensor]:
+        """Collate function for batching sequences."""
+        return tokenizer(sequences, return_tensors="pt", padding='longest', pad_to_multiple_of=8)
+    return _collate_fn
+
 
 @dataclass
 class EmbeddingArguments:
@@ -25,7 +29,7 @@ class EmbeddingArguments:
             embedding_batch_size: int = 4,
             embedding_num_workers: int = 0,
             download_embeddings: bool = False,
-            download_dir: str = 'Synthyra/plm_embeddings',
+            download_dir: str = 'Synthyra/mean_pooled_embeddings',
             matrix_embed: bool = False,
             embedding_pooling_types: List[str] = ['mean'],
             save_embeddings: bool = False,
@@ -44,96 +48,6 @@ class EmbeddingArguments:
         self.embed_dtype = embed_dtype
         self.sql = sql
         self.embedding_save_dir = embedding_save_dir
-
-
-class Pooler:
-    def __init__(self, pooling_types: List[str]):
-        self.pooling_types = pooling_types
-        self.pooling_options = {
-            'mean': self.mean_pooling,
-            'max': self.max_pooling,
-            'norm': self.norm_pooling,
-            'median': self.median_pooling,
-            'std': self.std_pooling,
-            'var': self.var_pooling,
-            'cls': self.cls_pooling,
-            'pool_parti': self.pool_parti
-        }
-
-    def mean_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.mean(dim=1)
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).sum(dim=1) / attention_mask.sum(dim=1)
-
-    def max_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.max(dim=1).values
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).max(dim=1).values
-
-    def norm_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.norm(dim=1, p=2)
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).norm(dim=1, p=2)
-
-    def median_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.median(dim=1).values
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).median(dim=1).values
-    
-    def std_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.std(dim=1)
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).std(dim=1)
-    
-    def var_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        if attention_mask is None:
-            return emb.var(dim=1)
-        else:
-            attention_mask = attention_mask.unsqueeze(-1)
-            return (emb * attention_mask).var(dim=1)
-
-    def cls_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
-        return emb[:, 0, :]
-
-    def __call__(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # [mean, max]
-        final_emb = []
-        for pooling_type in self.pooling_types:
-            final_emb.append(self.pooling_options[pooling_type](emb, attention_mask)) # (b, d)
-        return torch.cat(final_emb, dim=-1) # (b, n_pooling_types * d)
-
-    def pool_parti(X: torch.Tensor, 
-                attentions: Tuple[torch.Tensor]) -> torch.Tensor:
-        return main_pooling(token_emb= X, attention_layers= attentions)
-
-
-### Dataset for Embedding
-class ProteinDataset(Dataset):
-    """Simple dataset for protein sequences."""
-    def __init__(self, sequences: List[str]):
-        self.sequences = sequences
-
-    def __len__(self) -> int:
-        return len(self.sequences)
-
-    def __getitem__(self, idx: int) -> str:
-        return self.sequences[idx]
-
-
-def build_collator(tokenizer) -> Callable[[List[str]], tuple[torch.Tensor, torch.Tensor]]:
-    def _collate_fn(sequences: List[str]) -> tuple[torch.Tensor, torch.Tensor]:
-        """Collate function for batching sequences."""
-        return tokenizer(sequences, return_tensors="pt", padding='longest', pad_to_multiple_of=8)
-    return _collate_fn
 
 
 class Embedder:
@@ -158,11 +72,16 @@ class Embedder:
         # download from download_dir
         # unzip
         # move to embedding_save_dir
-        local_path = hf_hub_download(
-            repo_id=self.download_dir,
-            filename=f'embeddings/{model_name}_{self.matrix_embed}.pth.gz',
-            repo_type='dataset'
-        )
+        try:
+            local_path = hf_hub_download(
+                repo_id=self.download_dir,
+                filename=f'embeddings/{model_name}_{self.matrix_embed}.pth.gz',
+                repo_type='dataset'
+            )
+        except:
+            print(f'No embeddings found for {model_name} in {self.download_dir}')
+            return
+
         # unzip
         print_message(f'Unzipping {local_path}')
         with gzip.open(local_path, 'rb') as f_in:
@@ -192,6 +111,10 @@ class Embedder:
 
             # Save the combined embeddings
             print_message(f'Saving combined embeddings to {final_path}')
+            torch.save(downloaded_embeddings, final_path)
+        else:
+            print_message(f'Downloading embeddings from {self.download_dir}, no previous embeddings found')
+            downloaded_embeddings = torch.load(unzipped_path)
             torch.save(downloaded_embeddings, final_path)
         return final_path
 
@@ -266,7 +189,7 @@ class Embedder:
             else:
                 return pooler(residue_embeddings, attention_mask)
 
-        dataset = ProteinDataset(to_embed)
+        dataset = SimpleProteinDataset(to_embed)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=collate_fn, shuffle=False)
 
         if self.sql:
@@ -335,6 +258,7 @@ class Embedder:
 
 if __name__ == '__main__':
     ### Embed all supported datasets with all supported models
+    # py -m embedder
     import argparse
     from huggingface_hub import upload_file, login
     from data.supported_datasets import possible_with_vector_reps
@@ -350,7 +274,6 @@ if __name__ == '__main__':
     parser.add_argument('--embed_dtype', type=str, default='float16')
     parser.add_argument('--embedding_save_dir', type=str, default='embeddings')
     parser.add_argument('--download_dir', type=str, default='Synthyra/mean_pooled_embeddings')
-    parser.add_argument('--compress', default=True, action='store_true', help='Compress embeddings with gzip before uploading')
     args = parser.parse_args()
 
     if args.token is not None:
@@ -368,7 +291,7 @@ if __name__ == '__main__':
     # Get data    
     data_args = DataArguments(
         data_names=possible_with_vector_reps,
-        max_length=2048,
+        max_length=1024,
         trim=False
     )
     all_seqs = DataMixin(data_args).get_data()[1]
@@ -377,7 +300,7 @@ if __name__ == '__main__':
     embedder_args = EmbeddingArguments(
         batch_size=args.batch_size,
         num_workers=args.num_workers,
-        download_embeddings=False,
+        download_embeddings=True,
         matrix_embed=False,
         pooling_types=['mean'],
         save_embeddings=True,
@@ -393,18 +316,14 @@ if __name__ == '__main__':
         _ = embedder(model_name)
         save_path = os.path.join(args.embedding_save_dir, f'{model_name}_False.pth')
         
-        # Compress file if requested
-        if args.compress:
-            compressed_path = f"{save_path}.gz"
-            print(f"Compressing {save_path} to {compressed_path}")
-            with open(save_path, 'rb') as f_in:
-                with gzip.open(compressed_path, 'wb') as f_out:
-                    f_out.write(f_in.read())
-            upload_path = compressed_path
-            path_in_repo = f'embeddings/{model_name}_False.pth.gz'
-        else:
-            upload_path = save_path
-            path_in_repo = f'embeddings/{model_name}_False.pth'
+        compressed_path = f"{save_path}.gz"
+        print(f"Compressing {save_path} to {compressed_path}")
+        with open(save_path, 'rb') as f_in:
+            with gzip.open(compressed_path, 'wb') as f_out:
+                f_out.write(f_in.read())
+        upload_path = compressed_path
+        path_in_repo = f'embeddings/{model_name}_False.pth.gz'
+
             
         upload_file(
             path_or_fileobj=upload_path,
