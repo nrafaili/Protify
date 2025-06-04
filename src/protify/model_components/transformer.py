@@ -68,14 +68,18 @@ class PTransformerBlock(nn.Module):
     ):
         super().__init__()
         self.ln1 = LayerNorm(hidden_size)
-        self.attn = MultiHeadPAttention(hidden_size, n_heads, hidden_size, dropout, rotary)
+        self.attn = MultiHeadPAttention(
+            hidden_size=hidden_size,
+            n_heads=n_heads,
+            n_tokens=hidden_size,
+            dropout=dropout,
+            rotary=rotary,
+        )
         self.ln2 = LayerNorm(hidden_size)
         self.ffn = PAttention(
-            hidden_size,
-            n_heads,
-            intermediate_correction_fn(expansion_ratio, hidden_size),
-            dropout,
-            rotary,
+            hidden_size=hidden_size,
+            n_tokens=intermediate_correction_fn(expansion_ratio, hidden_size),
+            dropout=dropout,
         )
 
     def forward(self, x: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
