@@ -16,6 +16,8 @@ plots_dir: plots
 replay_path: null
 pretrained_probe_path: null
 
+hf_home: /mnt/batch/tasks/shared/LS_root/mounts/clusters/lhallee-misc/code
+
 # DataArgum
 ents:
 delimiter: ','
