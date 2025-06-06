@@ -113,8 +113,16 @@ def parse_arguments():
     if args.yaml_path is not None:
         with open(args.yaml_path, 'r') as file: 
             settings = yaml.safe_load(file)
-        args = SimpleNamespace(**settings)
-        return args
+        yaml_args = SimpleNamespace(**settings)
+        yaml_args.hf_token = args.hf_token
+        yaml_args.hf_username = args.hf_username
+        yaml_args.synthyra_api_key = args.synthyra_api_key
+        yaml_args.wandb_api_key = args.wandb_api_key
+        yaml_args.yaml_path = args.yaml_path
+        yaml_args.log_dir = args.log_dir
+        yaml_args.results_dir = args.results_dir
+        yaml_args.model_save_dir = args.model_save_dir
+        return yaml_args
     else:
         return args
 
