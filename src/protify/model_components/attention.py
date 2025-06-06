@@ -235,13 +235,18 @@ class AttentionLogitsSequence(nn.Module):
         self.Wp = nn.Parameter(torch.randn(1, hidden_size, num_labels))
         self.Wx = Linear(hidden_size, hidden_size)
 
+    def mean_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
+        if attention_mask is None:
+            return emb.mean(dim=1)
+        else:
+            return (emb * attention_mask).sum(dim=1) / attention_mask.sum(dim=1)
+
     def forward(
         self,
         x: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         **kwargs,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
-        eps = 1e-5
         b, L, d = x.size()
         p = self.Wp.expand(b, -1, -1) # (b, num_labels, d)
         x = self.Wx(x) # (b, L, d)
@@ -249,11 +254,9 @@ class AttentionLogitsSequence(nn.Module):
         if attention_mask is not None:
             attention_mask = attention_mask[:, :, None].expand(b, L, self.num_labels)
 
-        scores = torch.matmul(x, p) # (b, L, num_labels)
-        scores = (scores * attention_mask) + eps
-        probs = scores.softmax(dim=-1) # (b, L, num_labels)
-        logits = probs.mean(dim=1) # (b, num_labels)
-        return logits, probs
+        dots = torch.matmul(x, p) # (b, L, num_labels)
+        logits = self.mean_pooling(dots, attention_mask) # (b, num_labels)
+        return logits, dots
 
 
 class AttentionLogitsToken(nn.Module):
