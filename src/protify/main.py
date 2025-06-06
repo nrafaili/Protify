@@ -116,6 +116,7 @@ def parse_arguments():
         yaml_args = SimpleNamespace(**settings)
         yaml_args.hf_token = args.hf_token
         yaml_args.hf_username = args.hf_username
+        yaml_args.hf_home = args.hf_home
         yaml_args.synthyra_api_key = args.synthyra_api_key
         yaml_args.wandb_api_key = args.wandb_api_key
         yaml_args.yaml_path = args.yaml_path
