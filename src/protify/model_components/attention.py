@@ -277,7 +277,7 @@ class AttentionLogitsSequence(nn.Module):
 
         # y (b, L, num_labels)
         logits = self.mean_pooling(y, attention_mask) # (b, num_labels)
-        return logits, y
+        return logits, y, x, p
 
 
 class AttentionLogitsToken(nn.Module):

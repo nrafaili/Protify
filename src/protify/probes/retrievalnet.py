@@ -67,10 +67,11 @@ class RetrievalNetForSequenceClassification(PreTrainedModel):
             attention_mask: Optional[torch.Tensor] = None,
             labels: Optional[torch.Tensor] = None,
             output_attentions: Optional[bool] = False,
+            output_hidden_states: Optional[bool] = False,
     ) -> SequenceClassifierOutput:
         x = self.input_proj(embeddings) # (bs, seq_len, hidden_dim)
         x = self.transformer(x, attention_mask) # (bs, seq_len, hidden_dim)
-        logits, probs = self.get_logits(x, attention_mask) 
+        logits, sims, x, p = self.get_logits(x, attention_mask) 
         loss = None
         if labels is not None:
             if self.task_type == 'regression':
@@ -83,8 +84,8 @@ class RetrievalNetForSequenceClassification(PreTrainedModel):
         return SequenceClassifierOutput(
             loss=loss,
             logits=logits,
-            hidden_states=None,
-            attentions=probs if output_attentions else None
+            hidden_states=x if output_hidden_states else None,
+            attentions=sims if output_attentions else None
         )
 
 
