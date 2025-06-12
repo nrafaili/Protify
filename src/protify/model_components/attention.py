@@ -242,13 +242,18 @@ class AttentionLogitsSequence(nn.Module):
         else:
             return (emb * attention_mask).sum(dim=1) / attention_mask.sum(dim=1) # (b, d)
 
-    def dot_product(self, x: torch.Tensor, p: torch.Tensor):
+    def dot_product(self, x: torch.Tensor, p: torch.Tensor): # (b, L, d) * (b, d, num_labels) -> (b, L, num_labels)
         return torch.matmul(x, p)
 
-    def euclidean_distance(self, x: torch.Tensor, p: torch.Tensor):
-        return torch.norm(x - p, p=2, dim=-1)
+    def euclidean_distance(self, x: torch.Tensor, p: torch.Tensor): # (b, L, d) * (b, d, num_labels) -> (b, L, num_labels)
+        # x: (b, L, d), p: (b, d, num_labels)
+        x_exp = x.unsqueeze(-1)  # (b, L, d, 1)
+        p_exp = p.unsqueeze(1)   # (b, 1, d, num_labels)
+        dist = torch.abs(torch.norm(x_exp - p_exp, p=2, dim=2))  # (b, L, num_labels)
+        # Optionally, you may want to return -dist to be compatible with logits (higher is better)
+        return -dist
 
-    def cosine_similarity(self, x: torch.Tensor, p: torch.Tensor):
+    def cosine_similarity(self, x: torch.Tensor, p: torch.Tensor): # (b, L, d) * (b, d, num_labels) -> (b, L, num_labels)
         x = F.normalize(x, p=2, dim=-1)
         p = F.normalize(p, p=2, dim=-1)
         return torch.matmul(x, p)
