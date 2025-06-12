@@ -9,10 +9,10 @@ set -e  # Exit immediately if a command exits with a non-zero status
 echo "Setting up Python virtual environment for Protify..."
 
 # Create virtual environment
-python3 -m venv ~/bioenv
+python3 -m venv ~/protify_venv
 
 # Activate virtual environment
-source ~/bioenv/bin/activate
+source ~/protify_venv/bin/activate
 
 # Update pip and setuptools
 echo "Upgrading pip and setuptools..."
@@ -35,11 +35,11 @@ echo -e "\n======================="
 echo "Setup complete!"
 echo "======================="
 echo "To activate this environment in the future, run:"
-echo "    source ~/bioenv/bin/activate"
+echo "    source ~/protify_venv/bin/activate"
 echo ""
 echo "To deactivate the environment, simply run:"
 echo "    deactivate"
 echo ""
-echo "Your virtual environment is located at: ~/bioenv"
+echo "Your virtual environment is located at: ~/protify_venv"
 echo "======================="
 
