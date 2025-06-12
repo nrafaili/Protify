@@ -188,6 +188,16 @@ python -m pip install -r requirements.txt
 git submodule update --init --remote --recursive
 cd src/protify
 ```
+With a Python VM (linux)
+```console
+git clone https://@github.com/Synthyra/Protify.git
+cd Protify
+git submodule update --init --remote --recursive
+chmod +x setup_bioenv.sh
+./setup_bioenv.sh
+source ~/bioenv/bin/activate
+cd src/protify
+```
 
 If you would like a Python virtual environment with the requirements
 ```console
