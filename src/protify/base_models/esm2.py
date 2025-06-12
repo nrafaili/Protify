@@ -18,6 +18,7 @@ presets = {
     'ESM2-3B': 'Synthyra/ESM2-3B',
     'DSM-150': 'GleghornLab/ESM_diff_150',
     'DSM-650': 'GleghornLab/ESM_diff_650',
+    'DSM-PPI': 'Synthyra/DSM_ppi_full',
 }
 
 
