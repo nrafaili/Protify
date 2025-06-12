@@ -71,7 +71,7 @@ class RetrievalNetForSequenceClassification(PreTrainedModel):
     ) -> SequenceClassifierOutput:
         x = self.input_proj(embeddings) # (bs, seq_len, hidden_dim)
         x = self.transformer(x, attention_mask) # (bs, seq_len, hidden_dim)
-        logits, sims, x, p = self.get_logits(x, attention_mask) 
+        logits, sims, x = self.get_logits(x, attention_mask) 
         loss = None
         if labels is not None:
             if self.task_type == 'regression':
