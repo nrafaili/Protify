@@ -229,17 +229,29 @@ class AttentionLogitsSequence(nn.Module):
     """
     Cross-attention mechanism for token-parameter-attention (b, L, d) -> (b, L, num_labels) -> (b, num_labels)
     """
-    def __init__(self, hidden_size: int, num_labels: int = 1):
+    def __init__(self, hidden_size: int, num_labels: int = 1, sim_type: str = 'dot'):
         super(AttentionLogitsSequence, self).__init__()
         self.num_labels = num_labels
         self.Wp = nn.Parameter(torch.randn(1, hidden_size, num_labels))
         self.Wx = Linear(hidden_size, hidden_size)
+        self.sim_type = sim_type
 
     def mean_pooling(self, emb: torch.Tensor, attention_mask: Optional[torch.Tensor] = None): # (b, L, d) -> (b, d)
         if attention_mask is None:
             return emb.mean(dim=1)
         else:
-            return (emb * attention_mask).sum(dim=1) / attention_mask.sum(dim=1)
+            return (emb * attention_mask).sum(dim=1) / attention_mask.sum(dim=1) # (b, d)
+
+    def dot_product(self, x: torch.Tensor, p: torch.Tensor):
+        return torch.matmul(x, p)
+
+    def euclidean_distance(self, x: torch.Tensor, p: torch.Tensor):
+        return torch.norm(x - p, p=2, dim=-1)
+
+    def cosine_similarity(self, x: torch.Tensor, p: torch.Tensor):
+        x = F.normalize(x, p=2, dim=-1)
+        p = F.normalize(p, p=2, dim=-1)
+        return torch.matmul(x, p)
 
     def forward(
         self,
@@ -248,34 +260,61 @@ class AttentionLogitsSequence(nn.Module):
         **kwargs,
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         b, L, d = x.size()
-        p = self.Wp.expand(b, -1, -1) # (b, num_labels, d)
+        p = self.Wp.expand(b, -1, -1) # (b, d, num_labels)
         x = self.Wx(x) # (b, L, d)
 
         if attention_mask is not None:
-            attention_mask = attention_mask[:, :, None].expand(b, L, self.num_labels)
+            attention_mask = attention_mask[:, :, None].expand(b, L, self.num_labels) # (b, L, num_labels)
 
-        dots = torch.matmul(x, p) # (b, L, num_labels)
-        logits = self.mean_pooling(dots, attention_mask) # (b, num_labels)
-        return logits, dots
+        if self.sim_type == 'dot':
+            y = self.dot_product(x, p)
+        elif self.sim_type == 'euclidean':
+            y = self.euclidean_distance(x, p)
+        elif self.sim_type == 'cosine':
+            y = self.cosine_similarity(x, p)
+        else:
+            raise ValueError(f"Invalid similarity type: {self.sim_type}")
+
+        # y (b, L, num_labels)
+        logits = self.mean_pooling(y, attention_mask) # (b, num_labels)
+        return logits, y
 
 
 class AttentionLogitsToken(nn.Module):
     """
     Cross-attention mechanism for token-parameter-attention (b, L, d) -> (b, L, num_labels)
     """
-    def __init__(self, hidden_size: int, num_labels: int = 1):
+    def __init__(self, hidden_size: int, num_labels: int = 1, sim_type: str = 'dot'):
         super(AttentionLogitsToken, self).__init__()
         self.num_labels = num_labels
         self.Wp = nn.Parameter(torch.randn(1, hidden_size, num_labels))
         self.Wx = Linear(hidden_size, hidden_size)
-        self.out_proj = Linear(hidden_size, 1)
+        self.sim_type = sim_type
+
+    def dot_product(self, x: torch.Tensor, p: torch.Tensor):
+        return torch.matmul(x, p)
+    
+    def euclidean_distance(self, x: torch.Tensor, p: torch.Tensor):
+        return torch.norm(x - p, p=2, dim=-1)
+    
+    def cosine_similarity(self, x: torch.Tensor, p: torch.Tensor):
+        x = F.normalize(x, p=2, dim=-1)
+        p = F.normalize(p, p=2, dim=-1)
+        return torch.matmul(x, p)
 
     def forward(self, x: torch.Tensor, **kwargs) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         b, L, d = x.size()
-        p = self.Wp.expand(b, -1, -1) # (b, num_labels, d)
+        p = self.Wp.expand(b, -1, -1) # (b, d, num_labels)
         x = self.Wx(x) # (b, L, d)
-        logits = torch.matmul(x, p) # (b, L, num_labels)
-        return logits
+        if self.sim_type == 'dot':
+            logits = self.dot_product(x, p)
+        elif self.sim_type == 'euclidean':
+            logits = self.euclidean_distance(x, p)
+        elif self.sim_type == 'cosine':
+            logits = self.cosine_similarity(x, p)
+        else:
+            raise ValueError(f"Invalid similarity type: {self.sim_type}")
+        return logits # (b, L, num_labels)
 
 
 class MultiHeadPAttention(nn.Module):
