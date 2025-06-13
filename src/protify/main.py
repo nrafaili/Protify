@@ -32,7 +32,7 @@ def parse_arguments():
     parser.add_argument("--delimiter", default=",", help="Delimiter for data.")
     parser.add_argument("--col_names", nargs="+", default=["seqs", "labels"], help="Column names.")
     parser.add_argument("--max_length", type=int, default=1024, help="Maximum sequence length.")
-    parser.add_argument("--trim", action="store_true", default=False,
+    parser.add_argument("--trim", action="store_true", default=True,
                         help="Whether to trim sequences (default: False). If False, sequences are removed from the dataset if they are longer than max length. If True, they are truncated to max length."
                         )
     parser.add_argument("--data_names", nargs="+", default=["DeepLoc-2"], help="List of HF dataset names.") # TODO rename to data_names
@@ -56,7 +56,7 @@ def parse_arguments():
     parser.add_argument("--n_heads", type=int, default=4, help="Number of heads in multi-head attention.")
     parser.add_argument("--rotary", action="store_false", default=True,
                         help="Disable rotary embeddings (default: enabled). Use --rotary to toggle off.")
-    parser.add_argument("--probe_pooling_types", nargs="+", default=["cls"], help="Pooling types to use.")
+    parser.add_argument("--probe_pooling_types", nargs="+", default=["cls", "mean"], help="Pooling types to use.")
     parser.add_argument("--save_model", action="store_true", default=False, help="Save trained model (default: False).")
     parser.add_argument("--production_model", action="store_true", default=False, help="Production model (default: False).")
     parser.add_argument("--lora", action="store_true", default=False, help="Use LoRA (default: False).")
