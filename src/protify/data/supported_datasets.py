@@ -7,6 +7,7 @@ supported_datasets = {
     'MB': 'GleghornLab/MB_reg',
     'DeepLoc-2': 'GleghornLab/DL2_reg',
     'DeepLoc-10': 'GleghornLab/DL10_reg',
+    'Subcellular': 'GleghornLab/SL_13',
     'enzyme-kcat': 'GleghornLab/enzyme_kcat',
     'solubility': 'GleghornLab/solubility_prediction',
     'localization': 'GleghornLab/localization_prediction',
