@@ -203,6 +203,7 @@ class TrainerMixin:
         db_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{full}.db')
 
         if self.embedding_args.sql:
+            print('SQL enabled')
             if ppi:
                 if full:
                     raise ValueError('Full matrix embeddings not currently supported for SQL and PPI') # TODO: Implement
@@ -212,6 +213,7 @@ class TrainerMixin:
                 DatasetClass = EmbedsLabelsDatasetFromDisk
                 CollatorClass = EmbedsLabelsCollator
         else:
+            print('SQL disabled')
             if ppi:
                 DatasetClass = PairEmbedsLabelsDataset
                 CollatorClass = PairEmbedsLabelsCollator
