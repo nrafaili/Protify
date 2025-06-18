@@ -193,16 +193,16 @@ With a Python VM (linux)
 git clone https://@github.com/Synthyra/Protify.git
 cd Protify
 git submodule update --init --remote --recursive
-chmod +x setup_bioenv.sh
-./setup_bioenv.sh
-source ~/bioenv/bin/activate
+chmod +x setup_protify.sh
+./setup_protify.sh
+source ~/protify_venv/bin/activate
 cd src/protify
 ```
 
 If you would like a Python virtual environment with the requirements
 ```console
-chmod +x setup_bioenv.sh
-./setup_bioenv.sh
+chmod +x setup_protify.sh
+./setup_protify.sh
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

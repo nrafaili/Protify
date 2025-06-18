@@ -14,3 +14,4 @@
 !images/example_workflow/*.png
 !src/protify/*.png
 src/protify/private_yamls
+*.db
