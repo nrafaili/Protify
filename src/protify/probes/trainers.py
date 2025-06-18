@@ -38,7 +38,7 @@ class TrainerArguments:
             weight_decay: float = 0.00,
             task_type: str = 'regression',
             patience: int = 3,
-            read_scaler: int = 1000,
+            read_scaler: int = 100,
             save_model: bool = False,
             seed: int = 42,
             train_data_size: int = 100,
