@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# chmod +x setup_bioenv.sh
-# ./setup_bioenv.sh
+# chmod +x setup_protify.sh
+# ./setup_protify.sh
 
 # Set up error handling
 set -e  # Exit immediately if a command exits with a non-zero status
