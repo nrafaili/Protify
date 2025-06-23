@@ -25,7 +25,7 @@ class HybridProbe(PreTrainedModel):
     def __init__(self, config: HybridProbeConfig, model: nn.Module, probe: nn.Module):
         super().__init__(config)
         self.config = config
-        self.pool_before_probe = config.tokenwise or config.matrix_embed
+        self.pool_before_probe = not config.tokenwise and not config.matrix_embed
         self.pooler = Pooler(config.pooling_types)
         self.model = model
         self.probe = probe
@@ -39,4 +39,5 @@ class HybridProbe(PreTrainedModel):
         x = self.model(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
         if self.pool_before_probe:
             x = self.pooler(x, attention_mask)
-        return self.probe(x, labels=labels)
+        y = self.probe(x, labels=labels)
+        return y
