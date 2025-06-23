@@ -499,6 +499,7 @@ def main(args: SimpleNamespace):
         elif main.full_args.use_scikit:
             main.save_embeddings_to_disk()
             main.run_scikit_scheme()
+        
         else:
             main.save_embeddings_to_disk()
             main.run_nn_probes()

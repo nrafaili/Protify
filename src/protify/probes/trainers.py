@@ -340,6 +340,7 @@ class TrainerMixin:
             )
             config = HybridProbeConfig(
                 tokenwise=self.probe_args.tokenwise,
+                matrix_embed=self.embedding_args.matrix_embed,
                 pooling_types=self.embedding_args.pooling_types,
             )
 
