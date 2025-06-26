@@ -40,6 +40,7 @@ class RetrievalNetForSequenceClassification(PreTrainedModel):
     def __init__(self, config: RetrievalNetConfig):
         super().__init__(config)
         self.input_proj = nn.Linear(config.input_dim, config.hidden_dim)
+        
         #self.transformer = PTransformer(
         #    hidden_size=config.hidden_dim,
         #    n_heads=config.n_heads,
@@ -56,7 +57,11 @@ class RetrievalNetForSequenceClassification(PreTrainedModel):
             dropout=config.dropout,
             rotary=True,
         )
-        self.get_logits = AttentionLogitsSequence(hidden_size=config.hidden_dim, num_labels=config.num_labels)
+        self.get_logits = AttentionLogitsSequence(
+            hidden_size=config.hidden_dim,
+            num_labels=config.num_labels,
+            sim_type='cosine',
+        )
         self.num_labels = config.num_labels
         self.task_type = config.task_type
         self.loss_fct = get_loss_fct(config.task_type)
