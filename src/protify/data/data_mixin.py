@@ -63,10 +63,7 @@ class DataArguments:
         
         if data_dirs is not None:
             for dir in data_dirs:
-                print(dir)
-                if os.path.exists(dir):
-                    self.data_paths.append(dir)
-                else:
+                if not os.path.exists(dir):
                     raise FileNotFoundError(f'{dir} does not exist')
 
 
@@ -152,6 +149,9 @@ class DataMixin:
         for dataset, data_name in zip(hf_datasets, data_names):
             print_message(f'Processing {data_name}')
             train_set, valid_set, test_set, ppi = dataset
+            print(train_set)
+            print(valid_set)
+            print(test_set)
             if self._trim: # trim by length if necessary
                 original_train_size, original_valid_size, original_test_size = len(train_set), len(valid_set), len(test_set)
                 if ppi:
@@ -264,6 +264,20 @@ class DataMixin:
                 train_set = train_set['train']
                 test_set = train_set.train_test_split(test_size=0.5, seed=42)
                 test_set = test_set['test']
+
+            if not ppi:
+                print('Standardizing column names')
+                seq_col = self.data_args.col_names[0]
+                label_col = self.data_args.col_names[1]
+                train_set = train_set.rename_columns({seq_col: 'seqs', label_col: 'labels'})
+                valid_set = valid_set.rename_columns({seq_col: 'seqs', label_col: 'labels'})
+                test_set = test_set.rename_columns({seq_col: 'seqs', label_col: 'labels'})
+                # drop everything else
+                print('Removing extras')
+                train_set = train_set.remove_columns([col for col in train_set.column_names if col not in ['seqs', 'labels']])
+                valid_set = valid_set.remove_columns([col for col in valid_set.column_names if col not in ['seqs', 'labels']])
+                test_set = test_set.remove_columns([col for col in test_set.column_names if col not in ['seqs', 'labels']])
+
             datasets.append((train_set, valid_set, test_set, ppi))
             data_names.append(data_name)
 
@@ -279,9 +293,9 @@ class DataMixin:
                 valid_set = read_excel(valid_path)
                 test_set = read_excel(test_path)
             else:
-                train_set = read_csv(train_path, delimiter=self._delimiter, names=self._col_names, header=0)
-                valid_set = read_csv(valid_path, delimiter=self._delimiter, names=self._col_names, header=0)
-                test_set = read_csv(test_path, delimiter=self._delimiter, names=self._col_names, header=0)
+                train_set = read_csv(train_path, delimiter=self._delimiter)
+                valid_set = read_csv(valid_path, delimiter=self._delimiter)
+                test_set = read_csv(test_path, delimiter=self._delimiter)
 
             train_set = Dataset.from_pandas(train_set)
             valid_set = Dataset.from_pandas(valid_set)
@@ -300,10 +314,6 @@ class DataMixin:
                 valid_set = valid_set.remove_columns([col for col in valid_set.column_names if col not in ['seqs', 'labels']])
                 test_set = test_set.remove_columns([col for col in test_set.column_names if col not in ['seqs', 'labels']])
 
-            print(train_set['seqs'][0])
-            print(train_set['labels'][0])
-            print(valid_set)
-            print(test_set)
             datasets.append((train_set, valid_set, test_set, ppi))
             data_names.append(data_name)
 
