@@ -41,14 +41,14 @@ class RetrievalNetForSequenceClassification(PreTrainedModel):
         super().__init__(config)
         self.input_proj = nn.Linear(config.input_dim, config.hidden_dim)
         
-        #self.transformer = PTransformer(
-        #    hidden_size=config.hidden_dim,
-        #    n_heads=config.n_heads,
-        #    n_layers=config.n_layers,
-        #    expansion_ratio=config.expansion_ratio,
-        #    dropout=config.dropout,
-        #    rotary=True,
-        #)
+        self.transformer = PTransformer(
+            hidden_size=config.hidden_dim,
+            n_heads=config.n_heads,
+            n_layers=config.n_layers,
+            expansion_ratio=config.expansion_ratio,
+            dropout=config.dropout,
+            rotary=True,
+        )
         self.transformer = Transformer(
             hidden_size=config.hidden_dim,
             n_heads=config.n_heads,
