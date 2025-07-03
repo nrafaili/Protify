@@ -8,7 +8,7 @@ from glob import glob
 from pandas import read_csv, read_excel
 from datasets import load_dataset, Dataset
 from dataclasses import dataclass
-from utils import print_message
+from protify.utils import print_message
 from .supported_datasets import supported_datasets, standard_data_benchmark
 
 

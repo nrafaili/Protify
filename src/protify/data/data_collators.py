@@ -289,3 +289,25 @@ class OneHotCollator:
             'attention_mask': attention_masks,
             'labels': labels,
         }
+
+
+class InferenceCollator:
+    """Collator for inference on embeddings without labels."""
+    def __init__(self, full=False, **kwargs):
+        self.full = full
+        
+    def __call__(self, batch: List[torch.Tensor]) -> Dict[str, torch.Tensor]:
+        if self.full:
+            # For full/matrix embeddings, we need to pad to the same length
+            max_length = max(embed.size(0) for embed in batch)
+            embeds, attention_mask = _pad_matrix_embeds(batch, max_length)
+            return {
+                'embeddings': embeds,
+                'attention_mask': attention_mask,
+            }
+        else:
+            # For pooled embeddings, just stack them
+            embeds = torch.stack(batch)
+            return {
+                'embeddings': embeds,
+            }

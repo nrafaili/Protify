@@ -160,6 +160,10 @@ For more details about supported models and datasets, including programmatic acc
   - Coming soon: Full model fine-tuning, hybrid probing, and LoRA
 - **Automated model selection**: Find optimal scikit-learn models for your data with LazyPredict, enhanced by automatic hyperparameter optimization
   - Coming soon: GPU acceleration
+- **Hyperparameter optimization**: Automated hyperparameter tuning using Weights & Biases with YAML-based sweep configurations
+  - Supports Bayesian optimization, random search, and grid search
+  - Real-time experiment tracking and visualization
+  - Easy-to-edit YAML configuration files for search spaces
 - **Complete reproducibility**: Every session generates a detailed log that can be used to reproduce your entire workflow
 - **Publication-ready visualizations**: Generate cross-model and dataset comparisons with radar and bar plots, embedding analysis with PCA, t-SNE, and UMAP, and statistically sound confidence interval plots
 - **Extensive dataset support**: Access 25 protein datasets by default, or easily integrate your own local or private datasets

@@ -1,13 +1,14 @@
 ### imports
-import random
 import torch
-import numpy as np
+import random
 import sqlite3
+import numpy as np
+import os
 import torch.nn.functional as F
 from torch.utils.data import Dataset as TorchDataset
-from utils import print_message
 from tqdm.auto import tqdm
 from typing import List
+from protify.utils import print_message
 
 
 class PairEmbedsLabelsDatasetFromDisk(TorchDataset):
@@ -331,4 +332,82 @@ class SimpleProteinDataset(TorchDataset):
 
     def __getitem__(self, idx: int) -> str:
         return self.sequences[idx]
+
+
+class InferenceDataset(TorchDataset):
+    """Dataset for inference on unlabeled protein sequences."""
+    def __init__(self, sequences: List[str], emb_dict: dict, full: bool = False, **kwargs):
+        self.sequences = sequences
+        self.emb_dict = emb_dict
+        self.full = full
+        
+        # Check if all sequences have embeddings
+        missing_seqs = [seq for seq in sequences if seq not in emb_dict]
+        if missing_seqs:
+            raise ValueError(f"Embeddings not found for {len(missing_seqs)} sequences")
+        
+        print_message(f'Loaded {len(sequences)} sequences for inference')
+
+    def __len__(self):
+        return len(self.sequences)
+
+    def __getitem__(self, idx):
+        seq = self.sequences[idx]
+        emb = self.emb_dict[seq].float()
+        if self.full:
+            # Handle full embeddings if needed
+            emb = emb.squeeze(0) if emb.dim() > 2 else emb
+        else:
+            emb = emb.squeeze(0) if emb.dim() > 1 else emb
+        return emb
+
+
+class InferenceDatasetFromDisk(TorchDataset):
+    """Dataset for inference using SQL database storage."""
+    def __init__(
+            self,
+            sequences: List[str],
+            db_path: str,
+            input_dim: int = 768,
+            batch_size: int = 64,
+            read_scaler: int = 100,
+            full: bool = False,
+            **kwargs
+        ):
+        self.sequences = sequences
+        self.db_path = db_path
+        self.input_dim = input_dim
+        self.full = full
+        self.batch_size = batch_size
+        self.read_amt = read_scaler * batch_size
+        
+        # Check database exists
+        if not os.path.exists(db_path):
+            raise FileNotFoundError(f"Database not found: {db_path}")
+            
+        print_message(f'Loaded {len(sequences)} sequences for inference from disk')
+
+    def __len__(self):
+        return len(self.sequences)
+
+    def __getitem__(self, idx):
+        seq = self.sequences[idx]
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        result = c.execute("SELECT embedding FROM embeddings WHERE sequence=?", (seq,))
+        row = result.fetchone()
+        
+        if row is None:
+            conn.close()
+            raise ValueError(f"Embedding not found for sequence: {seq}")
+            
+        emb_data = row[0]
+        emb = torch.tensor(np.frombuffer(emb_data, dtype=np.float32).reshape(-1, self.input_dim))
+        
+        if not self.full:
+            emb = emb.squeeze(0) if emb.dim() > 1 else emb
+            
+        conn.close()
+        return emb
     

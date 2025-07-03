@@ -7,17 +7,17 @@ import webbrowser
 import os
 from types import SimpleNamespace
 from tkinter import ttk, messagebox, filedialog
-from base_models.get_base_models import BaseModelArguments, standard_models
-from data.supported_datasets import supported_datasets, standard_data_benchmark, internal_datasets
-from embedder import EmbeddingArguments
-from probes.get_probe import ProbeArguments
-from probes.trainers import TrainerArguments
-from main import MainProcess
+from protify.base_models.get_base_models import BaseModelArguments, standard_models
+from protify.data.supported_datasets import supported_datasets, standard_data_benchmark, internal_datasets
+from protify.embedder import EmbeddingArguments
+from protify.probes.get_probe import ProbeArguments
+from protify.probes.trainers import TrainerArguments
+from protify.main import MainProcess
 from concurrent.futures import ThreadPoolExecutor
-from data.data_mixin import DataArguments
-from probes.scikit_classes import ScikitArguments
-from utils import print_message, print_done, print_title
-from visualization.plot_result import create_plots
+from protify.data.data_mixin import DataArguments
+from protify.probes.scikit_classes import ScikitArguments
+from protify.utils import print_message, print_done, print_title
+from protify.visualization.plot_result import create_plots
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"

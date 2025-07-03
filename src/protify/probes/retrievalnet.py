@@ -4,8 +4,8 @@ from typing import Optional
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.modeling_outputs import SequenceClassifierOutput
 
-from model_components.attention import AttentionLogitsSequence, AttentionLogitsToken, Linear
-from model_components.transformer import PTransformer, Transformer
+from protify.model_components.attention import AttentionLogitsSequence, AttentionLogitsToken, Linear
+from protify.model_components.transformer import PTransformer, Transformer
 from .losses import get_loss_fct
 
 

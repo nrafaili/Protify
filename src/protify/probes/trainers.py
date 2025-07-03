@@ -4,8 +4,8 @@ import numpy as np
 from typing import Optional
 from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
 from dataclasses import dataclass
-from probes.hybrid_probe import HybridProbe, HybridProbeConfig
-from data.dataset_classes import (
+from protify.probes.hybrid_probe import HybridProbe, HybridProbeConfig
+from protify.data.dataset_classes import (
     EmbedsLabelsDatasetFromDisk,
     PairEmbedsLabelsDatasetFromDisk,
     EmbedsLabelsDataset,
@@ -13,15 +13,15 @@ from data.dataset_classes import (
     StringLabelDataset,
     PairStringLabelDataset,
 )
-from data.data_collators import (
+from protify.data.data_collators import (
     EmbedsLabelsCollator,
     PairEmbedsLabelsCollator,
     PairCollator_input_ids,
     StringLabelsCollator,
 )
-from visualization.ci_plots import regression_ci_plot, classification_ci_plot
-from utils import print_message
-from metrics import get_compute_metrics
+from protify.visualization.ci_plots import regression_ci_plot, classification_ci_plot
+from protify.utils import print_message
+from protify.metrics import get_compute_metrics
 
 
 @dataclass
@@ -101,7 +101,7 @@ class TrainerArguments:
             warmup_steps=warmup_steps,
             save_total_limit=3,
             logging_steps=1000,
-            report_to='none',
+            report_to='none',  # Will be overridden if wandb hyperopt is enabled
             load_best_model_at_end=True,
             metric_for_best_model='eval_loss',
             greater_is_better=False,
@@ -176,6 +176,22 @@ class TrainerMixin:
                 trainer.model.push_to_hub(hub_path, private=True)
             except Exception as e:
                 print_message(f'Error saving model: {e}')
+
+        # Save model for inference
+        if self.trainer_args.save:
+            inference_model_path = os.path.join(self.trainer_args.model_save_dir, f"{data_name}_{model_name}_{log_id}_inference.pth")
+            os.makedirs(self.trainer_args.model_save_dir, exist_ok=True)
+            
+            # Check if model has save_for_inference method
+            if hasattr(trainer.model, 'save_for_inference'):
+                trainer.model.save_for_inference(inference_model_path)
+            else:
+                # Fallback to regular torch.save
+                torch.save({
+                    'model_state_dict': trainer.model.state_dict(),
+                    'model_type': type(trainer.model).__name__.lower()
+                }, inference_model_path)
+                print_message(f'Model saved for inference at: {inference_model_path}')
 
         model = trainer.model.cpu()
         trainer.accelerator.free_memory()
@@ -357,6 +373,60 @@ class TrainerMixin:
                 ppi=ppi,
                 log_id=log_id,
             )
+
+    def enable_wandb_logging(self, project_name: str = None, run_name: str = None, 
+                           entity: str = None, config: dict = None):
+        """
+        Enable Weights & Biases logging for training.
+        
+        Args:
+            project_name: W&B project name
+            run_name: W&B run name
+            entity: W&B entity
+            config: Configuration dictionary to log
+        """
+        try:
+            import wandb
+            
+            # Initialize wandb run
+            wandb.init(
+                project=project_name,
+                name=run_name,
+                entity=entity,
+                config=config,
+                reinit=True
+            )
+            
+            # Update trainer args to report to wandb
+            self.trainer_args.report_to = 'wandb'
+            print_message(f"Enabled wandb logging for project: {project_name}")
+            
+        except ImportError:
+            print_message("wandb not installed. Install with: pip install wandb")
+        except Exception as e:
+            print_message(f"Error enabling wandb: {e}")
+
+    def disable_wandb_logging(self):
+        """Disable Weights & Biases logging."""
+        try:
+            import wandb
+            self.trainer_args.report_to = 'none'
+            wandb.finish()
+            print_message("Disabled wandb logging")
+        except ImportError:
+            pass
+        except Exception as e:
+            print_message(f"Error disabling wandb: {e}")
+
+    def get_model_for_training(self, model_name: str):
+        """Get model for training (placeholder - implement based on your model loading logic)."""
+        # This should be implemented based on your existing model loading code
+        pass
+    
+    def get_probe_for_training(self):
+        """Get probe for training (placeholder - implement based on your probe creation logic).""" 
+        # This should be implemented based on your existing probe creation code
+        pass
 
 
 

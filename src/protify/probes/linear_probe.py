@@ -3,7 +3,7 @@ from torch import nn
 from typing import Optional
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.modeling_outputs import SequenceClassifierOutput
-from model_components.mlp import intermediate_correction_fn
+from protify.model_components.mlp import intermediate_correction_fn
 from .losses import get_loss_fct
 
 
@@ -76,3 +76,48 @@ class LinearProbe(PreTrainedModel):
             hidden_states=None,
             attentions=None
         )
+
+    def predict(self, embeddings: torch.Tensor) -> tuple:
+        """
+        Generate predictions and probabilities for the given embeddings.
+        
+        Args:
+            embeddings: Input embeddings tensor
+            
+        Returns:
+            tuple: (predictions, probabilities)
+        """
+        self.eval()
+        with torch.no_grad():
+            outputs = self.forward(embeddings)
+            logits = outputs.logits
+            
+            if self.task_type == 'regression':
+                # For regression, apply sigmoid to get probabilities
+                probabilities = torch.sigmoid(logits)
+                predictions = (probabilities > 0.5).long()
+            elif self.task_type == 'multilabel':
+                # For multilabel, apply sigmoid per label
+                probabilities = torch.sigmoid(logits)
+                predictions = (probabilities > 0.5).long()
+            else:
+                # For single-label classification, apply softmax
+                probabilities = torch.softmax(logits, dim=-1)
+                predictions = torch.argmax(probabilities, dim=-1)
+                
+        return predictions, probabilities
+        
+    def save_for_inference(self, save_path: str):
+        """
+        Save model for inference with config information.
+        
+        Args:
+            save_path: Path to save the model
+        """
+        checkpoint = {
+            'model_state_dict': self.state_dict(),
+            'config': self.config,
+            'model_type': 'linear_probe'
+        }
+        torch.save(checkpoint, save_path)
+        print(f"Model saved for inference at: {save_path}")

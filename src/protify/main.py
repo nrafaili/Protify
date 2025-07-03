@@ -2,6 +2,7 @@ import os
 import argparse
 import yaml
 from types import SimpleNamespace
+from utils import torch_load, print_message
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -101,6 +102,13 @@ def parse_arguments():
     parser.add_argument("--full_finetuning", action="store_true", default=False, help="Full finetuning (default: False).")
     parser.add_argument("--hybrid_probe", action="store_true", default=False, help="Hybrid probe (default: False).")
 
+    # ----------------- WandbHyperoptArguments ----------------- #
+    parser.add_argument("--use_wandb_hyperopt", action="store_true", default=False, help="Enable wandb hyperparameter optimization (default: False).")
+    parser.add_argument("--wandb_project", default="protify-hyperopt", help="Weights & Biases project name.")
+    parser.add_argument("--wandb_entity", default=None, help="Weights & Biases entity.")
+    parser.add_argument("--sweep_config_path", default=None, help="Path to YAML sweep configuration file.")
+    parser.add_argument("--sweep_count", type=int, default=50, help="Number of hyperparameter optimization runs in sweep.")
+
     args = parser.parse_args()
 
     if args.hf_token is not None:
@@ -153,24 +161,31 @@ if __name__ == "__main__":
 import torch
 from torchinfo import summary
 
-from probes.get_probe import ProbeArguments, get_probe
+from protify.probes.get_probe import ProbeArguments, get_probe
 from base_models.get_base_models import BaseModelArguments, get_tokenizer, get_base_model_for_training
 from base_models.utils import wrap_lora
-from data.data_mixin import DataMixin, DataArguments
-from probes.trainers import TrainerMixin, TrainerArguments
-from probes.scikit_classes import ScikitArguments, ScikitProbe
+from protify.data.data_mixin import DataMixin, DataArguments
+from protify.probes.trainers import TrainerMixin, TrainerArguments
+from protify.probes.scikit_classes import ScikitArguments, ScikitProbe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
-from utils import torch_load, print_message
 from visualization.plot_result import create_plots
+from hyperopt import WandbHyperoptArguments, WandbHyperoptMixin
 
 
-class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
+class MainProcess(MetricsLogger, DataMixin, TrainerMixin, WandbHyperoptMixin):
     def __init__(self, full_args, GUI=False):
         super(MainProcess, self).__init__(full_args)
         super(DataMixin, self).__init__()
         super(TrainerMixin, self).__init__()
         self.full_args = full_args
+                
+        # Initialize WandbHyperoptMixin after other args are set up
+        wandb_hyperopt_args = None
+        if hasattr(full_args, 'use_wandb_hyperopt') and full_args.use_wandb_hyperopt:
+            wandb_hyperopt_args = WandbHyperoptArguments(**full_args.__dict__)
+        super(WandbHyperoptMixin, self).__init__(wandb_hyperopt_args=wandb_hyperopt_args)
+        
         if not GUI:
             self.start_log_main()
 
@@ -193,6 +208,11 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         self.trainer_args = TrainerArguments(**self.full_args.__dict__)
         self.logger_args = SimpleNamespace(**self.full_args.__dict__)
         self.scikit_args = ScikitArguments(**self.full_args.__dict__)
+        
+        # wandb_hyperopt_args is already initialized in constructor
+        if not hasattr(self, 'wandb_hyperopt_args') or self.wandb_hyperopt_args is None:
+            self.wandb_hyperopt_args = WandbHyperoptArguments(**self.full_args.__dict__)
+        
         self._sql = self.full_args.sql
         self._full = self.full_args.matrix_embed
         self._max_length = self.full_args.max_length
@@ -470,6 +490,92 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         create_plots(results_file, output_dir)
         print_message("Plots generated successfully!")
         
+    @log_method_calls
+    def run_hyperparameter_optimization_workflow(self):
+        """
+        Run hyperparameter optimization and then final training with best hyperparameters.
+        """
+        print_message("Starting hyperparameter optimization workflow...")
+        
+        # We need at least one model and one dataset for hyperopt
+        if not self.model_args.model_names or not self.datasets:
+            print_message("No models or datasets found for hyperparameter optimization")
+            return
+        
+        # Use the first model and first dataset for hyperopt
+        model_name = self.model_args.model_names[0]
+        data_name = list(self.datasets.keys())[0]
+        dataset = self.datasets[data_name]
+        train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
+        
+        # Set up probe args for hyperopt
+        self.probe_args.num_labels = num_labels
+        self.probe_args.task_type = label_type
+        self.trainer_args.task_type = label_type
+        
+        print_message(f"Running hyperparameter optimization on {model_name} with {data_name}")
+        
+        # Prepare data for hyperopt based on training mode
+        if self.trainer_args.full_finetuning:
+            # For full finetuning, no embeddings needed
+            best_config = self.run_hyperopt_and_get_best_config(
+                model_name=model_name,
+                data_name=data_name,
+                train_dataset=train_set,
+                valid_dataset=valid_set,
+                test_dataset=test_set,
+                ppi=ppi,
+                sweep_config_path=self.wandb_hyperopt_args.sweep_config_path
+            )
+        else:
+            # For probe training, we need embeddings
+            test_seq = self.all_seqs[0]
+            
+            if self._sql:
+                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{self._full}.db')
+                input_dim = self.get_embedding_dim_sql(save_path, test_seq)
+                emb_dict = None
+            else:
+                save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{self._full}.pth')
+                emb_dict = torch_load(save_path)
+                input_dim = self.get_embedding_dim_pth(emb_dict, test_seq)
+            
+            if ppi and not self._full:
+                self.probe_args.input_dim = input_dim * 2
+            else:
+                self.probe_args.input_dim = input_dim
+            
+            tokenizer = get_tokenizer(model_name)
+            
+            best_config = self.run_hyperopt_and_get_best_config(
+                model_name=model_name,
+                data_name=data_name,
+                train_dataset=train_set,
+                valid_dataset=valid_set,
+                test_dataset=test_set,
+                tokenizer=tokenizer,
+                emb_dict=emb_dict,
+                ppi=ppi,
+                sweep_config_path=self.wandb_hyperopt_args.sweep_config_path
+            )
+        
+        if not best_config:
+            print_message("No best configuration found from hyperparameter optimization")
+            return
+        
+        # Update arguments with best hyperparameters
+        self.update_args_with_best_config(best_config)
+        
+        print_message("Running final training with optimized hyperparameters...")
+        
+        # Now run the full training workflow with optimized hyperparameters
+        if self.trainer_args.full_finetuning:
+            self.run_full_finetuning()
+        elif self.trainer_args.hybrid_probe:
+            self.run_hybrid_probes()
+        else:
+            self.run_nn_probes()
+
 
 def main(args: SimpleNamespace):
     if args.replay_path is not None:
@@ -489,20 +595,33 @@ def main(args: SimpleNamespace):
         main.apply_current_settings()
         main.get_datasets()
         print_message(f"Number of sequences: {len(main.all_seqs)}")
-        if main.full_args.full_finetuning:
-            main.run_full_finetuning()
-
-        elif main.full_args.hybrid_probe:
-            main.save_embeddings_to_disk()
-            main.run_hybrid_probes()
-
-        elif main.full_args.use_scikit:
-            main.save_embeddings_to_disk()
-            main.run_scikit_scheme()
         
+        # Check if hyperparameter optimization is enabled
+        if main.wandb_hyperopt_args.use_wandb_hyperopt:
+            # Save embeddings first if needed for probe training
+            if not main.trainer_args.full_finetuning:
+                main.save_embeddings_to_disk()
+            
+            # Run hyperparameter optimization workflow
+            main.run_hyperparameter_optimization_workflow()
+            
         else:
-            main.save_embeddings_to_disk()
-            main.run_nn_probes()
+            # Original workflow without hyperopt
+            if main.full_args.full_finetuning:
+                main.run_full_finetuning()
+
+            elif main.full_args.hybrid_probe:
+                main.save_embeddings_to_disk()
+                main.run_hybrid_probes()
+
+            elif main.full_args.use_scikit:
+                main.save_embeddings_to_disk()
+                main.run_scikit_scheme()
+            
+            else:
+                main.save_embeddings_to_disk()
+                main.run_nn_probes()
+                
         main.write_results()
         main.generate_plots()
         main.end_log()

@@ -3,9 +3,9 @@ from torch import nn
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.modeling_outputs import SequenceClassifierOutput, TokenClassifierOutput
 from typing import List, Optional
-from pooler import Pooler
-from model_components.mlp import intermediate_correction_fn
-from model_components.transformer import Transformer
+from protify.pooler import Pooler
+from protify.model_components.mlp import intermediate_correction_fn
+from protify.model_components.transformer import Transformer
 from .losses import get_loss_fct
 
 

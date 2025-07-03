@@ -24,8 +24,7 @@ col_names:
   - labels
 max_length: !!int 1024
 trim: !!bool false
-data_names:
-  - DeepLoc-2
+data_names: []
 data_dirs: []
 
 
@@ -89,3 +88,11 @@ patience: !!int 1
 seed: !!int 42
 full_finetuning: !!bool false
 hybrid_probe: !!bool false
+
+
+# WandbHyperoptArguments:
+use_wandb_hyperopt: !!bool false
+wandb_project: protify-hyperopt
+wandb_entity: null
+sweep_config_path: null  # Path to YAML sweep configuration file
+sweep_count: !!int 50

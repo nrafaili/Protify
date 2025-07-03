@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from utils import print_message
+from protify.utils import print_message
 
 
 def log_method_calls(func):
