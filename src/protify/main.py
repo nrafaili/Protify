@@ -36,7 +36,7 @@ def parse_arguments():
     parser.add_argument("--trim", action="store_true", default=False,
                         help="Whether to trim sequences (default: False). If False, sequences are removed from the dataset if they are longer than max length. If True, they are truncated to max length."
                         )
-    parser.add_argument("--data_names", nargs="+", default=["DeepLoc-2"], help="List of HF dataset names.") # TODO rename to data_names
+    parser.add_argument("--data_names", nargs="*", default=["DeepLoc-2"], help="List of HF dataset names.") # TODO rename to data_names
     parser.add_argument("--data_dirs", nargs="+", default=[], help="List of local data directories.")
 
     # ----------------- BaseModelArguments ----------------- #
