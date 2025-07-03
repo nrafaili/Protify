@@ -4,8 +4,8 @@ import numpy as np
 from typing import Optional
 from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
 from dataclasses import dataclass
-from protify.probes.hybrid_probe import HybridProbe, HybridProbeConfig
-from protify.data.dataset_classes import (
+from probes.hybrid_probe import HybridProbe, HybridProbeConfig
+from data.dataset_classes import (
     EmbedsLabelsDatasetFromDisk,
     PairEmbedsLabelsDatasetFromDisk,
     EmbedsLabelsDataset,
@@ -13,15 +13,15 @@ from protify.data.dataset_classes import (
     StringLabelDataset,
     PairStringLabelDataset,
 )
-from protify.data.data_collators import (
+from data.data_collators import (
     EmbedsLabelsCollator,
     PairEmbedsLabelsCollator,
     PairCollator_input_ids,
     StringLabelsCollator,
 )
-from protify.visualization.ci_plots import regression_ci_plot, classification_ci_plot
-from protify.utils import print_message
-from protify.metrics import get_compute_metrics
+from visualization.ci_plots import regression_ci_plot, classification_ci_plot
+from utils import print_message
+from metrics import get_compute_metrics
 
 
 @dataclass

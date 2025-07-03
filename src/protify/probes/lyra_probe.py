@@ -5,8 +5,8 @@ from typing import Optional
 from einops import rearrange, repeat
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.modeling_outputs import SequenceClassifierOutput, TokenClassifierOutput
-from protify.model_components.mlp import intermediate_correction_fn
-from protify.pooler import Pooler
+from model_components.mlp import intermediate_correction_fn
+from pooler import Pooler
 from .losses import get_loss_fct
 
 

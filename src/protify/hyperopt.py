@@ -4,7 +4,8 @@ import wandb
 from typing import Dict, Any, Optional, Callable
 from dataclasses import dataclass
 from types import SimpleNamespace
-from protify.utils import print_message
+from utils import print_message
+from probes.trainers import TrainerArguments
 
 @dataclass
 class WandbHyperoptArguments:

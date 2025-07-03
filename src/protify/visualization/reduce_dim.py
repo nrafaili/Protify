@@ -8,7 +8,7 @@ from sklearn.decomposition import PCA as SklearnPCA
 from sklearn.manifold import TSNE as SklearnTSNE
 from typing import Optional, Union, List
 from matplotlib.colors import LinearSegmentedColormap
-from protify.utils import torch_load, print_message
+from utils import torch_load, print_message
 
 
 @dataclass

@@ -21,7 +21,7 @@ from sklearn.metrics import (
     r2_score,
     mean_squared_error,
 )
-from protify.utils import print_message
+from utils import print_message
 warnings.filterwarnings("ignore")
 pd.set_option("display.precision", 2)
 pd.set_option("display.float_format", lambda x: "%.2f" % x)

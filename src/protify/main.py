@@ -161,12 +161,12 @@ if __name__ == "__main__":
 import torch
 from torchinfo import summary
 
-from protify.probes.get_probe import ProbeArguments, get_probe
+from probes.get_probe import ProbeArguments, get_probe
 from base_models.get_base_models import BaseModelArguments, get_tokenizer, get_base_model_for_training
 from base_models.utils import wrap_lora
-from protify.data.data_mixin import DataMixin, DataArguments
-from protify.probes.trainers import TrainerMixin, TrainerArguments
-from protify.probes.scikit_classes import ScikitArguments, ScikitProbe
+from data.data_mixin import DataMixin, DataArguments
+from probes.trainers import TrainerMixin, TrainerArguments
+from probes.scikit_classes import ScikitArguments, ScikitProbe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
 from visualization.plot_result import create_plots

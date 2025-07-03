@@ -7,13 +7,13 @@ from typing import List, Dict, Optional, Union
 from dataclasses import dataclass
 from tqdm.auto import tqdm
 
-from protify.probes.linear_probe import LinearProbe
-from protify.probes.transformer_probe import TransformerProbe
-from protify.data.dataset_classes import InferenceDataset, InferenceDatasetFromDisk
-from protify.data.data_collators import InferenceCollator
+from probes.linear_probe import LinearProbe
+from probes.transformer_probe import TransformerProbe
+from data.dataset_classes import InferenceDataset, InferenceDatasetFromDisk
+from data.data_collators import InferenceCollator
 from embedder import Embedder, EmbeddingArguments
-from protify.utils import torch_load, print_message
-from protify.probes.linear_probe import LinearProbeConfig
+from utils import torch_load, print_message
+from probes.linear_probe import LinearProbeConfig
 
 
 @dataclass

@@ -9,13 +9,13 @@ from dataclasses import dataclass
 from typing import Optional, Callable, List
 from huggingface_hub import hf_hub_download
 
-from protify.data.dataset_classes import SimpleProteinDataset
+from data.dataset_classes import SimpleProteinDataset
 from base_models.get_base_models import get_base_model
-from protify.pooler import Pooler
-from protify.utils import torch_load, print_message
+from pooler import Pooler
+from utils import torch_load, print_message
 
-from protify.data.supported_datasets import possible_with_vector_reps
-from protify.data.data_mixin import DataArguments, DataMixin
+from data.supported_datasets import possible_with_vector_reps
+from data.data_mixin import DataArguments, DataMixin
 
 
 def build_collator(tokenizer) -> Callable[[List[str]], tuple[torch.Tensor, torch.Tensor]]:

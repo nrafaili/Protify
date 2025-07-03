@@ -9,10 +9,10 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from types import SimpleNamespace
-from protify.hyperopt import WandbHyperoptArguments, WandbHyperparameterOptimizer, WandbHyperoptMixin
-from protify.probes.trainers import TrainerArguments
-from protify.probes.get_probe import ProbeArguments
-from protify.utils import print_message
+from hyperopt import WandbHyperoptArguments, WandbHyperparameterOptimizer, WandbHyperoptMixin
+from probes.trainers import TrainerArguments
+from probes.get_probe import ProbeArguments
+from utils import print_message
 
 
 def test_wandb_hyperopt_arguments():

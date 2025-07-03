@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset as TorchDataset
 from tqdm.auto import tqdm
 from typing import List
-from protify.utils import print_message
+from utils import print_message
 
 
 class PairEmbedsLabelsDatasetFromDisk(TorchDataset):
