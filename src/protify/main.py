@@ -2,7 +2,7 @@ import os
 import argparse
 import yaml
 from types import SimpleNamespace
-from .utils import torch_load, print_message
+from utils import torch_load, print_message
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
