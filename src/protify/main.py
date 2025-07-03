@@ -178,13 +178,13 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin, WandbHyperoptMixin):
         super(MainProcess, self).__init__(full_args)
         super(DataMixin, self).__init__()
         super(TrainerMixin, self).__init__()
-        self.full_args = full_args
                 
         # Initialize WandbHyperoptMixin after other args are set up
         wandb_hyperopt_args = None
         if hasattr(full_args, 'use_wandb_hyperopt') and full_args.use_wandb_hyperopt:
             wandb_hyperopt_args = WandbHyperoptArguments(**full_args.__dict__)
-        super(WandbHyperoptMixin, self).__init__(wandb_hyperopt_args=wandb_hyperopt_args)
+        WandbHyperoptMixin.__init__(self, wandb_hyperopt_args=wandb_hyperopt_args)
+        self.full_args = full_args
         
         if not GUI:
             self.start_log_main()
