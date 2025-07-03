@@ -295,7 +295,6 @@ class WandbHyperoptMixin:
                     updated_probe_dict[key] = value
             
             # Create new args objects
-            from protify.probes.trainers import TrainerArguments
             self.trainer_args = TrainerArguments(**updated_trainer_dict)
             if original_probe_args:
                 self.probe_args = SimpleNamespace(**updated_probe_dict)
