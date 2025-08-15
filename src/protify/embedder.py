@@ -14,6 +14,9 @@ from base_models.get_base_models import get_base_model
 from pooler import Pooler
 from utils import torch_load, print_message
 
+from data.supported_datasets import possible_with_vector_reps
+from data.data_mixin import DataArguments, DataMixin
+
 
 def build_collator(tokenizer) -> Callable[[List[str]], tuple[torch.Tensor, torch.Tensor]]:
     def _collate_fn(sequences: List[str]) -> tuple[torch.Tensor, torch.Tensor]:
@@ -271,8 +274,6 @@ if __name__ == '__main__':
     # py -m embedder
     import argparse
     from huggingface_hub import upload_file, login
-    from data.supported_datasets import possible_with_vector_reps
-    from data.data_mixin import DataArguments, DataMixin
     from base_models.get_base_models import BaseModelArguments, get_base_model
 
     os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1' # prevent cache warning on Windows machines

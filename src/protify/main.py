@@ -2,6 +2,7 @@ import os
 import argparse
 import yaml
 from types import SimpleNamespace
+from utils import torch_load, print_message
 
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -36,7 +37,7 @@ def parse_arguments():
     parser.add_argument("--trim", action="store_true", default=False,
                         help="Whether to trim sequences (default: False). If False, sequences are removed from the dataset if they are longer than max length. If True, they are truncated to max length."
                         )
-    parser.add_argument("--data_names", nargs="+", default=["DeepLoc-2"], help="List of HF dataset names.") # TODO rename to data_names
+    parser.add_argument("--data_names", nargs="*", default=["DeepLoc-2"], help="List of HF dataset names.") # TODO rename to data_names
     parser.add_argument("--data_dirs", nargs="+", default=[], help="List of local data directories.")
 
     # ----------------- BaseModelArguments ----------------- #
@@ -104,6 +105,13 @@ def parse_arguments():
     parser.add_argument("--full_finetuning", action="store_true", default=False, help="Full finetuning (default: False).")
     parser.add_argument("--hybrid_probe", action="store_true", default=False, help="Hybrid probe (default: False).")
 
+    # ----------------- WandbHyperoptArguments ----------------- #
+    parser.add_argument("--use_wandb_hyperopt", action="store_true", default=False, help="Enable wandb hyperparameter optimization (default: False).")
+    parser.add_argument("--wandb_project", default="protify-hyperopt", help="Weights & Biases project name.")
+    parser.add_argument("--wandb_entity", default=None, help="Weights & Biases entity.")
+    parser.add_argument("--sweep_config_path", default=None, help="Path to YAML sweep configuration file.")
+    parser.add_argument("--sweep_count", type=int, default=50, help="Number of hyperparameter optimization runs in sweep.")
+
     args = parser.parse_args()
 
     if args.hf_token is not None:
@@ -160,16 +168,23 @@ from probes.trainers import TrainerMixin, TrainerArguments
 from probes.scikit_classes import ScikitArguments, ScikitProbe
 from embedder import EmbeddingArguments, Embedder
 from logger import MetricsLogger, log_method_calls
-from utils import torch_load, print_message
 from visualization.plot_result import create_plots
+from hyperopt import WandbHyperoptArguments, WandbHyperoptMixin
 
 
-class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
+class MainProcess(MetricsLogger, DataMixin, TrainerMixin, WandbHyperoptMixin):
     def __init__(self, full_args, GUI=False):
         super(MainProcess, self).__init__(full_args)
         super(DataMixin, self).__init__()
         super(TrainerMixin, self).__init__()
+                
+        # Initialize WandbHyperoptMixin after other args are set up
+        wandb_hyperopt_args = None
+        if hasattr(full_args, 'use_wandb_hyperopt') and full_args.use_wandb_hyperopt:
+            wandb_hyperopt_args = WandbHyperoptArguments(**full_args.__dict__)
+        WandbHyperoptMixin.__init__(self, wandb_hyperopt_args=wandb_hyperopt_args)
         self.full_args = full_args
+        
         if not GUI:
             self.start_log_main()
 
@@ -192,6 +207,11 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         self.trainer_args = TrainerArguments(**self.full_args.__dict__)
         self.logger_args = SimpleNamespace(**self.full_args.__dict__)
         self.scikit_args = ScikitArguments(**self.full_args.__dict__)
+        
+        # wandb_hyperopt_args is already initialized in constructor
+        if not hasattr(self, 'wandb_hyperopt_args') or self.wandb_hyperopt_args is None:
+            self.wandb_hyperopt_args = WandbHyperoptArguments(**self.full_args.__dict__)
+        
         self._sql = self.full_args.sql
         self._full = self.full_args.matrix_embed
         self._max_length = self.full_args.max_length
@@ -304,6 +324,141 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         self.log_metrics(data_name, model_name, valid_metrics, split_name='valid')
         self.log_metrics(data_name, model_name, test_metrics, split_name='test')
         return model
+
+    def _run_hyperopt_probe(
+            self,
+            model_name,
+            data_name,
+            train_set,
+            valid_set,
+            test_set,
+            tokenizer=None,
+            emb_dict=None,
+            ppi=False,
+            sweep_config_path=None,
+        ):
+        """
+        Run hyperparameter optimization and return the best trained probe/model.
+        Handles different training modes: full finetuning, hybrid probe, or regular probe.
+        """
+        if self.trainer_args.full_finetuning:
+            # Full finetuning mode
+            tokenwise = self.probe_args.tokenwise
+            num_labels = self.probe_args.num_labels
+            model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels, hybrid=False)
+            if self.probe_args.lora:
+                model = wrap_lora(model, self.probe_args.lora_r, self.probe_args.lora_alpha, self.probe_args.lora_dropout)
+            summary(model)
+            
+            best_config = self.run_hyperopt_and_get_best_config(
+                model_name=model_name,
+                data_name=data_name,
+                train_dataset=train_set,
+                valid_dataset=valid_set,
+                test_dataset=test_set,
+                ppi=ppi,
+                sweep_config_path=sweep_config_path
+            )
+            
+            if best_config:
+                self.update_args_with_best_config(best_config)
+                # Train final model with best hyperparameters
+                model, valid_metrics, test_metrics = self.trainer_base_model(
+                    model=model,
+                    tokenizer=tokenizer,
+                    model_name=model_name,
+                    data_name=data_name,
+                    train_dataset=train_set,
+                    valid_dataset=valid_set,
+                    test_dataset=test_set,
+                    ppi=ppi,
+                    log_id=self.random_id,
+                )
+                self.log_metrics(data_name, model_name, valid_metrics, split_name='valid')
+                self.log_metrics(data_name, model_name, test_metrics, split_name='test')
+                return model
+            return None
+            
+        elif self.trainer_args.hybrid_probe:
+            # Hybrid probe mode
+            tokenwise = self.probe_args.tokenwise
+            num_labels = self.probe_args.num_labels
+            model, tokenizer = get_base_model_for_training(model_name, tokenwise=tokenwise, num_labels=num_labels, hybrid=True)
+            if self.probe_args.lora:
+                model = wrap_lora(model, self.probe_args.lora_r, self.probe_args.lora_alpha, self.probe_args.lora_dropout)
+            probe = get_probe(self.probe_args)
+            summary(model)
+            summary(probe)
+            
+            best_config = self.run_hyperopt_and_get_best_config(
+                model_name=model_name,
+                data_name=data_name,
+                train_dataset=train_set,
+                valid_dataset=valid_set,
+                test_dataset=test_set,
+                tokenizer=tokenizer,
+                emb_dict=emb_dict,
+                ppi=ppi,
+                sweep_config_path=sweep_config_path
+            )
+            
+            if best_config:
+                self.update_args_with_best_config(best_config)
+                # Train final model with best hyperparameters
+                model, valid_metrics, test_metrics = self.trainer_hybrid_model(
+                    model=model,
+                    tokenizer=tokenizer,
+                    probe=probe,
+                    model_name=model_name,
+                    data_name=data_name,
+                    train_dataset=train_set,
+                    valid_dataset=valid_set,
+                    test_dataset=test_set,
+                    emb_dict=emb_dict,
+                    ppi=ppi,
+                    log_id=self.random_id,
+                )
+                self.log_metrics(data_name, model_name, valid_metrics, split_name='valid')
+                self.log_metrics(data_name, model_name, test_metrics, split_name='test')
+                return model
+            return None
+            
+        else:
+            # Regular probe mode
+            probe = get_probe(self.probe_args)
+            summary(probe)
+            
+            best_config = self.run_hyperopt_and_get_best_config(
+                model_name=model_name,
+                data_name=data_name,
+                train_dataset=train_set,
+                valid_dataset=valid_set,
+                test_dataset=test_set,
+                tokenizer=tokenizer,
+                emb_dict=emb_dict,
+                ppi=ppi,
+                sweep_config_path=sweep_config_path
+            )
+            
+            if best_config:
+                self.update_args_with_best_config(best_config)
+                # Train final probe with best hyperparameters
+                probe, valid_metrics, test_metrics = self.trainer_probe(
+                    model=probe,
+                    tokenizer=tokenizer,
+                    model_name=model_name,
+                    data_name=data_name,
+                    train_dataset=train_set,
+                    valid_dataset=valid_set,
+                    test_dataset=test_set,
+                    emb_dict=emb_dict,
+                    ppi=ppi,
+                    log_id=self.random_id,
+                )
+                self.log_metrics(data_name, model_name, valid_metrics, split_name='valid')
+                self.log_metrics(data_name, model_name, test_metrics, split_name='test')
+                return probe
+            return None
 
     @log_method_calls
     def run_full_finetuning(self):
@@ -469,6 +624,75 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
         create_plots(results_file, output_dir)
         print_message("Plots generated successfully!")
         
+    @log_method_calls
+    def run_hyperparameter_optimization_workflow(self):
+        """
+        Run hyperparameter optimization and then final training with best hyperparameters.
+        Uses _run_hyperopt_probe for each model/dataset combination.
+        """
+        print_message("Starting hyperparameter optimization workflow...")
+        
+        # We need at least one model and one dataset for hyperopt
+        if not self.model_args.model_names or not self.datasets:
+            print_message("No models or datasets found for hyperparameter optimization")
+            return
+        
+        # Log the combinations we're going to process
+        total_combinations = len(self.model_args.model_names) * len(self.datasets)
+        self.logger.info(f"Processing {total_combinations} model/dataset combinations with hyperopt")
+        
+        # Process each model/dataset combination
+        for model_name in self.model_args.model_names:
+            self.logger.info(f"Processing model: {model_name}")
+            
+            # Get tokenizer and prepare embeddings if needed
+            tokenizer = get_tokenizer(model_name)
+            emb_dict = None
+            
+            if not self.trainer_args.full_finetuning:
+                # For probe training, we need embeddings
+                test_seq = self.all_seqs[0]
+                
+                if self._sql:
+                    save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{self._full}.db')
+                    input_dim = self.get_embedding_dim_sql(save_path, test_seq, tokenizer)
+                    emb_dict = None
+                else:
+                    save_path = os.path.join(self.embedding_args.embedding_save_dir, f'{model_name}_{self._full}.pth')
+                    emb_dict = torch_load(save_path)
+                    input_dim = self.get_embedding_dim_pth(emb_dict, test_seq, tokenizer)
+            
+            # Process each dataset
+            for data_name, dataset in self.datasets.items():
+                self.logger.info(f"Processing dataset: {data_name}")
+                train_set, valid_set, test_set, num_labels, label_type, ppi = dataset
+                
+                # Set up probe args for this dataset
+                if not self.trainer_args.full_finetuning:
+                    if ppi and not self._full:
+                        self.probe_args.input_dim = input_dim * 2
+                    else:
+                        self.probe_args.input_dim = input_dim
+                
+                self.probe_args.num_labels = num_labels
+                self.probe_args.task_type = label_type
+                self.trainer_args.task_type = label_type
+                
+                print_message(f"Running hyperparameter optimization on {model_name} with {data_name}")
+                
+                # Run hyperopt for this model/dataset combination
+                _ = self._run_hyperopt_probe(
+                    model_name=model_name,
+                    data_name=data_name,
+                    train_set=train_set,
+                    valid_set=valid_set,
+                    test_set=test_set,
+                    tokenizer=tokenizer,
+                    emb_dict=emb_dict,
+                    ppi=ppi,
+                    sweep_config_path=self.wandb_hyperopt_args.sweep_config_path
+                )
+
 
 def main(args: SimpleNamespace):
     if args.replay_path is not None:
@@ -488,20 +712,33 @@ def main(args: SimpleNamespace):
         main.apply_current_settings()
         main.get_datasets()
         print_message(f"Number of sequences: {len(main.all_seqs)}")
-        if main.full_args.full_finetuning:
-            main.run_full_finetuning()
-
-        elif main.full_args.hybrid_probe:
-            main.save_embeddings_to_disk()
-            main.run_hybrid_probes()
-
-        elif main.full_args.use_scikit:
-            main.save_embeddings_to_disk()
-            main.run_scikit_scheme()
         
+        # Check if hyperparameter optimization is enabled
+        if main.wandb_hyperopt_args.use_wandb_hyperopt:
+            # Save embeddings first if needed for probe training
+            if not main.trainer_args.full_finetuning:
+                main.save_embeddings_to_disk()
+            
+            # Run hyperparameter optimization workflow
+            main.run_hyperparameter_optimization_workflow()
+            
         else:
-            main.save_embeddings_to_disk()
-            main.run_nn_probes()
+            # Original workflow without hyperopt
+            if main.full_args.full_finetuning:
+                main.run_full_finetuning()
+
+            elif main.full_args.hybrid_probe:
+                main.save_embeddings_to_disk()
+                main.run_hybrid_probes()
+
+            elif main.full_args.use_scikit:
+                main.save_embeddings_to_disk()
+                main.run_scikit_scheme()
+            
+            else:
+                main.save_embeddings_to_disk()
+                main.run_nn_probes()
+                
         main.write_results()
         main.generate_plots()
         main.end_log()

@@ -266,6 +266,11 @@ class DataMixin:
                 test_set = train_set.train_test_split(test_size=0.5, seed=42)
                 test_set = test_set['test']
 
+            # Sample only 10% of each split for efficient testing
+            train_set = train_set.train_test_split(test_size=0.1, seed=42)['test']
+            valid_set = valid_set.train_test_split(test_size=0.1, seed=42)['test']
+            test_set = test_set.train_test_split(test_size=0.1, seed=42)['test']
+
             if not ppi:
                 print('Standardizing column names')
                 seq_col = self.data_args.col_names[0]
@@ -297,6 +302,11 @@ class DataMixin:
                 train_set = read_csv(train_path, delimiter=self._delimiter)
                 valid_set = read_csv(valid_path, delimiter=self._delimiter)
                 test_set = read_csv(test_path, delimiter=self._delimiter)
+
+            # Sample only 10% of each split for efficient testing
+            train_set = train_set.sample(frac=0.1, random_state=42)
+            valid_set = valid_set.sample(frac=0.1, random_state=42)
+            test_set = test_set.sample(frac=0.1, random_state=42)
 
             train_set = Dataset.from_pandas(train_set)
             valid_set = Dataset.from_pandas(valid_set)
