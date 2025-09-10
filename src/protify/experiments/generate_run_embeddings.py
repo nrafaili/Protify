@@ -2,10 +2,10 @@ import os
 import argparse
 import torch
 
-from protify.seed_utils import set_global_seed, set_determinism
-from protify.data.data_mixin import DataArguments, DataMixin
-from protify.embedder import EmbeddingArguments, Embedder
-from protify.utils import print_message
+from seed_utils import set_global_seed, set_determinism
+from data.data_mixin import DataArguments, DataMixin
+from embedder import EmbeddingArguments, Embedder
+from utils import print_message
 
 set_global_seed(seed)
 if deterministic:
