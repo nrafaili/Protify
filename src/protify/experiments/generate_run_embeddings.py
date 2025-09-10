@@ -7,6 +7,8 @@ from data.data_mixin import DataArguments, DataMixin
 from embedder import EmbeddingArguments, Embedder
 from utils import print_message
 
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
 def generate_embeddings(
     data_name: str,
     seed: int,
