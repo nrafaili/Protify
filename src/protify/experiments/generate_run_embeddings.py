@@ -10,7 +10,7 @@ from utils import print_message
 set_global_seed(seed)
 if deterministic:
     set_determinism()
-
+print(f"Seed: {seed}, Deterministic: {deterministic}")
 def generate_embeddings(
     data_name: str,
     seed: int,
@@ -63,7 +63,7 @@ def generate_embeddings(
 def parse_args():
     parser = argparse.ArgumentParser(description='Generate embeddings for a single run (Random and Random-Transformer)')
     parser.add_argument('--data_names', type=str, default='DeepLoc-2', help='Dataset short name (e.g., DeepLoc-2)')
-    parser.add_argument('--seed', type=int, default=42, help='Random seed')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed')
     parser.add_argument('--deterministic', action='store_true', default=False, help='Enable deterministic algorithms')
     parser.add_argument('--num_seqs', type=int, default=256, help='Limit number of sequences to embed (0 = all)')
     parser.add_argument('--batch_size', type=int, default=8, help='Embedding batch size')
