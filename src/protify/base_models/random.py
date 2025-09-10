@@ -3,6 +3,7 @@ import torch.nn as nn
 from typing import Optional
 from transformers import EsmTokenizer, EsmConfig
 from model_components.transformer import TransformerForMaskedLM, TransformerConfig
+from ..seed_utils import get_global_seed, is_deterministic
 
 
 presets = {
@@ -20,18 +21,60 @@ class RandomModel(nn.Module):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
-        self.holder_param = torch.nn.Parameter(torch.randn(1, 1, self.hidden_size))
+        
+        # Use global seed reproducible parameter initialization if deterministic
+        global_seed = get_global_seed()
+        if is_deterministic():
+            # Create a generator with the global seed for reproducible initialization
+            generator = torch.Generator()
+            generator.manual_seed(global_seed)
+            self.holder_param = torch.nn.Parameter(torch.randn(1, 1, self.hidden_size, generator=generator))
+        else:
+            self.holder_param = torch.nn.Parameter(torch.randn(1, 1, self.hidden_size))
+        
+        # Store the seed for forward pass reproducibility
+        self.seed = global_seed
 
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         device = self.holder_param.device
-        return torch.randn(input_ids.shape[0], input_ids.shape[1], self.hidden_size, device=device)
+        
+        if is_deterministic() and (self.seed is not None):
+            # Deterministic random output based solely on global seed (no hashing)
+            generator = torch.Generator(device=device)
+            generator.manual_seed(self.seed)
+            return torch.randn(
+                input_ids.shape[0], input_ids.shape[1], self.hidden_size,
+                device=device, generator=generator
+            )
+        else:
+            return torch.randn(input_ids.shape[0], input_ids.shape[1], self.hidden_size, device=device)
 
 
 class RandomTransformer(nn.Module):
     def __init__(self, config: TransformerConfig):
         super().__init__()
         self.config = config
-        self.transformer = TransformerForMaskedLM(config)
+        
+        # Ensure the transformer is initialized with the global seed
+        global_seed = get_global_seed()
+        if is_deterministic() and (global_seed is not None):
+            # Set torch seed before initializing the transformer to ensure reproducible weights
+            current_state = torch.get_rng_state()
+            if torch.cuda.is_available():
+                cuda_state = torch.cuda.get_rng_state()
+            
+            torch.manual_seed(global_seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed(global_seed)
+            
+            self.transformer = TransformerForMaskedLM(config)
+            
+            # Restore the previous random state
+            torch.set_rng_state(current_state)
+            if torch.cuda.is_available():
+                torch.cuda.set_rng_state(cuda_state)
+        else:
+            self.transformer = TransformerForMaskedLM(config)
 
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None, output_attentions: bool = False) -> torch.Tensor:
         if output_attentions:

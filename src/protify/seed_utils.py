@@ -13,6 +13,8 @@ from typing import Optional
 
 # Global variable to store the current seed
 _GLOBAL_SEED: Optional[int] = None
+# Global flag to indicate if deterministic mode is enabled
+_DETERMINISTIC: bool = False
 
 
 def get_global_seed() -> Optional[int]:
@@ -97,6 +99,10 @@ def set_determinism():
     # Import torch only after the env var has been set
     import torch
 
+    # Mark deterministic mode enabled
+    global _DETERMINISTIC
+    _DETERMINISTIC = True
+
     # Set deterministic behavior for reproducibility
     # Note: This can significantly slow down operations. Only use if you need to be 100% reproducible
     torch.backends.cudnn.deterministic = True
@@ -112,3 +118,8 @@ def set_determinism():
             # print torch version
             print(f'torch version: {torch.__version__}')
             print('Make sure you are using the correct version of torch')
+
+
+def is_deterministic() -> bool:
+    """Return True if deterministic mode has been enabled via set_determinism()."""
+    return _DETERMINISTIC
