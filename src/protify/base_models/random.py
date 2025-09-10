@@ -33,10 +33,12 @@ class RandomModel(nn.Module):
         device = self.holder_param.device
         
         if self.deterministic:
-            return torch.randn(
+            # Generate using the dedicated CPU generator for reproducibility, then move to target device.
+            cpu_out = torch.randn(
                 input_ids.shape[0], input_ids.shape[1], self.hidden_size,
-                device=device, generator=self.generator
+                device='cpu', generator=self.generator
             )
+            return cpu_out.to(device)
         else:
             return torch.randn(input_ids.shape[0], input_ids.shape[1], self.hidden_size, device=device)
 
