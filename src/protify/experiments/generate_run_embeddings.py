@@ -16,7 +16,7 @@ def generate_embeddings(
 
     print_message(f"Loading dataset: {data_name}")
     data_args = DataArguments(
-        data_names=data_name,
+        data_names=[data_name],
         max_length=1024,
         trim=False,
     )
