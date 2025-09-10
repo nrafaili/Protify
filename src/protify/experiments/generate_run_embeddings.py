@@ -59,13 +59,14 @@ def parse_args():
     parser.add_argument('--data_names', type=str, default='DeepLoc-2', help='Dataset short name (e.g., DeepLoc-2)')
     parser.add_argument('--deterministic', action='store_true', default=False, help='Enable deterministic algorithms')
     parser.add_argument('--run_tag', type=str, required=True, help='Run identifier, e.g., run1 or 2025-09-10-1')
+    parser.add_argument('--seed', type=int, default=None, help='Seed for reproducibility (if omitted, current time is used).')
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     args = parse_args()
     # Set seed and determinism according to args
-    seed = set_global_seed()
+    seed = set_global_seed(args.seed)
     if args.deterministic:
         set_determinism()
     print(f"Seed: {seed}, Deterministic: {args.deterministic}")
