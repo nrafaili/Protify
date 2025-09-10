@@ -23,7 +23,7 @@ def generate_embeddings(
         trim=False,
     )
     datasets, all_seqs = DataMixin(data_args).get_data()
-
+    all_seqs = sorted(all_seqs, key=lambda s: (len(s), s))
     print_message(f"Preparing to embed {len(all_seqs)} sequences")
 
     out_dir = os.path.join('embeddings', f'{data_name}_seed{seed}_det{deterministic}_{run_tag}')

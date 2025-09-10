@@ -24,19 +24,33 @@ class RandomModel(nn.Module):
         
         self.holder_param = torch.nn.Parameter(torch.randn(1, 1, self.hidden_size), requires_grad=False)
         self.generator = torch.Generator(device='cpu')
-        seed = get_global_seed()
-        if seed is not None:
-            self.generator.manual_seed(seed)
+        self.base_seed = get_global_seed()
         self.deterministic = is_deterministic()
+        # Initialize the generator state
+        if self.base_seed is not None:
+            self.generator.manual_seed(self.base_seed)
 
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         device = self.holder_param.device
         
         if self.deterministic:
-            # Generate using the dedicated CPU generator for reproducibility, then move to target device.
+            # For deterministic behavior, create a hash-based seed from input properties
+            # This ensures identical inputs always produce identical outputs
+            batch_size, seq_len = input_ids.shape[0], input_ids.shape[1]
+            
+            # Create a deterministic seed based on input shape and base seed
+            # Use a simple but effective hash combining input dimensions and base seed
+            input_hash = hash((batch_size, seq_len, self.hidden_size)) % (2**31)
+            deterministic_seed = ((self.base_seed or 0) + input_hash) % (2**31)
+            
+            # Create a temporary generator for this specific call
+            temp_generator = torch.Generator(device='cpu')
+            temp_generator.manual_seed(deterministic_seed)
+            
+            # Generate using the temporary generator for reproducibility
             cpu_out = torch.randn(
-                input_ids.shape[0], input_ids.shape[1], self.hidden_size,
-                device='cpu', generator=self.generator
+                batch_size, seq_len, self.hidden_size,
+                device='cpu', generator=temp_generator
             )
             return cpu_out.to(device)
         else:
