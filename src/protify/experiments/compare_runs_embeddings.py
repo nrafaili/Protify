@@ -19,7 +19,7 @@ def stack_by_sequence_order(emb_dict: dict[str, torch.Tensor], seqs: list[str]) 
     return np.stack([emb_dict[s].numpy() for s in seqs], axis=0)
 
 
-def compare_arrays(a: np.ndarray, b: np.ndarray, name: str):
+def compare_arrays(a: np.ndarray, b: np.ndarray, name: str, atol: float = 1e-8, rtol: float = 1e-5):
     if a.shape != b.shape:
         print_message(f"{name}: Shape mismatch {a.shape} vs {b.shape}")
         return
@@ -61,12 +61,12 @@ def compare_runs(
     print_message(f"{model_a}: comparing {len(common_seqs_a)} sequences")
     a_arr_a = stack_by_sequence_order(a_model_a, common_seqs_a)
     b_arr_a = stack_by_sequence_order(b_model_a, common_seqs_a)
-    compare_arrays(a_arr_a, b_arr_a, f'{model_a} (RunA vs RunB)')
+    compare_arrays(a_arr_a, b_arr_a, f'{model_a} (RunA vs RunB)', atol=atol, rtol=rtol)
 
     print_message(f"{model_b}: comparing {len(common_seqs_b)} sequences")
     a_arr_b = stack_by_sequence_order(a_model_b, common_seqs_b)
     b_arr_b = stack_by_sequence_order(b_model_b, common_seqs_b)
-    compare_arrays(a_arr_b, b_arr_b, f'{model_b} (RunA vs RunB)')
+    compare_arrays(a_arr_b, b_arr_b, f'{model_b} (RunA vs RunB)', atol=atol, rtol=rtol)
 
 
 def parse_args():
