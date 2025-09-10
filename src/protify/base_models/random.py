@@ -3,7 +3,7 @@ import torch.nn as nn
 from typing import Optional
 from transformers import EsmTokenizer, EsmConfig
 from model_components.transformer import TransformerForMaskedLM, TransformerConfig
-from ..seed_utils import get_global_seed, is_deterministic
+from seed_utils import get_global_seed, is_deterministic
 
 
 presets = {
