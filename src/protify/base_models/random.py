@@ -32,14 +32,12 @@ class RandomModel(nn.Module):
         else:
             self.holder_param = torch.nn.Parameter(torch.randn(1, 1, self.hidden_size))
         
-        # Store the seed for forward pass reproducibility
         self.seed = global_seed
 
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         device = self.holder_param.device
         
         if is_deterministic() and (self.seed is not None):
-            # Deterministic random output based solely on global seed (no hashing)
             generator = torch.Generator(device=device)
             generator.manual_seed(self.seed)
             return torch.randn(
