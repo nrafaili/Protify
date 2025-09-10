@@ -22,27 +22,20 @@ class RandomModel(nn.Module):
         self.config = config
         self.hidden_size = config.hidden_size
         
-        # Use global seed reproducible parameter initialization if deterministic
-        global_seed = get_global_seed()
-        if is_deterministic():
-            # Create a generator with the global seed for reproducible initialization
-            generator = torch.Generator()
-            generator.manual_seed(global_seed)
-            self.holder_param = torch.nn.Parameter(torch.randn(1, 1, self.hidden_size, generator=generator))
-        else:
-            self.holder_param = torch.nn.Parameter(torch.randn(1, 1, self.hidden_size))
-        
-        self.seed = global_seed
+        self.holder_param = torch.nn.Parameter(torch.randn(1, 1, self.hidden_size), requires_grad=False)
+        self.generator = torch.Generator(device='cpu')
+        seed = get_global_seed()
+        if seed is not None:
+            self.generator.manual_seed(seed)
+        self.deterministic = is_deterministic()
 
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         device = self.holder_param.device
         
-        if is_deterministic() and (self.seed is not None):
-            generator = torch.Generator(device=device)
-            generator.manual_seed(self.seed)
+        if self.deterministic:
             return torch.randn(
                 input_ids.shape[0], input_ids.shape[1], self.hidden_size,
-                device=device, generator=generator
+                device=device, generator=self.generator
             )
         else:
             return torch.randn(input_ids.shape[0], input_ids.shape[1], self.hidden_size, device=device)
@@ -52,27 +45,7 @@ class RandomTransformer(nn.Module):
     def __init__(self, config: TransformerConfig):
         super().__init__()
         self.config = config
-        
-        # Ensure the transformer is initialized with the global seed
-        global_seed = get_global_seed()
-        if is_deterministic() and (global_seed is not None):
-            # Set torch seed before initializing the transformer to ensure reproducible weights
-            current_state = torch.get_rng_state()
-            if torch.cuda.is_available():
-                cuda_state = torch.cuda.get_rng_state()
-            
-            torch.manual_seed(global_seed)
-            if torch.cuda.is_available():
-                torch.cuda.manual_seed(global_seed)
-            
-            self.transformer = TransformerForMaskedLM(config)
-            
-            # Restore the previous random state
-            torch.set_rng_state(current_state)
-            if torch.cuda.is_available():
-                torch.cuda.set_rng_state(cuda_state)
-        else:
-            self.transformer = TransformerForMaskedLM(config)
+        self.transformer = TransformerForMaskedLM(config)
 
     def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None, output_attentions: bool = False) -> torch.Tensor:
         if output_attentions:
