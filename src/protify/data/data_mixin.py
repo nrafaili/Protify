@@ -239,7 +239,7 @@ class DataMixin:
             datasets[data_name] = (train_set, valid_set, test_set, num_labels, label_type, ppi)
 
         all_seqs = list(all_seqs)
-        all_seqs = sorted(all_seqs, key=len, reverse=True) # longest first
+        all_seqs = sorted(all_seqs, key=lambda s: (-len(s), s)) # longest first
         return datasets, all_seqs
 
     def get_data(self):
