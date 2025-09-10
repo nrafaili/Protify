@@ -28,7 +28,7 @@ def generate_embeddings(
     os.makedirs(out_dir, exist_ok=True)
 
     emb_args = EmbeddingArguments(
-        embedding_batch_size=batch_size,
+        embedding_batch_size=4,
         embedding_num_workers=0,
         download_embeddings=False,
         matrix_embed=False,
