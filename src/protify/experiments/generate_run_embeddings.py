@@ -2,15 +2,10 @@ import os
 import argparse
 import torch
 
-from seed_utils import set_global_seed, set_determinism
-from data.data_mixin import DataArguments, DataMixin
-from embedder import EmbeddingArguments, Embedder
-from utils import print_message
-
-set_global_seed(seed)
-if deterministic:
-    set_determinism()
-print(f"Seed: {seed}, Deterministic: {deterministic}")
+from protify.seed_utils import set_global_seed, set_determinism
+from protify.data.data_mixin import DataArguments, DataMixin
+from protify.embedder import EmbeddingArguments, Embedder
+from protify.utils import print_message
 def generate_embeddings(
     data_name: str,
     seed: int,
@@ -67,6 +62,11 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
+    # Set seed and determinism according to args
+    set_global_seed(args.seed)
+    if args.deterministic:
+        set_determinism()
+    print(f"Seed: {set_global_seed.__defaults__ if False else args.seed}, Deterministic: {args.deterministic}")
     generate_embeddings(
         data_name=args.data_names,
         seed=args.seed,
