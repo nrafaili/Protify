@@ -15,8 +15,6 @@ def generate_embeddings(
     data_name: str,
     seed: int,
     deterministic: bool,
-    num_seqs: int,
-    batch_size: int,
     run_tag: str,
 ):
 
@@ -27,8 +25,6 @@ def generate_embeddings(
         trim=False,
     )
     datasets, all_seqs = DataMixin(data_args).get_data()
-    if num_seqs is not None and num_seqs > 0:
-        all_seqs = all_seqs[:num_seqs]
 
     print_message(f"Preparing to embed {len(all_seqs)} sequences")
 
@@ -65,8 +61,6 @@ def parse_args():
     parser.add_argument('--data_names', type=str, default='DeepLoc-2', help='Dataset short name (e.g., DeepLoc-2)')
     parser.add_argument('--seed', type=int, default=None, help='Random seed')
     parser.add_argument('--deterministic', action='store_true', default=False, help='Enable deterministic algorithms')
-    parser.add_argument('--num_seqs', type=int, default=256, help='Limit number of sequences to embed (0 = all)')
-    parser.add_argument('--batch_size', type=int, default=8, help='Embedding batch size')
     parser.add_argument('--run_tag', type=str, required=True, help='Run identifier, e.g., run1 or 2025-09-10-1')
     return parser.parse_args()
 
@@ -77,8 +71,6 @@ if __name__ == '__main__':
         data_name=args.data_names,
         seed=args.seed,
         deterministic=args.deterministic,
-        num_seqs=args.num_seqs,
-        batch_size=args.batch_size,
         run_tag=args.run_tag,
     )
 
