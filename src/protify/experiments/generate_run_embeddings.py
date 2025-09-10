@@ -5,7 +5,6 @@ import torch
 from ..seed_utils import set_global_seed, set_determinism
 from ..data.data_mixin import DataArguments, DataMixin
 from ..embedder import EmbeddingArguments, Embedder
-from ..utils import print_message
 
 def generate_embeddings(
     data_name: str,
@@ -14,7 +13,7 @@ def generate_embeddings(
     run_tag: str,
 ):
 
-    print_message(f"Loading dataset: {data_name}")
+    print(f"Loading dataset: {data_name}")
     data_args = DataArguments(
         data_names=data_name,
         max_length=1024,
@@ -22,7 +21,7 @@ def generate_embeddings(
     )
     datasets, all_seqs = DataMixin(data_args).get_data()
 
-    print_message(f"Preparing to embed {len(all_seqs)} sequences")
+    print(f"Preparing to embed {len(all_seqs)} sequences")
 
     out_dir = os.path.join('embeddings', f'{data_name}_seed{seed}_det{deterministic}_{run_tag}')
     os.makedirs(out_dir, exist_ok=True)
@@ -42,14 +41,14 @@ def generate_embeddings(
     embedder = Embedder(emb_args, all_seqs)
 
     # Embed with Random-Transformer
-    print_message("Embedding with Random-Transformer")
+    print("Embedding with Random-Transformer")
     _ = embedder('Random-Transformer')
 
     # Embed with Random
-    print_message("Embedding with Random")
+    print("Embedding with Random")
     _ = embedder('Random')
 
-    print_message(f"Done. Saved to {out_dir}")
+    print(f"Done. Saved to {out_dir}")
 
 
 def parse_args():
@@ -67,7 +66,7 @@ if __name__ == '__main__':
     set_global_seed(args.seed)
     if args.deterministic:
         set_determinism()
-    print(f"Seed: {set_global_seed.__defaults__ if False else args.seed}, Deterministic: {args.deterministic}")
+    print(f"Seed: {set_global_seed.__defaults__ if args.seed is None else args.seed}, Deterministic: {args.deterministic}")
     generate_embeddings(
         data_name=args.data_names,
         seed=args.seed,
