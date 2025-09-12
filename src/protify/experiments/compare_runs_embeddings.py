@@ -33,8 +33,8 @@ def compare_arrays(a: np.ndarray, b: np.ndarray, name: str, atol: float = 1e-8, 
 def compare_runs(
     run_dir_a: str,
     run_dir_b: str,
-    model_a: str = 'Random',
-    model_b: str = 'Random-Transformer',
+    model_a: str = 'ANKH-Base',
+    model_b: str = 'ESM2-8',
     atol: float = 1e-8,
     rtol: float = 1e-5,
 ):
