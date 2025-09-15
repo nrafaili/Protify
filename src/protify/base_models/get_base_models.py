@@ -36,7 +36,9 @@ currently_supported_models = [
     'DSM-150',
     'DSM-650',
     'DSM-PPI',
-    'ProtCLM-1b'
+    'ProtCLM-1b',
+    'AMPLIFY-120',
+    'AMPLIFY-350',
     'OneHot-Protein',
     'OneHot-DNA',
     'OneHot-RNA',
@@ -61,7 +63,9 @@ standard_models = [
     'DPLM-650',
     'DSM-150',
     'DSM-650',
-    'DSM-PPI'
+    'DSM-PPI',
+    'AMPLIFY-120',
+    'AMPLIFY-350',
     'Random',
     'Random-Transformer',
 ]
@@ -111,6 +115,9 @@ def get_base_model(model_name: str):
     elif 'onehot' in model_name.lower():
         from .one_hot import build_one_hot_model
         return build_one_hot_model(model_name)
+    elif 'amplify' in model_name.lower():
+        from .amplify import build_amplify_model
+        return build_amplify_model(model_name)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
@@ -140,6 +147,9 @@ def get_base_model_for_training(model_name: str, tokenwise: bool = False, num_la
     elif 'protclm' in model_name.lower():
         from .protCLM import get_protCLM_for_training
         return get_protCLM_for_training(model_name, tokenwise, num_labels, hybrid)
+    elif 'amplify' in model_name.lower():
+        from .amplify import get_amplify_for_training
+        return get_amplify_for_training(model_name, tokenwise, num_labels, hybrid)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
@@ -172,6 +182,9 @@ def get_tokenizer(model_name: str):
     elif 'onehot' in model_name.lower():
         from .one_hot import get_one_hot_tokenizer
         return get_one_hot_tokenizer(model_name)
+    elif 'amplify' in model_name.lower():
+        from .amplify import get_amplify_tokenizer
+        return get_amplify_tokenizer(model_name)
     else:
         raise ValueError(f"Model {model_name} not supported")
 
