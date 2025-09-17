@@ -26,6 +26,7 @@ class GLMTokenizerWrapper(BaseSequenceTokenizer):
         kwargs.setdefault('return_tensors', 'pt')
         kwargs.setdefault('padding', 'longest')
         kwargs.setdefault('add_special_tokens', True)
+        kwargs.setdefault('return_token_type_ids', False)
         modified_sequences = [self.plus_token + seq for seq in sequences]
         tokenized = self.tokenizer(modified_sequences, **kwargs)
         return tokenized
@@ -87,4 +88,4 @@ if __name__ == '__main__':
     model, tokenizer = build_glm2_model('GLM2-650')
     print(model)
     print(tokenizer)
-    print(tokenizer('MEKVQYLTRSAIRRASTIEMPQQARQKLQNLFINFCLILICBBOLLICIIVMLL'))
+    print(tokenizer('MEKVQYLTRSAIRRASTIEMPQQARQKLQNLFINFCLILICBBOLLICIIVMLL'))  
