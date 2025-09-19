@@ -39,6 +39,8 @@ currently_supported_models = [
     'ProtCLM-1b',
     'AMPLIFY-120',
     'AMPLIFY-350',
+    'AMPLIFY-120-base',
+    'AMPLIFY-350-base',
     'OneHot-Protein',
     'OneHot-DNA',
     'OneHot-RNA',
