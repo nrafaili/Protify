@@ -53,20 +53,16 @@ class AmplifyForEmbedding(nn.Module):
         output_hidden_states: Optional[bool] = False,
     ) -> torch.Tensor:
 
+        out = self.plm(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=True,
+        )
         if output_attentions:
-            out = self.plm(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
-            )
-            return out.last_hidden_state, out.attentions
+            return out.hidden_states[-1], out.attentions
         else:
-            return self.plm(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                output_hidden_states=output_hidden_states,
-            ).last_hidden_state
+            return out.hidden_states[-1]
 
 
 def get_amplify_tokenizer(preset: str):
