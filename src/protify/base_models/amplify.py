@@ -105,17 +105,65 @@ class AMPLIFYConfig(PretrainedConfig):
         self.max_length = max_length
 
 class AmplifyTokenizerWrapper(BaseSequenceTokenizer):
-    def __init__(self, tokenizer: AutoTokenizer):
+    def __init__(self, tokenizer):
         super().__init__(tokenizer)
 
-    def __call__(self, sequences: Union[str, List[str]], **kwargs) -> Dict[str, torch.Tensor]:
-        if isinstance(sequences, str):
-            sequences = [sequences]
+    def _encode_one(self, seq: str, add_special_tokens: bool) -> torch.Tensor:
+        # Use in-file ProteinTokenizer if available; otherwise fall back to HF tokenizers
+        if hasattr(self.tokenizer, 'encode') and callable(getattr(self.tokenizer, 'encode')):
+            tokens = list(seq)
+            return self.tokenizer.encode(
+                tokens=tokens,
+                add_special_tokens=add_special_tokens,
+                random_truncate=False,
+            )
+        elif callable(getattr(self.tokenizer, '__call__', None)):
+            ids = self.tokenizer(seq, add_special_tokens=add_special_tokens, return_tensors=None)['input_ids']
+            # HF tokenizers may return list[int] or Tensor
+            return ids if torch.is_tensor(ids) else torch.tensor(ids, dtype=torch.long)
+        else:
+            raise ValueError('Unsupported tokenizer type supplied to AmplifyTokenizerWrapper')
+
+    def _pad_batch(self, batch_ids: List[torch.Tensor], pad_to_multiple_of: Optional[int] = None) -> Dict[str, torch.Tensor]:
+        pad_id = getattr(self.tokenizer, 'pad_token_id', 0)
+        max_len = max(ids.numel() for ids in batch_ids)
+        if pad_to_multiple_of is not None and max_len % pad_to_multiple_of != 0:
+            max_len = ((max_len + pad_to_multiple_of - 1) // pad_to_multiple_of) * pad_to_multiple_of
+        input_ids = torch.full((len(batch_ids), max_len), pad_id, dtype=torch.long)
+        attention_mask = torch.zeros((len(batch_ids), max_len), dtype=torch.long)
+        for i, ids in enumerate(batch_ids):
+            length = ids.numel()
+            input_ids[i, :length] = ids
+            attention_mask[i, :length] = 1
+        return {'input_ids': input_ids, 'attention_mask': attention_mask}
+
+    def __call__(self, sequences: Union[str, List[str], Tuple[List[str], List[str]]], **kwargs) -> Dict[str, torch.Tensor]:
         kwargs.setdefault('return_tensors', 'pt')
         kwargs.setdefault('padding', 'longest')
         kwargs.setdefault('add_special_tokens', True)
-        tokenized = self.tokenizer(sequences, **kwargs)
-        return tokenized
+        pad_to_multiple_of = kwargs.get('pad_to_multiple_of', None)
+        add_special_tokens = kwargs['add_special_tokens']
+
+        # Support pair inputs (seqs_a, seqs_b)
+        if isinstance(sequences, tuple) and len(sequences) == 2:
+            seqs_a, seqs_b = sequences
+            batch_ids = []
+            for sa, sb in zip(seqs_a, seqs_b):
+                ids_a = self._encode_one(sa, add_special_tokens)
+                ids_b = self._encode_one(sb, add_special_tokens)
+                ids = torch.cat([ids_a, ids_b], dim=0)
+                batch_ids.append(ids)
+            return self._pad_batch(batch_ids, pad_to_multiple_of)
+
+        if isinstance(sequences, str):
+            sequences = [sequences]
+
+        # If underlying tokenizer is an HF tokenizer with batching, delegate to it
+        if not hasattr(self.tokenizer, 'encode') and callable(getattr(self.tokenizer, '__call__', None)):
+            return self.tokenizer(sequences, **kwargs)
+
+        batch_ids = [self._encode_one(seq, add_special_tokens) for seq in sequences]
+        return self._pad_batch(batch_ids, pad_to_multiple_of)
 
 class RMSNorm(nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
@@ -632,18 +680,86 @@ class AmplifyForEmbedding(nn.Module):
             input_ids=input_ids,
             attention_mask=attention_mask,
             output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
         )
         if output_attentions:
-            return out.hidden_states[-1], out.attentions
+            return out.last_hidden_state, out.attentions
         else:
-            return out.hidden_states[-1]
+            return out.last_hidden_state
 
 
 def get_amplify_tokenizer(preset: str):
-    return AmplifyTokenizerWrapper(AutoTokenizer.from_pretrained(presets[preset], trust_remote_code=True))
+    """Builds an Amplify tokenizer wrapper using the in-file ProteinTokenizer.
+
+    Downloads the vocabulary from the HF repo if available; otherwise derives
+    it from the HF tokenizer and constructs a temporary vocab file.
+    """
+    from huggingface_hub import hf_hub_download
+    import os
+    import json
+    import tempfile
+
+    repo_id = presets[preset]
+
+    # Attempt to get special token ids from HF tokenizer config
+    hf_tok = AutoTokenizer.from_pretrained(repo_id, trust_remote_code=True)
+    pad_token_id = getattr(hf_tok, 'pad_token_id', 0)
+    mask_token_id = getattr(hf_tok, 'mask_token_id', 5)
+    bos_token_id = getattr(hf_tok, 'bos_token_id', getattr(hf_tok, 'cls_token_id', 1))
+    eos_token_id = getattr(hf_tok, 'eos_token_id', 2)
+    unk_token_id = getattr(hf_tok, 'unk_token_id', 3)
+
+    # 1) Try to download vocab.txt directly
+    vocab_path = None
+    try:
+        vocab_path = hf_hub_download(repo_id=repo_id, filename='vocab.txt')
+    except Exception:
+        # 2) Fallback: build vocab.txt from tokenizer.json or get_vocab()
+        try:
+            tok_json_path = hf_hub_download(repo_id=repo_id, filename='tokenizer.json')
+            with open(tok_json_path, 'r', encoding='utf-8') as f:
+                tok_json = json.load(f)
+            # Attempt to read model vocab in index order if available
+            vocab_items = tok_json.get('model', {}).get('vocab', {})
+            # vocab_items could be dict token->id or list of [token, score]
+            vocab_list = []
+            if isinstance(vocab_items, dict):
+                # Sort by id
+                vocab_list = [t for t, i in sorted(vocab_items.items(), key=lambda x: x[1])]
+            elif isinstance(vocab_items, list):
+                # List of tokens in order
+                vocab_list = [item[0] if isinstance(item, list) else item for item in vocab_items]
+            else:
+                # Last resort: use HF tokenizer's get_vocab order by id
+                vocab_dict = hf_tok.get_vocab()
+                vocab_list = [t for t, i in sorted(vocab_dict.items(), key=lambda x: x[1])]
+
+            # Write temporary vocab.txt
+            with tempfile.NamedTemporaryFile('w', delete=False, encoding='utf-8', suffix='.txt') as tmp:
+                for tok in vocab_list:
+                    tmp.write(f"{tok}\n")
+                vocab_path = tmp.name
+        except Exception:
+            # 3) Final fallback: derive vocab from get_vocab()
+            vocab_dict = hf_tok.get_vocab()
+            with tempfile.NamedTemporaryFile('w', delete=False, encoding='utf-8', suffix='.txt') as tmp:
+                for tok, _id in sorted(vocab_dict.items(), key=lambda x: x[1]):
+                    tmp.write(f"{tok}\n")
+                vocab_path = tmp.name
+
+    protein_tokenizer = ProteinTokenizer(
+        vocab_path=vocab_path,
+        pad_token_id=pad_token_id,
+        mask_token_id=mask_token_id,
+        bos_token_id=bos_token_id,
+        eos_token_id=eos_token_id,
+        unk_token_id=unk_token_id,
+        other_special_token_ids=None,
+    )
+    return AmplifyTokenizerWrapper(protein_tokenizer)
 
 
-def build_amplify_model(preset: str) -> Tuple[AmplifyForEmbedding, AutoTokenizer]:
+def build_amplify_model(preset: str) -> Tuple[AmplifyForEmbedding, BaseSequenceTokenizer]:
     model_path = presets[preset]
     model = AmplifyForEmbedding(model_path).eval()
     tokenizer = get_amplify_tokenizer(preset)
@@ -653,7 +769,8 @@ def build_amplify_model(preset: str) -> Tuple[AmplifyForEmbedding, AutoTokenizer
 def get_amplify_for_training(preset: str, tokenwise: bool = False, num_labels: int = None, hybrid: bool = False):
     model_path = presets[preset]
     if hybrid:
-        model = AutoModel.from_pretrained(model_path, trust_remote_code=True).eval()
+        # Use in-file embedding wrapper for hybrid probing
+        model = AmplifyForEmbedding(model_path).eval()
     else:
         if tokenwise:
             model = AutoModelForTokenClassification.from_pretrained(
