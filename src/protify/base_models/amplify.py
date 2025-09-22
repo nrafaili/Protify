@@ -31,12 +31,6 @@ class AmplifyTokenizerWrapper(BaseSequenceTokenizer):
         kwargs.setdefault('padding', 'longest')
         kwargs.setdefault('add_special_tokens', True)
         tokenized = self.tokenizer(sequences, **kwargs)
-        # Convert attention_mask to how AMPLIFY expects it
-        tokenized['attention_mask'] = torch.where(
-            tokenized['attention_mask'] == 1,
-            torch.tensor(0.0),
-            torch.tensor(float('-inf'))
-        )
         return tokenized
 
 
@@ -53,16 +47,23 @@ class AmplifyForEmbedding(nn.Module):
         output_hidden_states: Optional[bool] = False,
     ) -> torch.Tensor:
 
+        additive_mask = None
+        if attention_mask is not None:
+            additive_mask = torch.where(
+                attention_mask.to(dtype=torch.bool),
+                torch.tensor(0.0, device=attention_mask.device),
+                torch.tensor(float('-inf'), device=attention_mask.device)
+            )
         out = self.plm(
             input_ids=input_ids,
-            attention_mask=attention_mask,
+            attention_mask=additive_mask,
             output_attentions=output_attentions,
             output_hidden_states=True,
         )
         if output_attentions:
-            return out.hidden_states[-1].float(), out.attentions
+            return out.hidden_states[-1], out.attentions
         else:
-            return out.hidden_states[-1].float()
+            return out.hidden_states[-1]
 
 
 def get_amplify_tokenizer(preset: str):
