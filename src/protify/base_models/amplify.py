@@ -51,8 +51,8 @@ class AmplifyForEmbedding(nn.Module):
         if attention_mask is not None:
             additive_mask = torch.where(
                 attention_mask.to(dtype=torch.bool),
-                torch.tensor(0.0, device=attention_mask.device),
-                torch.tensor(float('-inf'), device=attention_mask.device)
+                torch.tensor(0.0, device=attention_mask.device, dtype=torch.float32),
+                torch.tensor(float('-inf'), device=attention_mask.device, dtype=torch.float32)
             )
         out = self.plm(
             input_ids=input_ids,
@@ -61,9 +61,9 @@ class AmplifyForEmbedding(nn.Module):
             output_hidden_states=True,
         )
         if output_attentions:
-            return out.hidden_states[-1], out.attentions
+            return out.hidden_states[-1].float(), out.attentions
         else:
-            return out.hidden_states[-1]
+            return out.hidden_states[-1].float()
 
 
 def get_amplify_tokenizer(preset: str):
@@ -100,3 +100,4 @@ if __name__ == '__main__':
     print(model)
     print(tokenizer)
     print(tokenizer('MEKVQYLTRSAIRRASTIEMPQQARQKLQNLFINFCLILICLLLICIIVMLL'))
+    
