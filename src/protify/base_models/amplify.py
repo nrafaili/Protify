@@ -60,9 +60,9 @@ class AmplifyForEmbedding(nn.Module):
             output_hidden_states=True,
         )
         if output_attentions:
-            return out.hidden_states[-1], out.attentions
+            return out.hidden_states[-1].to(torch.bfloat16), out.attentions
         else:
-            return out.hidden_states[-1]
+            return out.hidden_states[-1].to(torch.bfloat16)
 
 
 def get_amplify_tokenizer(preset: str):
@@ -99,5 +99,3 @@ if __name__ == '__main__':
     print(model)
     print(tokenizer)
     print(tokenizer('MEKVQYLTRSAIRRASTIEMPQQARQKLQNLFINFCLILICLLLICIIVMLL'))
-
-
