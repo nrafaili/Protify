@@ -47,23 +47,41 @@ class AmplifyForEmbedding(nn.Module):
         output_hidden_states: Optional[bool] = False,
     ) -> torch.Tensor:
 
+        # --- Build AMPLIFY's additive mask robustly ---
         additive_mask = None
         if attention_mask is not None:
-            additive_mask = torch.where(
-                attention_mask.to(dtype=torch.bool),
-                torch.tensor(0.0, device=attention_mask.device, dtype=torch.float16),
-                torch.tensor(float('-inf'), device=attention_mask.device, dtype=torch.float16)
+            model_dtype = next(self.plm.parameters()).dtype
+            device = attention_mask.device
+
+            # Heuristic: detect whether we already received an additive mask
+            is_binary_like = (
+                attention_mask.dtype in (torch.uint8, torch.int8, torch.int16, torch.int32, torch.int64, torch.bool)
+                or (attention_mask.dtype.is_floating_point and attention_mask.min() >= 0 and attention_mask.max() <= 1)
             )
+
+            if is_binary_like:
+                bin_mask = attention_mask.to(dtype=torch.bool)
+                # Avoid -inf in half precision paths; use a large finite negative
+                big_neg = -1e4 if model_dtype in (torch.float16, torch.bfloat16) else -1e9
+                additive_mask = torch.where(
+                    bin_mask,
+                    torch.zeros_like(attention_mask, dtype=model_dtype, device=device),
+                    torch.full_like(attention_mask, fill_value=big_neg, dtype=model_dtype, device=device),
+                )
+            else:
+                # Assume it's already additive; just cast to model dtype
+                additive_mask = attention_mask.to(device=device, dtype=model_dtype)
+
         out = self.plm(
             input_ids=input_ids,
-            attention_mask=additive_mask,
+            attention_mask=additive_mask,  # AMPLIFY wants additive (0 / big negative)
             output_attentions=output_attentions,
             output_hidden_states=True,
         )
-        if output_attentions:
-            return out.hidden_states[-1].float().to(torch.float16), out.attentions
-        else:
-            return out.hidden_states[-1].float().to(torch.float16)
+
+        # DO NOT force fp16 here; let downstream decide
+        last = out.hidden_states[-1]
+        return (last, out.attentions) if output_attentions else last
 
 
 def get_amplify_tokenizer(preset: str):
