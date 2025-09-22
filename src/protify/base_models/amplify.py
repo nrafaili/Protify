@@ -10,9 +10,6 @@ from transformers import (
 from transformers import PretrainedConfig, PreTrainedModel
 from transformers.modeling_outputs import MaskedLMOutput
 
-import yaml
-import safetensors.torch
-
 from .base_tokenizer import BaseSequenceTokenizer
 
 import torch
@@ -369,7 +366,7 @@ class ProteinTokenizer(object):
         add_special_tokens: bool = True,
         random_truncate: bool = True,
         **kwargs,
-    ) -> Union[List[int], Tensor]:
+    ) -> Union[List[int], torch.Tensor]:
         """Encodes a list of tokens into a list or tensor of token indices.
 
         Args:
@@ -568,14 +565,15 @@ class AMPLIFY(AMPLIFYPreTrainedModel):
 
     @classmethod
     def load(cls, checkpoint_path: str, config_path: str):
-
+        import yaml
+        import safetensors.torch as st
         with open(config_path, "r") as file:
             cfg = yaml.safe_load(file)
 
         model = AMPLIFY(AMPLIFYConfig(**cfg["model"], **cfg["tokenizer"]))
 
         if checkpoint_path.endswith(".safetensors"):
-            state_dict = safetensors.torch.load_file(checkpoint_path)
+            state_dict = st.load_file(checkpoint_path)
         elif checkpoint_path.endswith(".pt"):
             state_dict = torch.load(checkpoint_path)
         else:
