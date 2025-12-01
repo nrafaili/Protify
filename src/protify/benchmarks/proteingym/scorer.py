@@ -142,6 +142,15 @@ class SequenceProcessor:
         return parsed
     
     @staticmethod
+    def find_mismatches(s1: str | np.ndarray, s2: str) -> list[int]:
+        assert isinstance(s1, (str, np.ndarray)), f"s1 must be a string or numpy array, got {type(s1)}"
+        assert isinstance(s2, str), f"s2 must be a string, got {type(s2)}"
+        assert len(s1) == len(s2), f"s1 and s2 must have the same length, got {len(s1)} and {len(s2)}"
+        s1_arr = np.frombuffer(s1.encode(), dtype=np.uint8) if isinstance(s1, str) else s1
+        s2_arr = np.frombuffer(s2.encode(), dtype=np.uint8)
+        return np.where(s1_arr != s2_arr)[0]
+
+    @staticmethod
     def aa_to_token_ids(tokenizer) -> Dict[str, int]:
         """Precompute amino acid to token ID mapping."""
         amino_acids = list('ACDEFGHIKLMNPQRSTVWY')
@@ -201,6 +210,7 @@ class ProteinGymScorer:
         tokenizer: Any,
         device: torch.device,
         batch_size: int = 32,
+        max_batch_tokens: int = 16384
     ):
         self.model_name = model_name
         self.model = model
@@ -214,7 +224,8 @@ class ProteinGymScorer:
             self.aa_to_id = None
         self.unk_id = getattr(tokenizer, "unk_token_id", None)
         self.context_length = self.MODEL_CONTEXT_LENGTH.get(model_name, 1024)
-        
+        self.max_batch_tokens = max_batch_tokens
+
     def score_substitutions(
         self,
         df: pd.DataFrame,
@@ -245,21 +256,51 @@ class ProteinGymScorer:
         
         # Get sliced sequences
         target_seq = df['target_seq'].iloc[0]
-        sliced_df = SequenceProcessor.get_sequence_slices(
-            df,
-            target_seq=target_seq,
-            model_context_len=self.context_length,
-            start_idx=1,
-            scoring_window=scoring_window,
-            indel_mode=False
-        )
+        seq_len = len(target_seq)
+
+        if scoring_window == "optimal" and seq_len <= self.context_length:
+            # no slicing needed
+            sliced_df = df.copy()
+            sliced_df['window_start'] = 0
+            sliced_df['window_end'] = seq_len
+            sliced_df['sliced_mutated_seq'] = sliced_df['mutated_seq']
+        else:
+            sliced_df = SequenceProcessor.get_sequence_slices(
+                df,
+                target_seq=target_seq,
+                model_context_len=self.context_length,
+                start_idx=1,
+                scoring_window=scoring_window,
+                indel_mode=False
+            )
         
-        # Group sliced_df by mutant
-        grouped = sliced_df.groupby('mutant')
-        mutant_groups = {mutant: group for mutant, group in grouped}
+        encoded_target = np.frombuffer(target_seq.encode(), dtype=np.uint8)
+        mutation_info = {}
+        for _, row in df.iterrows():
+            mutant = row['mutant']
+            mutated_seq = row['mutated_seq']
+            mismatches = np.array(
+                SequenceProcessor.find_mismatches(encoded_target, mutated_seq), dtype=np.int64)
+            # Store as (positions, wt_aas, mt_aas)
+            wt_aas = ''.join(target_seq[p] for p in mismatches)
+            mt_aas = ''.join(mutated_seq[p] for p in mismatches)
+            mutation_info[mutant] = (mismatches, wt_aas, mt_aas)
+        
+        # Precompute window info
+        window_info = {}
+        for mutant in df['mutant'].unique():
+            mutant_slices = sliced_df[sliced_df['mutant'] == mutant]
+            wt_slice = mutant_slices[mutant_slices['mutated_seq'] == target_seq]
+            if len(wt_slice) > 0:
+                slice_row = wt_slice.iloc[0]
+                window_info[mutant] = {
+                    'window_start': int(slice_row['window_start']),
+                    'window_end': int(slice_row['window_end']),
+                    'sliced_seq': slice_row['sliced_mutated_seq']
+                }
         
         if scoring_method in ["masked_marginal", "mutant_marginal", "wildtype_marginal"]:
-            scores = self._score_marginal(df, target_seq, mutant_groups, scoring_method)
+            scores = self._score_marginal(df, target_seq, sliced_df, scoring_method, mutation_info, window_info)
         elif scoring_method == "pll":
             scores = self._score_pll_substitutions(sliced_df, target_seq)
         else:  # global_log_prob
@@ -337,101 +378,149 @@ class ProteinGymScorer:
         out['delta_log_prob'] = out['mutated_seq'].map(scores_by_variant)
         return out
     
+
+    def _create_dynamic_batches(
+        self,
+        sequences: List[str],
+        positions_list: List[List[int]],
+        max_batch_tokens: Optional[int] = None,
+    ) -> List[List[int]]:
+        """Create dynamic batches that pack sequences greedily until max_batch_tokens is reached."""
+        if max_batch_tokens is None:
+            max_batch_tokens = self.max_batch_tokens
+        
+        batches = []
+        current_batch = []
+        current_tokens = 0
+        
+        for idx, seq in enumerate(sequences):
+            # Calculate tokens for this sequence (+2 for BOS/EOS, or +1 for GLM2)
+            if self.model_name in self.GLM2_MODELS:
+                seq_tokens = len(seq) + 1
+            else:
+                seq_tokens = len(seq) + 2
+            
+            # If adding this sequence would exceed max_batch_tokens, start new batch
+            if current_batch and current_tokens + seq_tokens > max_batch_tokens:
+                batches.append(current_batch)
+                current_batch = []
+                current_tokens = 0
+            
+            current_batch.append(idx)
+            current_tokens += seq_tokens
+        
+        # Add final batch
+        if current_batch:
+            batches.append(current_batch)
+        
+        return batches
+        
     def _score_marginal(
         self,
         df: pd.DataFrame,
         target_seq: str,
-        mutant_groups: Dict,
+        sliced_df: pd.DataFrame,
         scoring_method: str,
+        mutation_info: Dict,
+        window_info: Dict,
     ) -> List[float]:
         """Score using marginal methods (masked/wildtype/mutant)."""
         
         if scoring_method == "masked_marginal":
-            return self._score_masked_marginal(df, target_seq, mutant_groups)
+            return self._score_masked_marginal(df, target_seq, sliced_df, mutation_info, window_info)
         elif scoring_method == "wildtype_marginal":
-            return self._score_wildtype_marginal(df, target_seq, mutant_groups)
-        else:  # mutant_marginal
-            return self._score_mutant_marginal(df, target_seq, mutant_groups)
+            return self._score_wildtype_marginal(df, target_seq, sliced_df, mutation_info, window_info)
+        else:
+            return self._score_mutant_marginal(df, target_seq, sliced_df, mutation_info, window_info)
     
     def _score_masked_marginal(
         self,
         df: pd.DataFrame,
         target_seq: str,
-        mutant_groups: Dict,
+        sliced_df: pd.DataFrame,
+        mutation_info: Dict,
+        window_info: Dict,
     ) -> List[float]:
-        """Score using masked marginal method."""
-        # Group by (window_start, window_end, pos_tuple) -> List[(row_idx, sorted_muts)]
-        position_groups: Dict[Tuple[int, int, Tuple[int, ...]], List[Tuple[int, Tuple[Tuple[str, int, str], ...]]]] = {}
+        """Score using masked marginal method with optimized vectorization."""
+        # Group by (window_start, window_end, pos_tuple) -> List[(row_idx, positions, wt_aas, mt_aas)]
+        position_groups: Dict[Tuple[int, int, Tuple[int, ...]], List[Tuple[int, np.ndarray, str, str]]] = {}
         
         for row_idx, row in enumerate(df.itertuples(index=False)):
             mutant = row.mutant
-            muts = SequenceProcessor.parse_mutant_string(mutant)
+            positions, wt_aas, mt_aas = mutation_info[mutant]
             
-            mutant_slices = mutant_groups.get(mutant)
-            wt_slice = mutant_slices[mutant_slices['mutated_seq'] == target_seq]
-            if len(wt_slice) == 0:
-                raise ValueError(f"No available slice for mutant {mutant} and method masked_marginal")
-            slice_row = wt_slice.iloc[0]
+            window = window_info.get(mutant)
+            if window is None:
+                raise ValueError(f"No available window for mutant {mutant}")
             
-            window_start = int(slice_row['window_start'])
-            window_end = int(slice_row['window_end'])
+            window_start = window['window_start']
+            window_end = window['window_end']
             
-            # Sanity check
-            min_pos = min(p for _, p, _ in muts)
-            max_pos = max(p for _, p, _ in muts)
+            # Check all positions are within window
+            min_pos = positions.min()
+            max_pos = positions.max()
             if not (window_start <= min_pos and max_pos < window_end):
                 raise ValueError(f"Window {window_start}-{window_end} does not contain all positions for variant {mutant}")
             
-            sorted_muts = tuple(sorted(muts, key=lambda x: x[1]))
-            pos_tuple = tuple(pos - window_start for _, pos, _ in sorted_muts)
+            # Convert to relative positions
+            pos_rel = positions - window_start
+            pos_tuple = tuple(sorted(pos_rel))
             
             key = (window_start, window_end, pos_tuple)
-            position_groups.setdefault(key, []).append((row_idx, sorted_muts))
+            position_groups.setdefault(key, []).append((row_idx, positions, wt_aas, mt_aas))
         
         sequences: List[str] = []
         positions_list: List[List[int]] = []
-        variant_info: List[List[Tuple[int, List[Tuple[str, int, str]]]]] = []
+        variant_info: List[List[Tuple[int, str, str]]] = []
         
         for (window_start, window_end, pos_tuple), variants in position_groups.items():
             window_seq = target_seq[window_start:window_end]
             sequences.append(window_seq)
             positions_list.append(list(pos_tuple))
-            variant_info.append([(row_idx, list(sorted_muts)) for row_idx, sorted_muts in variants])
+            variant_info.append([(row_idx, wt_aas, mt_aas) for row_idx, _, wt_aas, mt_aas in variants])
         
         total_variants = len(df)
         print(f"Computing scores for {len(sequences)} inputs, covering {total_variants} variants ...")
         
-        iterator = tqdm(
-            range(0, len(sequences), self.batch_size),
-            total=(len(sequences) + self.batch_size - 1) // self.batch_size,
-            desc="Assay batches (masked_marginal)",
-            unit="batch",
-            position=1,
-            leave=False,
+        per_variant_log_probs = self._position_log_probs_batched(
+            "masked_marginal", sequences, positions_list
         )
         
-        per_variant_log_probs = self._position_log_probs(
-            "masked_marginal", sequences, positions_list, iterator
-        )
-        
+        # Vectorized scoring
         scores = [0.0] * len(df)
-        for variants_in_group, score in zip(variant_info, per_variant_log_probs):
-            for row_idx, muts in variants_in_group:
-                assert score.size(0) == len(muts), "Mismatch between mutations and gathered logits"
-                wt_ids, mt_ids = [], []
-                for wt, _pos, mt in muts:
-                    wt_id = self.aa_to_id.get(wt)
-                    mt_id = self.aa_to_id.get(mt)
-                    if wt_id is None or mt_id is None or (self.unk_id is not None and (wt_id == self.unk_id or mt_id == self.unk_id)):
-                        raise ValueError(f"WT or MT is not in vocab: {wt} or {mt}")
-                    wt_ids.append(wt_id)
-                    mt_ids.append(mt_id)
-                
-                wt_tensor = torch.as_tensor(wt_ids, device=score.device)
-                mt_tensor = torch.as_tensor(mt_ids, device=score.device)
-                indices = torch.arange(len(wt_ids), device=score.device)
-                deltas = score[indices, mt_tensor] - score[indices, wt_tensor]
-                scores[row_idx] = deltas.sum().item()
+        for variants_in_group, log_probs in zip(variant_info, per_variant_log_probs):
+            # Pre-collect all WT/MT ids for the group
+            num_variants = len(variants_in_group)
+            num_positions = log_probs.size(0)
+            
+            # Build tensors for all variants in this group
+            wt_ids_list = []
+            mt_ids_list = []
+            
+            for row_idx, wt_aas, mt_aas in variants_in_group:
+                assert len(wt_aas) == num_positions, f"Variant {row_idx} in group has {len(wt_aas)} muts, expected {num_positions}"
+                wt_ids = [self.aa_to_id[aa] for aa in wt_aas]
+                mt_ids = [self.aa_to_id[aa] for aa in mt_aas]
+                wt_ids_list.append(wt_ids)
+                mt_ids_list.append(mt_ids)
+            
+            # Convert to tensors [num_variants, num_positions]
+            wt_tensor = torch.tensor(wt_ids_list, device=log_probs.device, dtype=torch.long)
+            mt_tensor = torch.tensor(mt_ids_list, device=log_probs.device, dtype=torch.long)
+            
+            # Expand log_probs for all variants: [num_positions, vocab] -> [num_variants, num_positions, vocab]
+            log_probs_expanded = log_probs.unsqueeze(0).expand(num_variants, -1, -1)
+            
+            # Gather WT and MT log probs: [num_variants, num_positions]
+            wt_log_probs = torch.gather(log_probs_expanded, 2, wt_tensor.unsqueeze(2)).squeeze(2)
+            mt_log_probs = torch.gather(log_probs_expanded, 2, mt_tensor.unsqueeze(2)).squeeze(2)
+            
+            # Compute deltas and sum across positions
+            deltas = (mt_log_probs - wt_log_probs).sum(dim=1)  # [num_variants]
+            
+            # Assign to scores
+            for i, (row_idx, _, _) in enumerate(variants_in_group):
+                scores[row_idx] = deltas[i].item()
         
         return scores
     
@@ -439,87 +528,86 @@ class ProteinGymScorer:
         self,
         df: pd.DataFrame,
         target_seq: str,
-        mutant_groups: Dict,
+        sliced_df: pd.DataFrame,
+        mutation_info: Dict,
+        window_info: Dict,
     ) -> List[float]:
         """Score using wildtype marginal method."""
-        # Group by (window_start, window_end) -> List[(row_idx, sorted_muts, pos_rels)]
-        window_groups: Dict[Tuple[int, int], List[Tuple[int, Tuple[Tuple[str, int, str], ...], Tuple[int, ...]]]] = {}
+        # Group by (window_start, window_end) -> List[(row_idx, positions, wt_aas, mt_aas)]
+        window_groups: Dict[Tuple[int, int], List[Tuple[int, np.ndarray, str, str]]] = {}
         
         for row_idx, row in enumerate(df.itertuples(index=False)):
             mutant = row.mutant
-            muts = SequenceProcessor.parse_mutant_string(mutant)
+            positions, wt_aas, mt_aas = mutation_info[mutant]
             
-            mutant_slices = mutant_groups.get(mutant)
-            wt_slice = mutant_slices[mutant_slices['mutated_seq'] == target_seq]
-            if len(wt_slice) == 0:
-                raise ValueError(f"No available slice for mutant {mutant} and method wildtype_marginal")
-            slice_row = wt_slice.iloc[0]
+            window = window_info.get(mutant)
+            if window is None:
+                raise ValueError(f"No available window for mutant {mutant}")
             
-            window_start = int(slice_row['window_start'])
-            window_end = int(slice_row['window_end'])
+            window_start = window['window_start']
+            window_end = window['window_end']
             
-            min_pos = min(p for _, p, _ in muts)
-            max_pos = max(p for _, p, _ in muts)
+            min_pos = positions.min()
+            max_pos = positions.max()
             if not (window_start <= min_pos and max_pos < window_end):
                 raise ValueError(f"Window {window_start}-{window_end} does not contain all positions for variant {mutant}")
             
-            sorted_muts = tuple(sorted(muts, key=lambda x: x[1]))
-            pos_rels = tuple(pos - window_start for _, pos, _ in sorted_muts)
-            
             key = (window_start, window_end)
-            window_groups.setdefault(key, []).append((row_idx, sorted_muts, pos_rels))
+            window_groups.setdefault(key, []).append((row_idx, positions, wt_aas, mt_aas))
         
         sequences: List[str] = []
         positions_list: List[List[int]] = []
-        window_to_variants: List[List[Tuple[int, List[Tuple[str, int, str]], List[int]]]] = []
+        window_to_variants: List[List[Tuple[int, np.ndarray, str, str]]] = []
         
         for (window_start, window_end), variants in window_groups.items():
             window_seq = target_seq[window_start:window_end]
             sequences.append(window_seq)
             
             all_positions = set()
-            for _, _, pos_rels in variants:
-                all_positions.update(pos_rels)
+            for _, positions, _, _ in variants:
+                all_positions.update((positions - window_start).tolist())
             positions_list.append(sorted(all_positions))
-            window_to_variants.append([(row_idx, list(sorted_muts), list(pos_rels)) for row_idx, sorted_muts, pos_rels in variants])
+            window_to_variants.append(variants)
         
         total_variants = len(df)
         print(f"Computing scores for {len(sequences)} windows, covering {total_variants} variants ...")
         
-        iterator = tqdm(
-            range(0, len(sequences), self.batch_size),
-            total=(len(sequences) + self.batch_size - 1) // self.batch_size,
-            desc="Assay batches (wildtype_marginal)",
-            unit="batch",
-            position=1,
-            leave=False,
-        )
-        
-        per_variant_log_probs = self._position_log_probs(
-            "wildtype_marginal", sequences, positions_list, iterator
+        per_variant_log_probs = self._position_log_probs_batched(
+            "wildtype_marginal", sequences, positions_list
         )
         
         scores = [0.0] * len(df)
         for window_idx, (window_log_probs, variants) in enumerate(zip(per_variant_log_probs, window_to_variants)):
             window_positions = positions_list[window_idx]
+            window_start = list(window_groups.keys())[window_idx][0]
             pos_to_idx = {pos: idx for idx, pos in enumerate(window_positions)}
             
-            for row_idx, muts, pos_rels in variants:
-                pos_indices = torch.tensor([pos_to_idx[pos] for pos in pos_rels], device=window_log_probs.device)
-                variant_log_probs = window_log_probs[pos_indices]
+            # Vectorized scoring for this window
+            wt_ids_list = []
+            mt_ids_list = []
+            pos_indices_list = []
+            row_indices = []
+            
+            for row_idx, positions, wt_aas, mt_aas in variants:
+                pos_rels = positions - window_start
+                pos_indices = [pos_to_idx[p] for p in pos_rels]
                 
-                assert variant_log_probs.size(0) == len(muts), "Mismatch between mutations and gathered logits"
-                wt_ids, mt_ids = [], []
-                for wt, _pos, mt in muts:
-                    wt_id = self.aa_to_id.get(wt)
-                    mt_id = self.aa_to_id.get(mt)
-                    if wt_id is None or mt_id is None or (self.unk_id is not None and (wt_id == self.unk_id or mt_id == self.unk_id)):
-                        raise ValueError(f"WT or MT is not in vocab: {wt} or {mt}")
-                    wt_ids.append(wt_id)
-                    mt_ids.append(mt_id)
+                wt_ids = [self.aa_to_id[aa] for aa in wt_aas]
+                mt_ids = [self.aa_to_id[aa] for aa in mt_aas]
                 
-                wt_tensor = torch.as_tensor(wt_ids, device=variant_log_probs.device)
-                mt_tensor = torch.as_tensor(mt_ids, device=variant_log_probs.device)
+                wt_ids_list.append(wt_ids)
+                mt_ids_list.append(mt_ids)
+                pos_indices_list.append(pos_indices)
+                row_indices.append(row_idx)
+            
+            # Score each variant in this window
+            for i, (row_idx, pos_indices, wt_ids, mt_ids) in enumerate(zip(row_indices, pos_indices_list, wt_ids_list, mt_ids_list)):
+                pos_tensor = torch.tensor(pos_indices, device=window_log_probs.device, dtype=torch.long)
+                variant_log_probs = window_log_probs[pos_tensor]  # [num_positions, vocab]
+                
+                wt_tensor = torch.tensor(wt_ids, device=variant_log_probs.device, dtype=torch.long)
+                mt_tensor = torch.tensor(mt_ids, device=variant_log_probs.device, dtype=torch.long)
+                
                 indices = torch.arange(len(wt_ids), device=variant_log_probs.device)
                 deltas = variant_log_probs[indices, mt_tensor] - variant_log_probs[indices, wt_tensor]
                 scores[row_idx] = deltas.sum().item()
@@ -530,78 +618,58 @@ class ProteinGymScorer:
         self,
         df: pd.DataFrame,
         target_seq: str,
-        mutant_groups: Dict,
+        sliced_df: pd.DataFrame,
+        mutation_info: Dict,
+        window_info: Dict,
     ) -> List[float]:
         """Score using mutant marginal method."""
         sequences: List[str] = []
         positions_list: List[List[int]] = []
-        variant_info: List[Tuple[int, List[Tuple[str, int, str]]]] = []
+        variant_info: List[Tuple[int, str, str]] = []
         
         for row_idx, row in enumerate(df.itertuples(index=False)):
             mutant = row.mutant
             mutated_seq = row.mutated_seq
-            muts = SequenceProcessor.parse_mutant_string(mutant)
+            positions, wt_aas, mt_aas = mutation_info[mutant]
             
-            for wt, pos, mt in muts:
-                assert 0 <= pos < len(target_seq), f"Mutation pos {pos} out of range for target_seq length {len(target_seq)}"
-            
-            mutant_slices = mutant_groups.get(mutant)
+            # Get mutant slice
+            mutant_slices = sliced_df[sliced_df['mutant'] == mutant]
             mut_slice = mutant_slices[mutant_slices['mutated_seq'] == mutated_seq]
             if len(mut_slice) == 0:
-                raise ValueError(f"No available slice for mutant {mutant} and method mutant_marginal")
+                raise ValueError(f"No available slice for mutant {mutant}")
             slice_row = mut_slice.iloc[0]
             
             window_start = int(slice_row['window_start'])
             window_end = int(slice_row['window_end'])
             window_seq = slice_row['sliced_mutated_seq']
             
-            min_pos = min(p for _, p, _ in muts)
-            max_pos = max(p for _, p, _ in muts)
+            min_pos = positions.min()
+            max_pos = positions.max()
             if not (window_start <= min_pos and max_pos < window_end):
                 raise ValueError(f"Window {window_start}-{window_end} does not contain all positions for variant {mutant}")
             
-            pos_rels: List[int] = []
-            for wt, pos, mt in muts:
-                rel = pos - window_start
-                assert window_seq[rel] == mutated_seq[pos], f"mutant_marginal: residue mismatch at abs {pos} (rel {rel})"
-                pos_rels.append(rel)
+            pos_rels = (positions - window_start).tolist()
             
             sequences.append(window_seq)
             positions_list.append(pos_rels)
-            variant_info.append((row_idx, muts))
+            variant_info.append((row_idx, wt_aas, mt_aas))
         
         print(f"Computing scores for {len(sequences)} variants ...")
         
-        iterator = tqdm(
-            range(0, len(sequences), self.batch_size),
-            total=(len(sequences) + self.batch_size - 1) // self.batch_size,
-            desc="Assay batches (mutant_marginal)",
-            unit="batch",
-            position=1,
-            leave=False,
-        )
-        
-        per_variant_log_probs = self._position_log_probs(
-            "mutant_marginal", sequences, positions_list, iterator
+        per_variant_log_probs = self._position_log_probs_batched(
+            "mutant_marginal", sequences, positions_list
         )
         
         scores = [0.0] * len(df)
-        for (row_idx, muts), score in zip(variant_info, per_variant_log_probs):
-            assert score.size(0) == len(muts), "Mismatch between mutations and gathered logits"
-            muts = sorted(muts, key=lambda x: x[1])
-            wt_ids, mt_ids = [], []
-            for wt, _pos, mt in muts:
-                wt_id = self.aa_to_id.get(wt)
-                mt_id = self.aa_to_id.get(mt)
-                if wt_id is None or mt_id is None or (self.unk_id is not None and (wt_id == self.unk_id or mt_id == self.unk_id)):
-                    raise ValueError(f"WT or MT is not in vocab: {wt} or {mt}")
-                wt_ids.append(wt_id)
-                mt_ids.append(mt_id)
+        for (row_idx, wt_aas, mt_aas), log_probs in zip(variant_info, per_variant_log_probs):
+            wt_ids = [self.aa_to_id[aa] for aa in wt_aas]
+            mt_ids = [self.aa_to_id[aa] for aa in mt_aas]
             
-            wt_tensor = torch.as_tensor(wt_ids, device=score.device)
-            mt_tensor = torch.as_tensor(mt_ids, device=score.device)
-            indices = torch.arange(len(wt_ids), device=score.device)
-            deltas = score[indices, mt_tensor] - score[indices, wt_tensor]
+            wt_tensor = torch.tensor(wt_ids, device=log_probs.device, dtype=torch.long)
+            mt_tensor = torch.tensor(mt_ids, device=log_probs.device, dtype=torch.long)
+            
+            indices = torch.arange(len(wt_ids), device=log_probs.device)
+            deltas = log_probs[indices, mt_tensor] - log_probs[indices, wt_tensor]
             scores[row_idx] = deltas.sum().item()
         
         return scores
@@ -700,22 +768,31 @@ class ProteinGymScorer:
         return out
     
     @torch.inference_mode()
-    def _position_log_probs(
+    def _position_log_probs_batched(
         self,
         scoring_method: str,
         sequences: List[str],
         positions_list: List[List[int]],
-        progress_bar,
     ) -> List[torch.Tensor]:
-        """Return batched log probabilities for multiple positions per sequence."""
+        """Return batched log probabilities with dynamic batching."""
         assert len(sequences) == len(positions_list), "Must have one position list per sequence"
         
-        all_log_probs = []
+        # Create dynamic batches
+        batch_indices = self._create_dynamic_batches(sequences, positions_list)
         
-        for batch_start in progress_bar:
-            batch_end = min(batch_start + self.batch_size, len(sequences))
-            batch_sequences = sequences[batch_start:batch_end]
-            batch_positions_list = positions_list[batch_start:batch_end]
+        all_log_probs = [None] * len(sequences)
+        
+        progress_bar = tqdm(
+            batch_indices,
+            desc=f"Assay batches ({scoring_method})",
+            unit="batch",
+            position=1,
+            leave=False,
+        )
+        
+        for batch_idx_list in progress_bar:
+            batch_sequences = [sequences[i] for i in batch_idx_list]
+            batch_positions_list = [positions_list[i] for i in batch_idx_list]
             
             tokens = self.tokenizer(
                 batch_sequences,
@@ -755,11 +832,11 @@ class ProteinGymScorer:
             
             logits = outputs.logits
             
-            for batch_idx, positions in enumerate(batch_positions_list):
+            for batch_idx, (orig_idx, positions) in enumerate(zip(batch_idx_list, batch_positions_list)):
                 token_indices = torch.tensor([pos + 1 for pos in positions], device=self.device, dtype=torch.long)
                 selected_logits = logits[batch_idx, token_indices]
                 log_probs = torch.log_softmax(selected_logits, dim=-1)
-                all_log_probs.append(log_probs)
+                all_log_probs[orig_idx] = log_probs
         
         return all_log_probs
     
@@ -1003,12 +1080,8 @@ class ProteinGymRunner:
         if 'delta_log_prob' in results_to_save.columns:
             results_to_save = results_to_save.rename(columns={'delta_log_prob': model_name})
         
-        # Only keep one row of 'target_seq' (present in first row), blank the rest
-        first_target_seq = None
-        if 'target_seq' in results_to_save.columns and len(results_to_save) > 0:
-            first_target_seq = str(results_to_save['target_seq'].iloc[0])
-            results_to_save['target_seq'] = ''
-            results_to_save.iloc[0, results_to_save.columns.get_loc('target_seq')] = first_target_seq
+        if 'target_seq' in results_to_save.columns:
+            results_to_save = results_to_save.drop(columns=['target_seq'])
         
         # If an aggregated file exists, merge the new model column
         if os.path.exists(per_dms_path):

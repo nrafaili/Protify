@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from typing import Iterator, TypedDict
 import torch
 from tqdm import tqdm
-from .FastPLMs.e1.modeling_e1 import E1ForMaskedLM, E1MaskedLMOutputWithPast, E1BatchPreparer, get_context, DataPrepConfig, KVCache
+from base_models.FastPLMs.e1.modeling_e1 import E1ForMaskedLM, E1MaskedLMOutputWithPast, E1BatchPreparer, get_context, DataPrepConfig, KVCache
 
 IndexedSequence = tuple[int, str]
 logger = logging.getLogger(__name__)

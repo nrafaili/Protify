@@ -31,6 +31,13 @@ from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAtte
 from .base_tokenizer import BaseSequenceTokenizer
 
 
+class ModelOutput:
+    def __init__(self, last_hidden_state=None, logits=None, attentions=None):
+        self.last_hidden_state = last_hidden_state
+        self.logits = logits
+        self.attentions = attentions
+
+
 MODEL_REGISTRY = {}
 
 def register_model(name):
@@ -351,11 +358,17 @@ class DPLMForEmbedding(nn.Module):
     ) -> torch.Tensor:
         if output_attentions:
             out = self.dplm(input_ids, attention_mask=attention_mask, output_attentions=output_attentions)
-            return out.last_hidden_state, out.attentions
+            return ModelOutput(
+                last_hidden_state=out['last_hidden_state'],
+                attentions=out.get('attentions', None)
+            )
         else:
             if self.return_logits:
                 out = self.dplm(input_ids, attention_mask=attention_mask)
-                return out.last_hidden_state, out.logits
+                return ModelOutput(
+                    last_hidden_state=out['last_hidden_state'],
+                    logits=out['logits']
+                )
             else:
                 return self.dplm(input_ids, attention_mask=attention_mask)['last_hidden_state']
 

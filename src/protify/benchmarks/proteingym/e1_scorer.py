@@ -8,7 +8,7 @@ import torch
 from tqdm import tqdm
 from transformers.utils import logging
 
-from .FastPLMs.e1.modeling_e1 import E1ForMaskedLM, DataPrepConfig
+from base_models.FastPLMs.e1.modeling_e1 import E1ForMaskedLM, DataPrepConfig
 from .e1_predictor import E1Predictor
 
 logger = logging.get_logger(__name__)

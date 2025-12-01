@@ -15,7 +15,6 @@ def compare_scoring_methods(
     device: Optional[str] = None,
     methods: Optional[List[str]] = None,
     dms_ids: Optional[List[str]] = None,
-    progress: bool = True,
     output_csv: Optional[str] = None,
     batch_size: int = 32,
     scoring_window: str = "optimal"
