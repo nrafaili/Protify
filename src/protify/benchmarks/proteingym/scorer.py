@@ -172,6 +172,10 @@ class ProteinGymScorer:
     tokenizer : Any
     device : torch.device
     batch_size : int
+    use_autocast : bool
+        Whether to use autocast for inference (default True)
+    dtype : torch.dtype, optional
+        Data type for autocast. If None, uses MODEL_DTYPE default for model.
     """
     
     # Model context lengths (minus 2 for special tokens)
@@ -200,6 +204,32 @@ class ProteinGymScorer:
         'E1-600': 2046,
     }
     
+    # Default dtype for autocast per model (None = no autocast for that model)
+    MODEL_DTYPE = {
+        'ESM2-8': torch.float16,
+        'ESM2-35': torch.float16,
+        'ESM2-150': torch.float16,
+        'ESM2-650': torch.float16,
+        'ESM2-3B': torch.float16,
+        'ESMC-300': torch.float16,
+        'ESMC-600': torch.float16,
+        'ProtBert': torch.float16,
+        'ProtBert-BFD': torch.float16,
+        'GLM2-150': torch.float16,
+        'GLM2-650': torch.float16,
+        'DSM-150': torch.float16,
+        'DSM-650': torch.float16,
+        'DPLM-150': torch.float16,
+        'DPLM-650': torch.float16,
+        'DPLM-3B': torch.float16,
+        'Random-Transformer': torch.float16,
+        'AMPLIFY-120': torch.float16,
+        'AMPLIFY-350': torch.float16,
+        'E1-150': None,  # E1 models don't use autocast
+        'E1-300': None,
+        'E1-600': None,
+    }
+    
     # Models that don't append EOS token
     GLM2_MODELS = ["GLM2-150", "GLM2-650", "GLM2-GAIA"]
     
@@ -210,7 +240,9 @@ class ProteinGymScorer:
         tokenizer: Any,
         device: torch.device,
         batch_size: int = 32,
-        max_batch_tokens: int = 16384
+        max_batch_tokens: int = 16384,
+        use_autocast: bool = True,
+        dtype: Optional[torch.dtype] = None,
     ):
         self.model_name = model_name
         self.model = model
@@ -225,6 +257,17 @@ class ProteinGymScorer:
         self.unk_id = getattr(tokenizer, "unk_token_id", None)
         self.context_length = self.MODEL_CONTEXT_LENGTH.get(model_name, 1024)
         self.max_batch_tokens = max_batch_tokens
+        
+        # Autocast settings
+        self.use_autocast = use_autocast
+        # Use provided dtype, or fall back to model default, or None (no autocast)
+        if dtype is not None:
+            self.dtype = dtype
+        else:
+            self.dtype = self.MODEL_DTYPE.get(model_name, torch.float16)
+        # If dtype is None (e.g., E1 models), disable autocast
+        if self.dtype is None:
+            self.use_autocast = False
 
     def score_substitutions(
         self,
@@ -258,14 +301,7 @@ class ProteinGymScorer:
         target_seq = df['target_seq'].iloc[0]
         seq_len = len(target_seq)
 
-        if scoring_window == "optimal" and seq_len <= self.context_length:
-            # no slicing needed
-            sliced_df = df.copy()
-            sliced_df['window_start'] = 0
-            sliced_df['window_end'] = seq_len
-            sliced_df['sliced_mutated_seq'] = sliced_df['mutated_seq']
-        else:
-            sliced_df = SequenceProcessor.get_sequence_slices(
+        sliced_df = SequenceProcessor.get_sequence_slices(
                 df,
                 target_seq=target_seq,
                 model_context_len=self.context_length,
@@ -276,28 +312,41 @@ class ProteinGymScorer:
         
         encoded_target = np.frombuffer(target_seq.encode(), dtype=np.uint8)
         mutation_info = {}
-        for _, row in df.iterrows():
-            mutant = row['mutant']
-            mutated_seq = row['mutated_seq']
+        for row in df.itertuples(index=False):
+            mutant = row.mutant
+            if mutant in mutation_info:  # in case df has duplicates
+                continue
+            mutated_seq = row.mutated_seq
             mismatches = np.array(
-                SequenceProcessor.find_mismatches(encoded_target, mutated_seq), dtype=np.int64)
-            # Store as (positions, wt_aas, mt_aas)
+                SequenceProcessor.find_mismatches(encoded_target, mutated_seq),
+                dtype=np.int64
+            )
             wt_aas = ''.join(target_seq[p] for p in mismatches)
             mt_aas = ''.join(mutated_seq[p] for p in mismatches)
             mutation_info[mutant] = (mismatches, wt_aas, mt_aas)
-        
-        # Precompute window info
-        window_info = {}
-        for mutant in df['mutant'].unique():
-            mutant_slices = sliced_df[sliced_df['mutant'] == mutant]
-            wt_slice = mutant_slices[mutant_slices['mutated_seq'] == target_seq]
-            if len(wt_slice) > 0:
-                slice_row = wt_slice.iloc[0]
-                window_info[mutant] = {
-                    'window_start': int(slice_row['window_start']),
-                    'window_end': int(slice_row['window_end']),
-                    'sliced_seq': slice_row['sliced_mutated_seq']
+    
+        # --- window_info (FAST) ---
+        if scoring_window == "optimal" and seq_len <= self.context_length:
+            # no slicing needed; everyone shares one window
+            uniq_mutants = pd.unique(df["mutant"])
+            window_info = {
+                m: {"window_start": 0, "window_end": seq_len, "sliced_seq": target_seq}
+                for m in uniq_mutants
+            }
+        else:
+            wt_rows = (
+                sliced_df.loc[sliced_df["mutated_seq"].eq(target_seq),
+                                ["mutant", "window_start", "window_end", "sliced_mutated_seq"]]
+                .drop_duplicates(subset=["mutant"])
+            )
+            window_info = {
+                r.mutant: {
+                    "window_start": int(r.window_start),
+                    "window_end": int(r.window_end),
+                    "sliced_seq": r.sliced_mutated_seq,
                 }
+                for r in wt_rows.itertuples(index=False)
+            }
         
         if scoring_method in ["masked_marginal", "mutant_marginal", "wildtype_marginal"]:
             scores = self._score_marginal(df, target_seq, sliced_df, scoring_method, mutation_info, window_info)
@@ -508,15 +557,10 @@ class ProteinGymScorer:
             wt_tensor = torch.tensor(wt_ids_list, device=log_probs.device, dtype=torch.long)
             mt_tensor = torch.tensor(mt_ids_list, device=log_probs.device, dtype=torch.long)
             
-            # Expand log_probs for all variants: [num_positions, vocab] -> [num_variants, num_positions, vocab]
-            log_probs_expanded = log_probs.unsqueeze(0).expand(num_variants, -1, -1)
-            
-            # Gather WT and MT log probs: [num_variants, num_positions]
-            wt_log_probs = torch.gather(log_probs_expanded, 2, wt_tensor.unsqueeze(2)).squeeze(2)
-            mt_log_probs = torch.gather(log_probs_expanded, 2, mt_tensor.unsqueeze(2)).squeeze(2)
-            
-            # Compute deltas and sum across positions
-            deltas = (mt_log_probs - wt_log_probs).sum(dim=1)  # [num_variants]
+            pos_idx = torch.arange(num_positions, device=log_probs.device)[None, :].expand(num_variants, -1)
+            wt_log_probs = log_probs[pos_idx, wt_tensor]  # [num_variants, num_positions]
+            mt_log_probs = log_probs[pos_idx, mt_tensor]
+            deltas = (mt_log_probs - wt_log_probs).sum(dim=1)
             
             # Assign to scores
             for i, (row_idx, _, _) in enumerate(variants_in_group):
@@ -790,6 +834,8 @@ class ProteinGymScorer:
             leave=False,
         )
         
+        dev = "cuda" if self.device.type == "cuda" else "cpu"
+        
         for batch_idx_list in progress_bar:
             batch_sequences = [sequences[i] for i in batch_idx_list]
             batch_positions_list = [positions_list[i] for i in batch_idx_list]
@@ -826,11 +872,19 @@ class ProteinGymScorer:
                     token_indices = [pos + 1 for pos in positions]
                     masked_input_ids[batch_idx, token_indices] = mask_id
                 
-                outputs = self.model(masked_input_ids, attention_mask=attention_mask)
+                if self.use_autocast:
+                    with torch.autocast(dev, dtype=self.dtype):
+                        outputs = self.model(masked_input_ids, attention_mask=attention_mask)
+                else:
+                    outputs = self.model(masked_input_ids, attention_mask=attention_mask)
             else:
-                outputs = self.model(input_ids, attention_mask=attention_mask)
+                if self.use_autocast:
+                    with torch.autocast(dev, dtype=self.dtype):
+                        outputs = self.model(input_ids, attention_mask=attention_mask)
+                else:
+                    outputs = self.model(input_ids, attention_mask=attention_mask)
             
-            logits = outputs.logits
+            logits = outputs.logits.float()
             
             for batch_idx, (orig_idx, positions) in enumerate(zip(batch_idx_list, batch_positions_list)):
                 token_indices = torch.tensor([pos + 1 for pos in positions], device=self.device, dtype=torch.long)
@@ -859,6 +913,7 @@ class ProteinGymScorer:
             length_groups[len(seq)].append((idx, seq))
         
         results = [None] * len(sequences)
+        device_type = "cuda" if self.device.type == "cuda" else "cpu"
         
         for seq_len, indexed_seqs in length_groups.items():
             indices = [idx for idx, _ in indexed_seqs]
@@ -904,7 +959,11 @@ class ProteinGymScorer:
                 pos_indices = position_tensor.repeat(num_seqs)
                 masked_batch[row_indices, pos_indices] = mask_id
                 
-                outputs = self.model(masked_batch, attention_mask=attention_mask_batch)
+                if self.use_autocast:
+                    with torch.autocast(device_type, dtype=self.dtype):
+                        outputs = self.model(masked_batch, attention_mask=attention_mask_batch)
+                else:
+                    outputs = self.model(masked_batch, attention_mask=attention_mask_batch)
                 logits = outputs.logits.float()
                 
                 log_probs = torch.log_softmax(logits, dim=-1)
@@ -934,6 +993,7 @@ class ProteinGymScorer:
     ) -> List[float]:
         """Compute log probability for multiple sequences with batched processing."""
         results = []
+        device_type = "cuda" if self.device.type == "cuda" else "cpu"
         
         for batch_start in progress_bar:
             batch_end = min(batch_start + self.batch_size, len(sequences))
@@ -948,7 +1008,11 @@ class ProteinGymScorer:
             input_ids = tokens['input_ids'].to(self.device)
             attention_mask = tokens['attention_mask'].to(self.device)
             
-            output = self.model(input_ids, attention_mask=attention_mask)
+            if self.use_autocast:
+                with torch.autocast(device_type, dtype=self.dtype):
+                    output = self.model(input_ids, attention_mask=attention_mask)
+            else:
+                output = self.model(input_ids, attention_mask=attention_mask)
             logits = output.logits.float()
             log_probs = torch.log_softmax(logits, dim=-1)
             
@@ -993,6 +1057,8 @@ class ProteinGymRunner:
         scoring_method: str = "masked_marginal",
         scoring_window: str = "optimal",
         batch_size: int = 32,
+        use_autocast: bool = True,
+        dtype: Optional[torch.dtype] = None,
     ) -> Dict[str, float]:
         """Run zero-shot scoring for all specified models and assays.
         
@@ -1010,6 +1076,10 @@ class ProteinGymRunner:
             "optimal" or "sliding"
         batch_size : int
             Batch size for inference
+        use_autocast : bool
+            Whether to use autocast for inference (default True)
+        dtype : torch.dtype, optional
+            Data type for autocast. If None, uses model default.
             
         Returns
         -------
@@ -1033,6 +1103,8 @@ class ProteinGymRunner:
                 tokenizer=tokenizer,
                 device=self.device,
                 batch_size=batch_size,
+                use_autocast=use_autocast,
+                dtype=dtype,
             )
             
             assay_iterator = tqdm(dms_ids, desc="All assays", unit="assay", position=0)

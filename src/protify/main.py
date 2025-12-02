@@ -129,6 +129,8 @@ def parse_arguments():
                         help="Compare different scoring methods across models and DMS assays (default: False).")
     parser.add_argument("--score_only", action="store_true", default=False,
                         help="Only run the ProteinGym benchmarking script on existing CSV files, skip zero-shot scoring (default: False).")
+    parser.add_argument("--no_autocast", action="store_true", default=False,
+                        help="Disable autocast for ProteinGym scoring (default: False, autocast enabled).")
 
     args = parser.parse_args()
 
@@ -625,6 +627,8 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
             results_dir=results_dir,
             repo_id="GleghornLab/ProteinGym_DMS",
         )
+        use_autocast = not getattr(self.full_args, 'no_autocast', False)
+        
         self._proteingym_timing = runner.run(
             dms_ids=dms_ids,
             model_names=model_names,
@@ -632,6 +636,7 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
             scoring_method=scoring_method,
             scoring_window=scoring_window,
             batch_size=getattr(self.full_args, 'pg_batch_size', 32),
+            use_autocast=use_autocast,
         )
         print_message(f"ProteinGym zero-shot complete. Results in {results_dir}")
 
