@@ -3,177 +3,92 @@ Precision Comparison Test Suite
 
 Tests masked marginal scoring across FP32, FP16, and BF16 precision modes.
 Compares logits and final masked marginal Δlog-prob scores across FP32, FP16, and BF16.
+
+Alternatively, the `--embeddings_test` option supports general embedding precision
+testing using SwissProt sequences.
 """
 
 import os
+import gc
+import random
 import numpy as np
 import torch
+import torch.nn.functional as F
 import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any, Union
 from scipy.stats import spearmanr
 from tqdm.auto import tqdm
+from dataclasses import dataclass
+from datasets import load_dataset
+
 from benchmarks.proteingym.scorer import ProteinGymScorer, SequenceProcessor
 from benchmarks.proteingym.data_loader import load_proteingym_dms
 from base_models.get_base_models import get_base_model
-from seed_utils import set_global_seed, set_determinism
+from seed_utils import set_global_seed, seed_worker, dataloader_generator, get_global_seed
+from embedder import Embedder, EmbeddingArguments, build_collator
+from pooler import Pooler
+from data.dataset_classes import SimpleProteinDataset
+from torch.utils.data import DataLoader
+
 
 TEST_DMS_IDS = [
     "A4_HUMAN_Seuma_2022",  # Stability
     "ACE2_HUMAN_Chan_2020",  # Binding
-    "D7PM05_CLYGR_Somermeyer_2022",  # Activity
     "ENV_HV1BR_Haddox_2016",  # Organismal fitness
 ]
 
 
-def masked_marginal_scoring(
+def score_with_precision(
     model: Any,
     tokenizer: Any,
     model_name: str,
     device: torch.device,
-    sequences: List[str],
-    positions_list: List[List[int]],
+    df: pd.DataFrame,
+    target_seq: str,
     dtype: Optional[torch.dtype] = None,
     max_batch_tokens: int = 16384,
-) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
+) -> Tuple[List[float], List[torch.Tensor]]:
     """
-    Run forward pass with specified precision and return both logits and log_probs.
+    Score variants using ProteinGymScorer with specified precision.
+    
+    Creates a ProteinGymScorer instance with appropriate precision settings
+    and uses _position_log_probs_batched with return_logits=True.
     
     Args:
         model: The model to run inference on
         tokenizer: The tokenizer
-        model_name: Name of the model (for GLM2 handling)
+        model_name: Name of the model
         device: Device to run on
-        sequences: List of sequences to score
-        positions_list: List of position lists (one per sequence)
+        df: DataFrame with variants to score
+        target_seq: Target sequence
         dtype: Optional dtype for autocast (None for FP32)
         max_batch_tokens: Maximum tokens per batch
         
     Returns:
-        Tuple of (list of logits tensors, list of log_probs tensors)
-    """
-    GLM2_MODELS = ["GLM2-150", "GLM2-650", "GLM2-GAIA"]
-    
-    batches = []
-    current_batch = []
-    current_tokens = 0
-    
-    for idx, seq in enumerate(sequences):
-        if model_name in GLM2_MODELS:
-            seq_tokens = len(seq) + 1
-        else:
-            seq_tokens = len(seq) + 2
-        
-        if current_batch and current_tokens + seq_tokens > max_batch_tokens:
-            batches.append(current_batch)
-            current_batch = []
-            current_tokens = 0
-        
-        current_batch.append(idx)
-        current_tokens += seq_tokens
-    
-    if current_batch:
-        batches.append(current_batch)
-    
-    all_logits = [None] * len(sequences)
-    all_log_probs = [None] * len(sequences)
-    
-    dev = "cuda" if device.type == "cuda" else "cpu"
-    
-    for batch_idx_list in batches:
-        batch_sequences = [sequences[i] for i in batch_idx_list]
-        batch_positions_list = [positions_list[i] for i in batch_idx_list]
-        
-        tokens = tokenizer(
-            batch_sequences,
-            return_tensors='pt',
-            add_special_tokens=True,
-            padding=False,
-        )
-        input_ids = tokens['input_ids'].to(device)
-        attention_mask = tokens['attention_mask'].to(device)
-        seq_lengths = attention_mask.sum(dim=1)
-        
-        # GLM2 does not append EOS
-        if model_name in GLM2_MODELS:
-            expected_lengths = torch.tensor([len(seq) + 1 for seq in batch_sequences], device=seq_lengths.device)
-            if not torch.equal(seq_lengths, expected_lengths):
-                raise AssertionError("Tokenized length must equal len(sequence)+1 for GLM2 models in the batch")
-        else:
-            expected_lengths = torch.tensor([len(seq) + 2 for seq in batch_sequences], device=seq_lengths.device)
-            if not torch.equal(seq_lengths, expected_lengths):
-                raise AssertionError("Tokenized length must equal len(sequence)+2 for all sequences in the batch")
-        
-        # Get mask token ID
-        mask_id = tokenizer.mask_token_id
-        if mask_id is None:
-            mask_id = tokenizer.convert_tokens_to_ids(getattr(tokenizer, 'mask_token', '<mask>'))
-        if mask_id is None:
-            raise ValueError("Tokenizer has no mask token.")
-        
-        masked_input_ids = input_ids.clone()
-        for batch_idx, positions in enumerate(batch_positions_list):
-            token_indices = [pos + 1 for pos in positions]
-            masked_input_ids[batch_idx, token_indices] = mask_id
-        
-        # Run forward pass with specified precision
-        if dtype is None: # FP32
-            outputs = model(masked_input_ids, attention_mask=attention_mask)
-            logits = outputs.logits.float()
-        else:
-            with torch.autocast(dev, dtype=dtype):
-                outputs = model(masked_input_ids, attention_mask=attention_mask)
-            logits = outputs.logits.float()
-        
-        for batch_idx, (orig_idx, positions) in enumerate(zip(batch_idx_list, batch_positions_list)):
-            token_indices = torch.tensor([pos + 1 for pos in positions], device=device, dtype=torch.long)
-            selected_logits = logits[batch_idx, token_indices]
-            
-            # Check for NaN/non-finite values in logits
-            if not torch.isfinite(selected_logits).all():
-                nan_count = torch.isnan(selected_logits).sum().item()
-                inf_count = torch.isinf(selected_logits).sum().item()
-                raise ValueError(
-                    f"Non-finite values in logits for sequence {orig_idx}: "
-                    f"{nan_count} NaNs, {inf_count} Infs"
-                )
-            
-            log_probs = torch.log_softmax(selected_logits, dim=-1)
-            
-            # Check for NaN/non-finite values in log_probs
-            if not torch.isfinite(log_probs).all():
-                nan_count = torch.isnan(log_probs).sum().item()
-                inf_count = torch.isinf(log_probs).sum().item()
-                raise ValueError(
-                    f"Non-finite values in log_probs for sequence {orig_idx}: "
-                    f"{nan_count} NaNs, {inf_count} Infs"
-                )
-            
-            all_logits[orig_idx] = selected_logits
-            all_log_probs[orig_idx] = log_probs
-    
-    return all_logits, all_log_probs
-
-
-def score_with_precision(
-    scorer: ProteinGymScorer,
-    df: pd.DataFrame,
-    target_seq: str,
-    dtype: Optional[torch.dtype] = None,
-) -> Tuple[List[float], List[torch.Tensor]]:
-    """
-    Returns both scores and logits for comparison.
-    
-    Args:
-        scorer: ProteinGymScorer instance
-        df: DataFrame with variants to score
-        target_seq: Target sequence
-        dtype: Optional dtype for autocast (None for FP32)
-        
-    Returns:
         Tuple of (scores list, logits list)
     """
+    if dtype is None:
+        use_autocast = False
+        scorer_dtype = None
+    else:
+        use_autocast = True
+        scorer_dtype = dtype
+    
+    # Create scorer with appropriate precision settings
+    scorer = ProteinGymScorer(
+        model_name=model_name,
+        model=model,
+        tokenizer=tokenizer,
+        device=device,
+        batch_size=32,
+        max_batch_tokens=max_batch_tokens,
+        use_autocast=use_autocast,
+        dtype=scorer_dtype,
+    )
+    
+    # Build mutation info
     encoded_target = np.frombuffer(target_seq.encode(), dtype=np.uint8)
     mutation_info = {}
     for row in df.itertuples(index=False):
@@ -197,6 +112,7 @@ def score_with_precision(
         for m in uniq_mutants
     }
     
+    # Group by position for efficient batching
     position_groups: Dict[Tuple[int, int, Tuple[int, ...]], List[Tuple[int, np.ndarray, str, str]]] = {}
     
     for row_idx, row in enumerate(df.itertuples(index=False)):
@@ -231,17 +147,15 @@ def score_with_precision(
         positions_list.append(list(pos_tuple))
         variant_info.append([(row_idx, wt_aas, mt_aas) for row_idx, _, wt_aas, mt_aas in variants])
     
-    all_logits, all_log_probs = masked_marginal_scoring(
-        scorer.model,
-        scorer.tokenizer,
-        scorer.model_name,
-        scorer.device,
+    # Use scorer's _position_log_probs_batched with return_logits=True
+    all_log_probs, all_logits = scorer._position_log_probs_batched(
+        "masked_marginal",
         sequences,
         positions_list,
-        dtype=dtype,
-        max_batch_tokens=scorer.max_batch_tokens,
+        return_logits=True,
     )
     
+    # Calculate scores from log_probs
     scores = [0.0] * len(df)
     all_variant_logits = [None] * len(df)
     
@@ -380,19 +294,19 @@ def plot_error_histogram(
     fp16_scores: List[float],
     bf16_scores: List[float],
     output_path: str,
-    dms_id: str,
     model_name: str,
+    num_assays: int,
 ):
     """
-    Plot histogram of score errors (FP32 - FP16 and FP32 - BF16).
+    Plot histogram of score errors (FP32 - FP16 and FP32 - BF16) averaged across assays.
     
     Args:
-        fp32_scores: List of FP32 scores
-        fp16_scores: List of FP16 scores
-        bf16_scores: List of BF16 scores
+        fp32_scores: List of FP32 scores (concatenated from all assays)
+        fp16_scores: List of FP16 scores (concatenated from all assays)
+        bf16_scores: List of BF16 scores (concatenated from all assays)
         output_path: Path to save the plot
-        dms_id: DMS assay ID
         model_name: Model name
+        num_assays: Number of assays the scores were aggregated from
     """
     fp32_arr = np.array(fp32_scores)
     fp16_arr = np.array(fp16_scores)
@@ -420,7 +334,7 @@ def plot_error_histogram(
     plt.hist(bf16_errors, bins=50, edgecolor='black', alpha=0.6, label='BF16 Error (FP32 - BF16)', color='red')
     plt.xlabel('Score Error (FP32 - Precision)', fontsize=12)
     plt.ylabel('Frequency', fontsize=12)
-    plt.title(f'Distribution of Score Errors\n{model_name} - {dms_id}', fontsize=14)
+    plt.title(f'Distribution of Score Errors (Averaged Across {num_assays} Assays)\n{model_name}', fontsize=14)
     plt.legend(fontsize=10)
     plt.grid(True, alpha=0.3)
     
@@ -440,6 +354,90 @@ def plot_error_histogram(
     plt.close()
 
 
+def plot_score_scatter(
+    fp32_scores: List[float],
+    fp16_scores: List[float],
+    bf16_scores: List[float],
+    output_path: str,
+    model_name: str,
+    num_assays: int,
+):
+    """
+    Plot scatter plot of FP32 scores vs FP16/BF16 scores to visualize correlation.
+    """
+    fp32_arr = np.array(fp32_scores)
+    fp16_arr = np.array(fp16_scores)
+    bf16_arr = np.array(bf16_scores)
+    
+    # Validate all score arrays are finite
+    if not np.all(np.isfinite(fp32_arr)):
+        nan_count = np.isnan(fp32_arr).sum()
+        inf_count = np.isinf(fp32_arr).sum()
+        raise ValueError(f"Non-finite values in FP32 scores: {nan_count} NaNs, {inf_count} Infs")
+    if not np.all(np.isfinite(fp16_arr)):
+        nan_count = np.isnan(fp16_arr).sum()
+        inf_count = np.isinf(fp16_arr).sum()
+        raise ValueError(f"Non-finite values in FP16 scores: {nan_count} NaNs, {inf_count} Infs")
+    if not np.all(np.isfinite(bf16_arr)):
+        nan_count = np.isnan(bf16_arr).sum()
+        inf_count = np.isinf(bf16_arr).sum()
+        raise ValueError(f"Non-finite values in BF16 scores: {nan_count} NaNs, {inf_count} Infs")
+    
+    # Compute Spearman correlations
+    fp16_spearman, _ = spearmanr(fp32_arr, fp16_arr)
+    bf16_spearman, _ = spearmanr(fp32_arr, bf16_arr)
+    
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    
+    # Determine axis limits based on data range
+    all_scores = np.concatenate([fp32_arr, fp16_arr, bf16_arr])
+    min_val, max_val = all_scores.min(), all_scores.max()
+    padding = (max_val - min_val) * 0.05
+    axis_min, axis_max = min_val - padding, max_val + padding
+    
+    # Plot 1: FP32 vs FP16
+    ax1 = axes[0]
+    ax1.scatter(fp32_arr, fp16_arr, alpha=0.3, s=10, color='blue', edgecolors='none')
+    ax1.plot([axis_min, axis_max], [axis_min, axis_max], 'k--', linewidth=1, label='y = x')
+    ax1.set_xlabel('FP32 Score', fontsize=12)
+    ax1.set_ylabel('FP16 Score', fontsize=12)
+    ax1.set_title(f'FP32 vs FP16 Scores\n{model_name}', fontsize=14)
+    ax1.set_xlim(axis_min, axis_max)
+    ax1.set_ylim(axis_min, axis_max)
+    ax1.set_aspect('equal', adjustable='box')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(loc='upper left', fontsize=10)
+    
+    # Add Spearman correlation text
+    stats_text = f'Spearman ρ = {fp16_spearman:.6f}\nN = {len(fp32_arr)}'
+    ax1.text(0.95, 0.05, stats_text,
+             transform=ax1.transAxes, verticalalignment='bottom', horizontalalignment='right',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5), fontsize=10)
+    
+    # Plot 2: FP32 vs BF16
+    ax2 = axes[1]
+    ax2.scatter(fp32_arr, bf16_arr, alpha=0.3, s=10, color='red', edgecolors='none')
+    ax2.plot([axis_min, axis_max], [axis_min, axis_max], 'k--', linewidth=1, label='y = x')
+    ax2.set_xlabel('FP32 Score', fontsize=12)
+    ax2.set_ylabel('BF16 Score', fontsize=12)
+    ax2.set_title(f'FP32 vs BF16 Scores\n{model_name}', fontsize=14)
+    ax2.set_xlim(axis_min, axis_max)
+    ax2.set_ylim(axis_min, axis_max)
+    ax2.set_aspect('equal', adjustable='box')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(loc='upper left', fontsize=10)
+    
+    # Add Spearman correlation text
+    stats_text = f'Spearman ρ = {bf16_spearman:.6f}\nN = {len(fp32_arr)}'
+    ax2.text(0.95, 0.05, stats_text,
+             transform=ax2.transAxes, verticalalignment='bottom', horizontalalignment='right',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5), fontsize=10)
+    
+    plt.suptitle(f'Score Correlation Across {num_assays} Assays', fontsize=12, y=1.02)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
+
 def run_precision_test(
     dms_ids: List[str],
     model_names: List[str],
@@ -448,16 +446,8 @@ def run_precision_test(
 ):
     """
     Run precision comparison test across models and DMS assays.
-    
-    Args:
-        dms_ids: List of DMS assay IDs to test
-        model_names: List of model names to test
-        seed: Random seed for determinism
-        output_dir: Directory to save results
     """
-    # Set determinism
     seed = set_global_seed(seed)
-    set_determinism()
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -480,18 +470,16 @@ def run_precision_test(
         print(f"Testing model: {model_name}")
         print(f"{'='*80}")
         
+        # Collect scores across all assays for this model
+        all_fp32_scores: List[float] = []
+        all_fp16_scores: List[float] = []
+        all_bf16_scores: List[float] = []
+        assays_processed = 0
+        
         try:
             model, tokenizer = get_base_model(model_name, masked_lm=True)
             model = model.to(device)
             model.eval()
-            
-            scorer = ProteinGymScorer(
-                model_name=model_name,
-                model=model,
-                tokenizer=tokenizer,
-                device=device,
-                batch_size=32,
-            )
             
             for dms_id in tqdm(dms_ids, desc=f"Assays ({model_name})", leave=False):
                 print(f"\n  Processing DMS: {dms_id}")
@@ -499,32 +487,54 @@ def run_precision_test(
                 try:
                     df = load_proteingym_dms(dms_id, mode="benchmark", repo_id="GleghornLab/ProteinGym_DMS")
                     if df is None or len(df) == 0:
-                        print(f"    Warning: No data for {dms_id}")
+                        print(f"Warning: No data for {dms_id}")
                         continue
                     
                     target_seq = df['target_seq'].iloc[0]
                     seq_len = len(target_seq)
                     
                     # Verify sequence fits in context window
-                    context_len = scorer.context_length
+                    context_len = ProteinGymScorer.MODEL_CONTEXT_LENGTH.get(model_name, 1022)
                     if seq_len > context_len:
-                        print(f"    Warning: Sequence length {seq_len} > context length {context_len} for {model_name}")
+                        print(f"Warning: Sequence length {seq_len} > context length {context_len} for {model_name}")
                         continue
                     
                     # Run scoring with different precisions
+                    # Clear GPU cache before each run to prevent OOM
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    
                     print(f"    Running FP32...")
                     set_global_seed(seed)  # Reset seed for each precision run
-                    fp32_scores, fp32_logits = score_with_precision(scorer, df, target_seq, dtype=None)
+                    fp32_scores, fp32_logits = score_with_precision(
+                        model, tokenizer, model_name, device, df, target_seq, dtype=None
+                    )
+                    # Move logits to CPU immediately to free GPU memory
+                    fp32_logits = [l.cpu() if l is not None else None for l in fp32_logits]
+                    
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
                     
                     print(f"    Running FP16...")
                     set_global_seed(seed)
-                    fp16_scores, fp16_logits = score_with_precision(scorer, df, target_seq, dtype=torch.float16)
+                    fp16_scores, fp16_logits = score_with_precision(
+                        model, tokenizer, model_name, device, df, target_seq, dtype=torch.float16
+                    )
+                    fp16_logits = [l.cpu() if l is not None else None for l in fp16_logits]
+                    
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
                     
                     print(f"    Running BF16...")
                     set_global_seed(seed)
-                    bf16_scores, bf16_logits = score_with_precision(scorer, df, target_seq, dtype=torch.bfloat16)
+                    bf16_scores, bf16_logits = score_with_precision(
+                        model, tokenizer, model_name, device, df, target_seq, dtype=torch.bfloat16
+                    )
+                    bf16_logits = [l.cpu() if l is not None else None for l in bf16_logits]
                     
-                    # Compare logits
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    
                     fp16_logits_mse, fp16_logits_max_diff = compare_logits(fp32_logits, fp16_logits)
                     bf16_logits_mse, bf16_logits_max_diff = compare_logits(fp32_logits, bf16_logits)
                     
@@ -550,20 +560,42 @@ def run_precision_test(
                         'bf16_spearman': bf16_spearman,
                     })
                     
-                    # Generate histogram
-                    hist_path = os.path.join(output_dir, f"{model_name}_{dms_id}_error_histogram.png")
-                    plot_error_histogram(fp32_scores, fp16_scores, bf16_scores, hist_path, dms_id, model_name)
-                    print(f"      Saved histogram to {hist_path}")
+                    # Collect scores for combined histogram
+                    all_fp32_scores.extend(fp32_scores)
+                    all_fp16_scores.extend(fp16_scores)
+                    all_bf16_scores.extend(bf16_scores)
+                    assays_processed += 1
+                    
+                    # Clean up logits after processing each DMS assay
+                    del fp32_logits, fp16_logits, bf16_logits
+                    del fp32_scores, fp16_scores, bf16_scores
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
                     
                 except Exception as e:
                     print(f"Error processing {dms_id}: {e}")
                     import traceback
                     traceback.print_exc()
+                    # Clean up on error as well
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
                     continue
             
+            hist_path = os.path.join(output_dir, f"{model_name}_error_histogram.png")
+            plot_error_histogram(all_fp32_scores, all_fp16_scores, all_bf16_scores, hist_path, model_name, assays_processed)
+            print(f"\n  Saved combined histogram to {hist_path}")
+            
+            # Plot scatter plot
+            scatter_path = os.path.join(output_dir, f"{model_name}_score_scatter.png")
+            plot_score_scatter(all_fp32_scores, all_fp16_scores, all_bf16_scores, scatter_path, model_name, assays_processed)
+            print(f"  Saved scatter plot to {scatter_path}")
+            
             # Clean up model
-            del model, tokenizer, scorer
-            torch.cuda.empty_cache() if torch.cuda.is_available() else None
+            del model, tokenizer
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
             
         except Exception as e:
             print(f"Error loading model {model_name}: {e}")
@@ -582,42 +614,599 @@ def run_precision_test(
     print(summary_df.to_string(index=False))
 
 
-def main():
+# =============================================================================
+# Embedding Precision Testing
+# =============================================================================
+
+class PrecisionEmbedder(Embedder):
+    """
+    Subclass of Embedder that supports precision control via autocast.
     
+    Overrides _embed_sequences to wrap forward pass with torch.autocast()
+    when dtype is fp16/bf16. For FP32, no autocast is used.
+    """
+    
+    def __init__(self, args: EmbeddingArguments, all_seqs: List[str], dtype: Optional[torch.dtype] = None):
+        super().__init__(args, all_seqs)
+        self.precision_dtype = dtype
+        self.use_autocast = dtype is not None
+    
+    @torch.inference_mode()
+    def _embed_sequences(
+            self,
+            to_embed: List[str],
+            save_path: str,
+            embedding_model: Any,
+            tokenizer: Any,
+            embeddings_dict: Dict[str, torch.Tensor]) -> Optional[Dict[str, torch.Tensor]]:
+
+        os.makedirs(self.embedding_save_dir, exist_ok=True)
+        
+        # For FP32, ensure model is in float32
+        if self.precision_dtype is None:
+            model = embedding_model.float().to(self.device).eval()
+        else:
+            model = embedding_model.to(self.device).eval()
+        
+        device = self.device
+        device_type = "cuda" if device.type == "cuda" else "cpu"
+        collate_fn = build_collator(tokenizer)
+        
+        if self.matrix_embed:
+            pooler = None
+        else:
+            pooler = Pooler(self.pooling_types)
+
+        def _get_embeddings(
+                residue_embeddings: torch.Tensor,
+                attention_mask: Optional[torch.Tensor] = None,
+                attentions: Optional[torch.Tensor] = None
+            ) -> torch.Tensor:
+            if residue_embeddings.ndim == 2 or self.matrix_embed:
+                return residue_embeddings
+            else:
+                return pooler(emb=residue_embeddings, attention_mask=attention_mask, attentions=attentions)
+
+        dataset = SimpleProteinDataset(to_embed)
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            prefetch_factor=2 if self.num_workers > 0 else None,
+            collate_fn=collate_fn,
+            shuffle=False,
+            pin_memory=True,
+            worker_init_fn=seed_worker,
+            generator=dataloader_generator(get_global_seed())
+        )
+
+        for i, batch in tqdm(enumerate(dataloader), total=len(dataloader), desc='Embedding batches'):
+            seqs = to_embed[i * self.batch_size:(i + 1) * self.batch_size]
+            batch = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
+            if 'attention_mask' in batch:
+                attention_mask = batch['attention_mask']
+            elif 'sequence_ids' in batch:
+                attention_mask = (batch['sequence_ids'] != -1).long().to(device)
+            else:
+                attention_mask = torch.ones_like(batch['input_ids'], device=device)
+
+            # Forward pass with precision control
+            if self.use_autocast:
+                with torch.autocast(device_type, dtype=self.precision_dtype):
+                    residue_embeddings = model(**batch)
+            else:
+                residue_embeddings = model(**batch)
+            
+            embeddings = _get_embeddings(residue_embeddings, attention_mask=attention_mask).cpu()
+
+            for seq, emb, mask in zip(seqs, embeddings, attention_mask.cpu()):
+                if self.matrix_embed:
+                    emb = emb[mask.bool()]
+                embeddings_dict[seq] = emb.to(self.embed_dtype)
+            
+        return embeddings_dict
+
+
+def load_swissprot_sequences(n_samples: int = 1000, seed: Optional[int] = None, max_length: int = 1022) -> List[str]:
+    """
+    Load sequences from Synthyra/SwissProt dataset using streaming.
+    
+    Args:
+        n_samples: Number of sequences to sample
+        seed: Random seed for reproducibility
+        max_length: Maximum sequence length to include
+        
+    Returns:
+        List of sampled sequences
+    """
+    
+    if seed is not None:
+        random.seed(seed)
+    
+    print(f"Loading Synthyra/SwissProt with streaming=True...")
+    dataset = load_dataset("Synthyra/SwissProt", split="train", streaming=True)
+    
+    buffer_size = n_samples * 5
+    sequences = []
+    
+    print(f"Collecting sequences (buffer_size={buffer_size})...")
+    for i, example in enumerate(tqdm(dataset, total=buffer_size, desc="Loading sequences")):
+        seq = example.get('sequence', example.get('Sequence', ''))
+        if seq and len(seq) <= max_length:
+            sequences.append(seq)
+        if len(sequences) >= buffer_size:
+            break
+    
+    # Sample
+    sequences = random.sample(sequences, n_samples)
+    
+    print(f"Sampled {len(sequences)} sequences (max_length={max_length})")
+    return sequences
+
+
+def compare_embeddings(
+    fp32_embs: Dict[str, torch.Tensor],
+    other_embs: Dict[str, torch.Tensor],
+) -> Dict[str, float]:
+    """
+    Compare embeddings between FP32 and another precision mode.
+    
+    Args:
+        fp32_embs: Dict of sequence -> FP32 embedding tensor
+        other_embs: Dict of sequence -> other precision embedding tensor
+        
+    Returns:
+        Dict with MSE, max absolute difference, and cosine similarity metrics
+    """
+    all_mse = []
+    all_max_diff = []
+    all_cos_sim = []
+    
+    common_seqs = set(fp32_embs.keys()) & set(other_embs.keys())
+    
+    for seq in common_seqs:
+        fp32_emb = fp32_embs[seq].float().flatten()
+        other_emb = other_embs[seq].float().flatten()
+        
+        # Raw difference metrics
+        diff = fp32_emb - other_emb
+        mse = (diff ** 2).mean().item()
+        max_diff = diff.abs().max().item()
+        
+        # Cosine similarity
+        cos_sim = F.cosine_similarity(fp32_emb.unsqueeze(0), other_emb.unsqueeze(0)).item()
+        
+        all_mse.append(mse)
+        all_max_diff.append(max_diff)
+        all_cos_sim.append(cos_sim)
+    
+    return {
+        'mse_mean': np.mean(all_mse),
+        'mse_std': np.std(all_mse),
+        'max_diff': np.max(all_max_diff),
+        'cos_sim_mean': np.mean(all_cos_sim),
+        'cos_sim_std': np.std(all_cos_sim),
+        'cos_sim_min': np.min(all_cos_sim),
+        'n_sequences': len(common_seqs),
+    }
+
+
+def plot_embedding_histogram(
+    fp32_embs: Dict[str, torch.Tensor],
+    fp16_embs: Dict[str, torch.Tensor],
+    bf16_embs: Dict[str, torch.Tensor],
+    output_path: str,
+    model_name: str,
+):
+    """
+    Plot histogram of embedding differences and cosine similarities.
+    
+    Args:
+        fp32_embs: Dict of sequence -> FP32 embedding tensor
+        fp16_embs: Dict of sequence -> FP16 embedding tensor
+        bf16_embs: Dict of sequence -> BF16 embedding tensor
+        output_path: Path to save the plot
+        model_name: Model name for title
+    """
+    common_seqs = set(fp32_embs.keys()) & set(fp16_embs.keys()) & set(bf16_embs.keys())
+    
+    fp16_diffs = []
+    bf16_diffs = []
+    fp16_cos_sims = []
+    bf16_cos_sims = []
+    
+    for seq in common_seqs:
+        fp32_emb = fp32_embs[seq].float().flatten()
+        fp16_emb = fp16_embs[seq].float().flatten()
+        bf16_emb = bf16_embs[seq].float().flatten()
+        
+        # Mean absolute differences per embedding
+        fp16_diffs.append((fp32_emb - fp16_emb).abs().mean().item())
+        bf16_diffs.append((fp32_emb - bf16_emb).abs().mean().item())
+        
+        # Cosine similarities
+        fp16_cos_sims.append(F.cosine_similarity(fp32_emb.unsqueeze(0), fp16_emb.unsqueeze(0)).item())
+        bf16_cos_sims.append(F.cosine_similarity(fp32_emb.unsqueeze(0), bf16_emb.unsqueeze(0)).item())
+    
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    
+    # Plot 1: Mean Absolute Differences
+    ax1 = axes[0]
+    ax1.hist(fp16_diffs, bins=50, edgecolor='black', alpha=0.6, label='FP16', color='blue')
+    ax1.hist(bf16_diffs, bins=50, edgecolor='black', alpha=0.6, label='BF16', color='red')
+    ax1.set_xlabel('Mean Absolute Difference per Embedding', fontsize=12)
+    ax1.set_ylabel('Frequency', fontsize=12)
+    ax1.set_title(f'Embedding Differences vs FP32\n{model_name}', fontsize=14)
+    ax1.legend(fontsize=10)
+    ax1.grid(True, alpha=0.3)
+    
+    # Add stats
+    fp16_mean = np.mean(fp16_diffs)
+    bf16_mean = np.mean(bf16_diffs)
+    stats_text = (f'FP16 - Mean: {fp16_mean:.6f}, Std: {np.std(fp16_diffs):.6f}\n'
+                  f'BF16 - Mean: {bf16_mean:.6f}, Std: {np.std(bf16_diffs):.6f}')
+    ax1.text(0.95, 0.95, stats_text,
+             transform=ax1.transAxes, verticalalignment='top', horizontalalignment='right',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5), fontsize=9)
+    
+    # Plot 2: Cosine Similarities
+    ax2 = axes[1]
+    ax2.hist(fp16_cos_sims, bins=50, edgecolor='black', alpha=0.6, label='FP16', color='blue')
+    ax2.hist(bf16_cos_sims, bins=50, edgecolor='black', alpha=0.6, label='BF16', color='red')
+    ax2.set_xlabel('Cosine Similarity with FP32', fontsize=12)
+    ax2.set_ylabel('Frequency', fontsize=12)
+    ax2.set_title(f'Embedding Cosine Similarity vs FP32\n{model_name}', fontsize=14)
+    ax2.legend(fontsize=10)
+    ax2.grid(True, alpha=0.3)
+    
+    # Add stats
+    fp16_cos_mean = np.mean(fp16_cos_sims)
+    bf16_cos_mean = np.mean(bf16_cos_sims)
+    stats_text = (f'FP16 - Mean: {fp16_cos_mean:.6f}, Min: {np.min(fp16_cos_sims):.6f}\n'
+                  f'BF16 - Mean: {bf16_cos_mean:.6f}, Min: {np.min(bf16_cos_sims):.6f}')
+    ax2.text(0.05, 0.95, stats_text,
+             transform=ax2.transAxes, verticalalignment='top', horizontalalignment='left',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5), fontsize=9)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.close()
+
+
+def plot_embedding_scatter(
+    fp32_embs: Dict[str, torch.Tensor],
+    fp16_embs: Dict[str, torch.Tensor],
+    bf16_embs: Dict[str, torch.Tensor],
+    output_path: str,
+    model_name: str,
+):
+    """
+    Plot scatter plot of FP32 embedding norms vs FP16/BF16 embedding norms,
+    and cosine similarity comparisons.
+    """
+    common_seqs = list(set(fp32_embs.keys()) & set(fp16_embs.keys()) & set(bf16_embs.keys()))
+    
+    fp32_norms = []
+    fp16_norms = []
+    bf16_norms = []
+    fp16_cos_sims = []
+    bf16_cos_sims = []
+    
+    for seq in common_seqs:
+        fp32_emb = fp32_embs[seq].float().flatten()
+        fp16_emb = fp16_embs[seq].float().flatten()
+        bf16_emb = bf16_embs[seq].float().flatten()
+        
+        # L2 norms
+        fp32_norms.append(torch.norm(fp32_emb).item())
+        fp16_norms.append(torch.norm(fp16_emb).item())
+        bf16_norms.append(torch.norm(bf16_emb).item())
+        
+        # Cosine similarities
+        fp16_cos_sims.append(F.cosine_similarity(fp32_emb.unsqueeze(0), fp16_emb.unsqueeze(0)).item())
+        bf16_cos_sims.append(F.cosine_similarity(fp32_emb.unsqueeze(0), bf16_emb.unsqueeze(0)).item())
+    
+    fp32_norms = np.array(fp32_norms)
+    fp16_norms = np.array(fp16_norms)
+    bf16_norms = np.array(bf16_norms)
+    fp16_cos_sims = np.array(fp16_cos_sims)
+    bf16_cos_sims = np.array(bf16_cos_sims)
+    
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    
+    # Plot 1: FP32 norm vs FP16 norm
+    ax1 = axes[0]
+    ax1.scatter(fp32_norms, fp16_norms, alpha=0.3, s=10, color='blue', edgecolors='none', label='FP16')
+    ax1.scatter(fp32_norms, bf16_norms, alpha=0.3, s=10, color='red', edgecolors='none', label='BF16')
+    
+    # Add y=x line
+    all_norms = np.concatenate([fp32_norms, fp16_norms, bf16_norms])
+    min_val, max_val = all_norms.min(), all_norms.max()
+    padding = (max_val - min_val) * 0.05
+    axis_min, axis_max = min_val - padding, max_val + padding
+    ax1.plot([axis_min, axis_max], [axis_min, axis_max], 'k--', linewidth=1, label='y = x')
+    
+    ax1.set_xlabel('FP32 Embedding Norm', fontsize=12)
+    ax1.set_ylabel('Reduced Precision Embedding Norm', fontsize=12)
+    ax1.set_title(f'Embedding Norm Comparison\n{model_name}', fontsize=14)
+    ax1.set_xlim(axis_min, axis_max)
+    ax1.set_ylim(axis_min, axis_max)
+    ax1.set_aspect('equal', adjustable='box')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(loc='upper left', fontsize=10)
+    
+    # Add stats
+    fp16_norm_corr, _ = spearmanr(fp32_norms, fp16_norms)
+    bf16_norm_corr, _ = spearmanr(fp32_norms, bf16_norms)
+    stats_text = f'Spearman ρ:\n  FP16: {fp16_norm_corr:.6f}\n  BF16: {bf16_norm_corr:.6f}\nN = {len(common_seqs)}'
+    ax1.text(0.95, 0.05, stats_text,
+             transform=ax1.transAxes, verticalalignment='bottom', horizontalalignment='right',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5), fontsize=9)
+    
+    # Plot 2: FP16 cosine similarity vs BF16 cosine similarity
+    ax2 = axes[1]
+    ax2.scatter(fp16_cos_sims, bf16_cos_sims, alpha=0.3, s=10, color='purple', edgecolors='none')
+    
+    # Add y=x line
+    cos_min = min(fp16_cos_sims.min(), bf16_cos_sims.min())
+    cos_max = max(fp16_cos_sims.max(), bf16_cos_sims.max())
+    cos_padding = (cos_max - cos_min) * 0.05
+    cos_axis_min, cos_axis_max = cos_min - cos_padding, min(1.0, cos_max + cos_padding)
+    ax2.plot([cos_axis_min, cos_axis_max], [cos_axis_min, cos_axis_max], 'k--', linewidth=1, label='y = x')
+    
+    ax2.set_xlabel('FP16 Cosine Similarity with FP32', fontsize=12)
+    ax2.set_ylabel('BF16 Cosine Similarity with FP32', fontsize=12)
+    ax2.set_title(f'Cosine Similarity Comparison\n{model_name}', fontsize=14)
+    ax2.set_xlim(cos_axis_min, cos_axis_max)
+    ax2.set_ylim(cos_axis_min, cos_axis_max)
+    ax2.set_aspect('equal', adjustable='box')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(loc='upper left', fontsize=10)
+    
+    # Add stats
+    cos_corr, _ = spearmanr(fp16_cos_sims, bf16_cos_sims)
+    stats_text = (f'FP16 Mean: {np.mean(fp16_cos_sims):.6f}\n'
+                  f'BF16 Mean: {np.mean(bf16_cos_sims):.6f}\n'
+                  f'Spearman ρ: {cos_corr:.6f}')
+    ax2.text(0.05, 0.05, stats_text,
+             transform=ax2.transAxes, verticalalignment='bottom', horizontalalignment='left',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5), fontsize=9)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
+
+def run_embeddings_precision_test(
+    model_names: Optional[List[str]] = None,
+    pooling_types: List[str] = ['mean', 'var'],
+    n_samples: int = 1000,
+    seed: Optional[int] = None,
+    output_dir: str = "precision_test_results",
+    batch_size: int = 16,
+):
+    """
+    Run embedding precision comparison test across models.
+    
+    Args:
+        model_names: List of model names to test (None = all supported models)
+        pooling_types: Pooling methods to use
+        n_samples: Number of sequences to sample from SwissProt
+        seed: Random seed for reproducibility
+        output_dir: Directory to save results
+        batch_size: Batch size for embedding
+    """
+    seed = set_global_seed(seed)
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Get test models
+    all_models = list(ProteinGymScorer.MODEL_CONTEXT_LENGTH.keys())
+    test_models = [m for m in all_models if not m.lower().startswith("e1")]
+    
+    if model_names:
+        test_models = [m for m in test_models if m in model_names]
+    
+    print(f"Testing {len(test_models)} models: {test_models}")
+    print(f"Pooling types: {pooling_types}")
+    
+    # Load SwissProt sequences once
+    sequences = load_swissprot_sequences(n_samples=n_samples, seed=seed)
+    print(f"Loaded {len(sequences)} sequences for embedding")
+    
+    results_summary = []
+    
+    for model_name in tqdm(test_models, desc="Models"):
+        print(f"\n{'='*80}")
+        print(f"Testing model: {model_name}")
+        print(f"{'='*80}")
+        
+        try:
+            model, tokenizer = get_base_model(model_name)
+            model = model.to(device)
+            model.eval()
+            
+            # Create embedding arguments
+            emb_args = EmbeddingArguments(
+                embedding_batch_size=batch_size,
+                embedding_num_workers=0,
+                download_embeddings=False,
+                matrix_embed=False,
+                embedding_pooling_types=pooling_types,
+                save_embeddings=False,
+                embed_dtype=torch.float32,
+                sql=False,
+                embedding_save_dir=output_dir,
+            )
+            
+            # Embed with FP32
+            print(f"  Embedding with FP32...")
+            set_global_seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            fp32_embedder = PrecisionEmbedder(emb_args, sequences, dtype=None)
+            fp32_embs = fp32_embedder._embed_sequences(sequences, "", model, tokenizer, {})
+            
+            # Embed with FP16
+            print(f"  Embedding with FP16...")
+            set_global_seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            fp16_embedder = PrecisionEmbedder(emb_args, sequences, dtype=torch.float16)
+            fp16_embs = fp16_embedder._embed_sequences(sequences, "", model, tokenizer, {})
+            
+            # Embed with BF16
+            print(f"  Embedding with BF16...")
+            set_global_seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            bf16_embedder = PrecisionEmbedder(emb_args, sequences, dtype=torch.bfloat16)
+            bf16_embs = bf16_embedder._embed_sequences(sequences, "", model, tokenizer, {})
+            
+            # Compare embeddings
+            fp16_metrics = compare_embeddings(fp32_embs, fp16_embs)
+            bf16_metrics = compare_embeddings(fp32_embs, bf16_embs)
+            
+            print(f"\nResults for {model_name}:")
+            print(f"FP16 - MSE: {fp16_metrics['mse_mean']:.6e}, Max Diff: {fp16_metrics['max_diff']:.6e}, "
+                  f"Cos Sim: {fp16_metrics['cos_sim_mean']:.6f} (min: {fp16_metrics['cos_sim_min']:.6f})")
+            print(f"BF16 - MSE: {bf16_metrics['mse_mean']:.6e}, Max Diff: {bf16_metrics['max_diff']:.6e}, "
+                  f"Cos Sim: {bf16_metrics['cos_sim_mean']:.6f} (min: {bf16_metrics['cos_sim_min']:.6f})")
+            
+            results_summary.append({
+                'model': model_name,
+                'seed': seed,
+                'n_sequences': fp16_metrics['n_sequences'],
+                'pooling_types': ','.join(pooling_types),
+                'fp16_mse_mean': fp16_metrics['mse_mean'],
+                'fp16_max_diff': fp16_metrics['max_diff'],
+                'fp16_cos_sim_mean': fp16_metrics['cos_sim_mean'],
+                'fp16_cos_sim_min': fp16_metrics['cos_sim_min'],
+                'bf16_mse_mean': bf16_metrics['mse_mean'],
+                'bf16_max_diff': bf16_metrics['max_diff'],
+                'bf16_cos_sim_mean': bf16_metrics['cos_sim_mean'],
+                'bf16_cos_sim_min': bf16_metrics['cos_sim_min'],
+            })
+            
+            # Plot histograms
+            hist_path = os.path.join(output_dir, f"{model_name}_embedding_precision.png")
+            plot_embedding_histogram(fp32_embs, fp16_embs, bf16_embs, hist_path, model_name)
+            print(f"  Saved histogram to {hist_path}")
+            
+            # Plot scatter plot
+            scatter_path = os.path.join(output_dir, f"{model_name}_embedding_scatter.png")
+            plot_embedding_scatter(fp32_embs, fp16_embs, bf16_embs, scatter_path, model_name)
+            print(f"  Saved scatter plot to {scatter_path}")
+            
+            # Clean up
+            del fp32_embs, fp16_embs, bf16_embs
+            del model, tokenizer
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            
+        except Exception as e:
+            print(f"Error processing model {model_name}: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
+    
+    # Save summary
+    summary_df = pd.DataFrame(results_summary)
+    summary_path = os.path.join(output_dir, "embedding_precision_summary.csv")
+    summary_df.to_csv(summary_path, index=False)
+    print(f"\n{'='*80}")
+    print(f"Summary saved to {summary_path}")
+    print(f"{'='*80}\n")
+    
+    print("\nSummary Results:")
+    print(summary_df.to_string(index=False))
+
+def main():
     parser = argparse.ArgumentParser(
-        description='Precision Comparison Test - Compare FP32, FP16, and BF16 scoring'
+        description='Precision Comparison Test - Compare FP32, FP16, and BF16 for ProteinGym scoring and embeddings'
     )
+    
+    # Test mode selection
     parser.add_argument(
-        '--dms_ids',
-        nargs='+',
-        default=TEST_DMS_IDS,
+        '--embeddings_test',
+        action='store_true',
+        help='Run embeddings precision test instead of ProteinGym scoring test'
     )
+    
+    # Common arguments
     parser.add_argument(
         '--model_names',
         nargs='+',
         default=None,
+        help='List of model names to test'
     )
     parser.add_argument(
         '--seed',
         type=int,
         default=None,
+        help='Random seed for reproducibility'
     )
     parser.add_argument(
         '--output_dir',
         type=str,
         default='precision_test_results',
+        help='Output directory for results'
+    )
+    
+    # ProteinGym scoring test arguments
+    parser.add_argument(
+        '--dms_ids',
+        nargs='+',
+        default=TEST_DMS_IDS,
+        help='DMS assay IDs to test (for scoring test)'
+    )
+    
+    # Embeddings test arguments
+    parser.add_argument(
+        '--pooling_type',
+        nargs='+',
+        default=['mean', 'var'],
+        help='Pooling method(s) for embeddings (default: mean var)'
+    )
+    parser.add_argument(
+        '--n_samples',
+        type=int,
+        default=1000,
+        help='Number of sequences to sample from SwissProt (default: 1000)'
+    )
+    parser.add_argument(
+        '--batch_size',
+        type=int,
+        default=16,
+        help='Batch size for embedding (default: 16)'
     )
     
     args = parser.parse_args()
     
-    run_precision_test(
-        dms_ids=args.dms_ids,
-        model_names=args.model_names,
-        seed=args.seed,
-        output_dir=args.output_dir,
-    )
+    if args.embeddings_test:
+        run_embeddings_precision_test(
+            model_names=args.model_names,
+            pooling_types=args.pooling_type,
+            n_samples=args.n_samples,
+            seed=args.seed,
+            output_dir=args.output_dir,
+            batch_size=args.batch_size,
+        )
+    else:
+        run_precision_test(
+            dms_ids=args.dms_ids,
+            model_names=args.model_names,
+            seed=args.seed,
+            output_dir=args.output_dir,
+        )
 
 
 if __name__ == '__main__':
     main()
-

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import torch
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 from tqdm.auto import tqdm
 
 
@@ -817,7 +817,8 @@ class ProteinGymScorer:
         scoring_method: str,
         sequences: List[str],
         positions_list: List[List[int]],
-    ) -> List[torch.Tensor]:
+        return_logits: bool = False,
+    ) -> Union[List[torch.Tensor], Tuple[List[torch.Tensor], List[torch.Tensor]]]:
         """Return batched log probabilities with dynamic batching."""
         assert len(sequences) == len(positions_list), "Must have one position list per sequence"
         
@@ -825,6 +826,7 @@ class ProteinGymScorer:
         batch_indices = self._create_dynamic_batches(sequences, positions_list)
         
         all_log_probs = [None] * len(sequences)
+        all_selected_logits = [None] * len(sequences) if return_logits else None
         
         progress_bar = tqdm(
             batch_indices,
@@ -891,7 +893,11 @@ class ProteinGymScorer:
                 selected_logits = logits[batch_idx, token_indices]
                 log_probs = torch.log_softmax(selected_logits, dim=-1)
                 all_log_probs[orig_idx] = log_probs
+                if return_logits:
+                    all_selected_logits[orig_idx] = selected_logits
         
+        if return_logits:
+            return all_log_probs, all_selected_logits  # type: ignore[return-value]
         return all_log_probs
     
     @torch.inference_mode()
