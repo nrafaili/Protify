@@ -354,90 +354,6 @@ def plot_error_histogram(
     plt.close()
 
 
-def plot_score_scatter(
-    fp32_scores: List[float],
-    fp16_scores: List[float],
-    bf16_scores: List[float],
-    output_path: str,
-    model_name: str,
-    num_assays: int,
-):
-    """
-    Plot scatter plot of FP32 scores vs FP16/BF16 scores to visualize correlation.
-    """
-    fp32_arr = np.array(fp32_scores)
-    fp16_arr = np.array(fp16_scores)
-    bf16_arr = np.array(bf16_scores)
-    
-    # Validate all score arrays are finite
-    if not np.all(np.isfinite(fp32_arr)):
-        nan_count = np.isnan(fp32_arr).sum()
-        inf_count = np.isinf(fp32_arr).sum()
-        raise ValueError(f"Non-finite values in FP32 scores: {nan_count} NaNs, {inf_count} Infs")
-    if not np.all(np.isfinite(fp16_arr)):
-        nan_count = np.isnan(fp16_arr).sum()
-        inf_count = np.isinf(fp16_arr).sum()
-        raise ValueError(f"Non-finite values in FP16 scores: {nan_count} NaNs, {inf_count} Infs")
-    if not np.all(np.isfinite(bf16_arr)):
-        nan_count = np.isnan(bf16_arr).sum()
-        inf_count = np.isinf(bf16_arr).sum()
-        raise ValueError(f"Non-finite values in BF16 scores: {nan_count} NaNs, {inf_count} Infs")
-    
-    # Compute Spearman correlations
-    fp16_spearman, _ = spearmanr(fp32_arr, fp16_arr)
-    bf16_spearman, _ = spearmanr(fp32_arr, bf16_arr)
-    
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    
-    # Determine axis limits based on data range
-    all_scores = np.concatenate([fp32_arr, fp16_arr, bf16_arr])
-    min_val, max_val = all_scores.min(), all_scores.max()
-    padding = (max_val - min_val) * 0.05
-    axis_min, axis_max = min_val - padding, max_val + padding
-    
-    # Plot 1: FP32 vs FP16
-    ax1 = axes[0]
-    ax1.scatter(fp32_arr, fp16_arr, alpha=0.3, s=10, color='blue', edgecolors='none')
-    ax1.plot([axis_min, axis_max], [axis_min, axis_max], 'k--', linewidth=1, label='y = x')
-    ax1.set_xlabel('FP32 Score', fontsize=12)
-    ax1.set_ylabel('FP16 Score', fontsize=12)
-    ax1.set_title(f'FP32 vs FP16 Scores\n{model_name}', fontsize=14)
-    ax1.set_xlim(axis_min, axis_max)
-    ax1.set_ylim(axis_min, axis_max)
-    ax1.set_aspect('equal', adjustable='box')
-    ax1.grid(True, alpha=0.3)
-    ax1.legend(loc='upper left', fontsize=10)
-    
-    # Add Spearman correlation text
-    stats_text = f'Spearman ρ = {fp16_spearman:.6f}\nN = {len(fp32_arr)}'
-    ax1.text(0.95, 0.05, stats_text,
-             transform=ax1.transAxes, verticalalignment='bottom', horizontalalignment='right',
-             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5), fontsize=10)
-    
-    # Plot 2: FP32 vs BF16
-    ax2 = axes[1]
-    ax2.scatter(fp32_arr, bf16_arr, alpha=0.3, s=10, color='red', edgecolors='none')
-    ax2.plot([axis_min, axis_max], [axis_min, axis_max], 'k--', linewidth=1, label='y = x')
-    ax2.set_xlabel('FP32 Score', fontsize=12)
-    ax2.set_ylabel('BF16 Score', fontsize=12)
-    ax2.set_title(f'FP32 vs BF16 Scores\n{model_name}', fontsize=14)
-    ax2.set_xlim(axis_min, axis_max)
-    ax2.set_ylim(axis_min, axis_max)
-    ax2.set_aspect('equal', adjustable='box')
-    ax2.grid(True, alpha=0.3)
-    ax2.legend(loc='upper left', fontsize=10)
-    
-    # Add Spearman correlation text
-    stats_text = f'Spearman ρ = {bf16_spearman:.6f}\nN = {len(fp32_arr)}'
-    ax2.text(0.95, 0.05, stats_text,
-             transform=ax2.transAxes, verticalalignment='bottom', horizontalalignment='right',
-             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5), fontsize=10)
-    
-    plt.suptitle(f'Score Correlation Across {num_assays} Assays', fontsize=12, y=1.02)
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
-    plt.close()
-
 def run_precision_test(
     dms_ids: List[str],
     model_names: List[str],
@@ -584,11 +500,6 @@ def run_precision_test(
             hist_path = os.path.join(output_dir, f"{model_name}_error_histogram.png")
             plot_error_histogram(all_fp32_scores, all_fp16_scores, all_bf16_scores, hist_path, model_name, assays_processed)
             print(f"\n  Saved combined histogram to {hist_path}")
-            
-            # Plot scatter plot
-            scatter_path = os.path.join(output_dir, f"{model_name}_score_scatter.png")
-            plot_score_scatter(all_fp32_scores, all_fp16_scores, all_bf16_scores, scatter_path, model_name, assays_processed)
-            print(f"  Saved scatter plot to {scatter_path}")
             
             # Clean up model
             del model, tokenizer
@@ -873,109 +784,6 @@ def plot_embedding_histogram(
     plt.close()
 
 
-def plot_embedding_scatter(
-    fp32_embs: Dict[str, torch.Tensor],
-    fp16_embs: Dict[str, torch.Tensor],
-    bf16_embs: Dict[str, torch.Tensor],
-    output_path: str,
-    model_name: str,
-):
-    """
-    Plot scatter plot of FP32 embedding norms vs FP16/BF16 embedding norms,
-    and cosine similarity comparisons.
-    """
-    common_seqs = list(set(fp32_embs.keys()) & set(fp16_embs.keys()) & set(bf16_embs.keys()))
-    
-    fp32_norms = []
-    fp16_norms = []
-    bf16_norms = []
-    fp16_cos_sims = []
-    bf16_cos_sims = []
-    
-    for seq in common_seqs:
-        fp32_emb = fp32_embs[seq].float().flatten()
-        fp16_emb = fp16_embs[seq].float().flatten()
-        bf16_emb = bf16_embs[seq].float().flatten()
-        
-        # L2 norms
-        fp32_norms.append(torch.norm(fp32_emb).item())
-        fp16_norms.append(torch.norm(fp16_emb).item())
-        bf16_norms.append(torch.norm(bf16_emb).item())
-        
-        # Cosine similarities
-        fp16_cos_sims.append(F.cosine_similarity(fp32_emb.unsqueeze(0), fp16_emb.unsqueeze(0)).item())
-        bf16_cos_sims.append(F.cosine_similarity(fp32_emb.unsqueeze(0), bf16_emb.unsqueeze(0)).item())
-    
-    fp32_norms = np.array(fp32_norms)
-    fp16_norms = np.array(fp16_norms)
-    bf16_norms = np.array(bf16_norms)
-    fp16_cos_sims = np.array(fp16_cos_sims)
-    bf16_cos_sims = np.array(bf16_cos_sims)
-    
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    
-    # Plot 1: FP32 norm vs FP16 norm
-    ax1 = axes[0]
-    ax1.scatter(fp32_norms, fp16_norms, alpha=0.3, s=10, color='blue', edgecolors='none', label='FP16')
-    ax1.scatter(fp32_norms, bf16_norms, alpha=0.3, s=10, color='red', edgecolors='none', label='BF16')
-    
-    # Add y=x line
-    all_norms = np.concatenate([fp32_norms, fp16_norms, bf16_norms])
-    min_val, max_val = all_norms.min(), all_norms.max()
-    padding = (max_val - min_val) * 0.05
-    axis_min, axis_max = min_val - padding, max_val + padding
-    ax1.plot([axis_min, axis_max], [axis_min, axis_max], 'k--', linewidth=1, label='y = x')
-    
-    ax1.set_xlabel('FP32 Embedding Norm', fontsize=12)
-    ax1.set_ylabel('Reduced Precision Embedding Norm', fontsize=12)
-    ax1.set_title(f'Embedding Norm Comparison\n{model_name}', fontsize=14)
-    ax1.set_xlim(axis_min, axis_max)
-    ax1.set_ylim(axis_min, axis_max)
-    ax1.set_aspect('equal', adjustable='box')
-    ax1.grid(True, alpha=0.3)
-    ax1.legend(loc='upper left', fontsize=10)
-    
-    # Add stats
-    fp16_norm_corr, _ = spearmanr(fp32_norms, fp16_norms)
-    bf16_norm_corr, _ = spearmanr(fp32_norms, bf16_norms)
-    stats_text = f'Spearman ρ:\n  FP16: {fp16_norm_corr:.6f}\n  BF16: {bf16_norm_corr:.6f}\nN = {len(common_seqs)}'
-    ax1.text(0.95, 0.05, stats_text,
-             transform=ax1.transAxes, verticalalignment='bottom', horizontalalignment='right',
-             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5), fontsize=9)
-    
-    # Plot 2: FP16 cosine similarity vs BF16 cosine similarity
-    ax2 = axes[1]
-    ax2.scatter(fp16_cos_sims, bf16_cos_sims, alpha=0.3, s=10, color='purple', edgecolors='none')
-    
-    # Add y=x line
-    cos_min = min(fp16_cos_sims.min(), bf16_cos_sims.min())
-    cos_max = max(fp16_cos_sims.max(), bf16_cos_sims.max())
-    cos_padding = (cos_max - cos_min) * 0.05
-    cos_axis_min, cos_axis_max = cos_min - cos_padding, min(1.0, cos_max + cos_padding)
-    ax2.plot([cos_axis_min, cos_axis_max], [cos_axis_min, cos_axis_max], 'k--', linewidth=1, label='y = x')
-    
-    ax2.set_xlabel('FP16 Cosine Similarity with FP32', fontsize=12)
-    ax2.set_ylabel('BF16 Cosine Similarity with FP32', fontsize=12)
-    ax2.set_title(f'Cosine Similarity Comparison\n{model_name}', fontsize=14)
-    ax2.set_xlim(cos_axis_min, cos_axis_max)
-    ax2.set_ylim(cos_axis_min, cos_axis_max)
-    ax2.set_aspect('equal', adjustable='box')
-    ax2.grid(True, alpha=0.3)
-    ax2.legend(loc='upper left', fontsize=10)
-    
-    # Add stats
-    cos_corr, _ = spearmanr(fp16_cos_sims, bf16_cos_sims)
-    stats_text = (f'FP16 Mean: {np.mean(fp16_cos_sims):.6f}\n'
-                  f'BF16 Mean: {np.mean(bf16_cos_sims):.6f}\n'
-                  f'Spearman ρ: {cos_corr:.6f}')
-    ax2.text(0.05, 0.05, stats_text,
-             transform=ax2.transAxes, verticalalignment='bottom', horizontalalignment='left',
-             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5), fontsize=9)
-    
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
-    plt.close()
-
 def run_embeddings_precision_test(
     model_names: Optional[List[str]] = None,
     pooling_types: List[str] = ['mean', 'var'],
@@ -1097,11 +905,6 @@ def run_embeddings_precision_test(
             hist_path = os.path.join(output_dir, f"{model_name}_embedding_precision.png")
             plot_embedding_histogram(fp32_embs, fp16_embs, bf16_embs, hist_path, model_name)
             print(f"  Saved histogram to {hist_path}")
-            
-            # Plot scatter plot
-            scatter_path = os.path.join(output_dir, f"{model_name}_embedding_scatter.png")
-            plot_embedding_scatter(fp32_embs, fp16_embs, bf16_embs, scatter_path, model_name)
-            print(f"  Saved scatter plot to {scatter_path}")
             
             # Clean up
             del fp32_embs, fp16_embs, bf16_embs
