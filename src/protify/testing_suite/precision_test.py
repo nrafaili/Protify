@@ -36,7 +36,7 @@ from torch.utils.data import DataLoader
 TEST_DMS_IDS = [
     "A4_HUMAN_Seuma_2022",  # Stability
     "ACE2_HUMAN_Chan_2020",  # Binding
-    "ENV_HV1BR_Haddox_2016",  # Organismal fitness
+    "CAPSD_AAV2S_Sinai_2021",  # Organismal fitness
 ]
 
 
@@ -531,9 +531,9 @@ def run_precision_test(
 
 class PrecisionEmbedder(Embedder):
     """
-    Subclass of Embedder that supports precision control via autocast.
+    Subclass of Embedder that supports embedding with precision via autocast.
     
-    Overrides _embed_sequences to wrap forward pass with torch.autocast()
+    Overrides _embed_sequences to wrap the forward pass with torch.autocast()
     when dtype is fp16/bf16. For FP32, no autocast is used.
     """
     
@@ -552,21 +552,14 @@ class PrecisionEmbedder(Embedder):
             embeddings_dict: Dict[str, torch.Tensor]) -> Optional[Dict[str, torch.Tensor]]:
 
         os.makedirs(self.embedding_save_dir, exist_ok=True)
-        
-        # For FP32, ensure model is in float32
-        if self.precision_dtype is None:
-            model = embedding_model.float().to(self.device).eval()
-        else:
-            model = embedding_model.to(self.device).eval()
-        
+
         device = self.device
-        device_type = "cuda" if device.type == "cuda" else "cpu"
+        device_type = "cuda" if device.type == "cuda" else "cpu"        
+        model = embedding_model.to(device).eval()
+        
         collate_fn = build_collator(tokenizer)
         
-        if self.matrix_embed:
-            pooler = None
-        else:
-            pooler = Pooler(self.pooling_types)
+        pooler = Pooler(self.pooling_types)
 
         def _get_embeddings(
                 residue_embeddings: torch.Tensor,
@@ -620,36 +613,24 @@ class PrecisionEmbedder(Embedder):
 
 def load_swissprot_sequences(n_samples: int = 1000, seed: Optional[int] = None, max_length: int = 1022) -> List[str]:
     """
-    Load sequences from Synthyra/SwissProt dataset using streaming.
-    
-    Args:
-        n_samples: Number of sequences to sample
-        seed: Random seed for reproducibility
-        max_length: Maximum sequence length to include
-        
-    Returns:
-        List of sampled sequences
+    Load sequences from Synthyra/SwissProt dataset.
     """
     
     if seed is not None:
         random.seed(seed)
     
-    print(f"Loading Synthyra/SwissProt with streaming=True...")
+    print(f"Loading Synthyra/SwissProt...")
     dataset = load_dataset("Synthyra/SwissProt", split="train", streaming=True)
+    dataset = dataset.shuffle(seed=seed, buffer_size=50000)
     
-    buffer_size = n_samples * 5
     sequences = []
-    
-    print(f"Collecting sequences (buffer_size={buffer_size})...")
-    for i, example in enumerate(tqdm(dataset, total=buffer_size, desc="Loading sequences")):
+    print(f"Collecting {n_samples} random sequences...")
+    for example in tqdm(dataset, total=n_samples, desc="Sampling sequences"):
         seq = example.get('sequence', example.get('Sequence', ''))
         if seq and len(seq) <= max_length:
             sequences.append(seq)
-        if len(sequences) >= buffer_size:
+        if len(sequences) >= n_samples:
             break
-    
-    # Sample
-    sequences = random.sample(sequences, n_samples)
     
     print(f"Sampled {len(sequences)} sequences (max_length={max_length})")
     return sequences
