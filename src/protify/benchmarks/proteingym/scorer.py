@@ -767,20 +767,27 @@ class ProteinGymScorer:
         
         print(f"Scoring {len(sequences)} variants with E1 ({scoring_method})...")
         
-        results = scorer.score(
-            parent_sequence=target_seq,
-            sequences=sequences,
-            sequence_ids=sequence_ids,
-            context_seqs=None,
-            context_reduction="none",
-        )
-        
-        scores_dict = {r["id"]: r["score"] for r in results}
-        scores = [scores_dict[mutant] for mutant in sequence_ids]
-        
-        out = df.copy()
-        out['delta_log_prob'] = scores
-        return out
+        try:
+            results = scorer.score(
+                parent_sequence=target_seq,
+                sequences=sequences,
+                sequence_ids=sequence_ids,
+                context_seqs=None,
+                context_reduction="none",
+            )
+            
+            scores_dict = {r["id"]: r["score"] for r in results}
+            scores = [scores_dict[mutant] for mutant in sequence_ids]
+            
+            out = df.copy()
+            out['delta_log_prob'] = scores
+            return out
+        finally:
+            # Clean up E1Scorer's cache and GPU memory after each assay
+            scorer.cleanup()
+            del scorer
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
     
     @torch.inference_mode()
     def _position_log_probs_batched(

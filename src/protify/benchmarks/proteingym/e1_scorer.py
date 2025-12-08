@@ -66,6 +66,12 @@ class E1Scorer:
 
         self.vocab_size = len(self.vocab)
 
+    def cleanup(self) -> None:
+        """Clean up GPU memory and caches."""
+        self.predictor.kv_cache.reset()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
     def mask_sequence(self, sequence: str, mask_position: int) -> str:
         """
         Mask a given position in a sequence.
