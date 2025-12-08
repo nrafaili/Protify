@@ -125,6 +125,8 @@ def parse_arguments():
                         help="Select how to slice the sequence for ProteinGym zero-shot.")
     parser.add_argument("--pg_batch_size", type=int, default=32,
                         help="Batch size for ProteinGym zero-shot scoring (default: 32).")
+    parser.add_argument("--max_batch_tokens", type=int, default=65536,
+                        help="Maximum tokens per batch for dynamic batching in ProteinGym scoring (default: 65536). Higher values increase GPU utilization.")
     parser.add_argument("--compare_scoring_methods", action="store_true", default=False,
                         help="Compare different scoring methods across models and DMS assays (default: False).")
     parser.add_argument("--score_only", action="store_true", default=False,
@@ -636,6 +638,7 @@ class MainProcess(MetricsLogger, DataMixin, TrainerMixin):
             scoring_method=scoring_method,
             scoring_window=scoring_window,
             batch_size=getattr(self.full_args, 'pg_batch_size', 32),
+            max_batch_tokens=getattr(self.full_args, 'max_batch_tokens', 65536),
             use_autocast=use_autocast,
         )
         print_message(f"ProteinGym zero-shot complete. Results in {results_dir}")

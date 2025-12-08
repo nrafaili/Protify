@@ -71,21 +71,24 @@ class SequenceProcessor:
                 df['mutation_barycenter'] = df['mutated_seq'].apply(lambda x: len(x) // 2)
                 df['scoring_optimal_window'] = df['mutated_seq'].apply(lambda x: (0, len(x)))
             
-            df['sliced_mutated_seq'] = [
-                df['mutated_seq'][index][df['scoring_optimal_window'][index][0]:df['scoring_optimal_window'][index][1]] 
-                for index in range(num_mutants)
-            ]
             df['window_start'] = df['scoring_optimal_window'].map(lambda x: x[0])
             df['window_end'] = df['scoring_optimal_window'].map(lambda x: x[1])
             del df['scoring_optimal_window'], df['mutation_barycenter']
             
+            df['sliced_mutated_seq'] = [
+                seq[start:end] 
+                for seq, start, end in zip(df['mutated_seq'], df['window_start'], df['window_end'])
+            ]
+            
             df_wt = df.copy()
-            df_wt['mutated_seq'] = [target_seq] * num_mutants
+            df_wt['mutated_seq'] = target_seq
+            assert len(df_wt) == num_mutants, "Number of wild type sequences should be equal to the number of mutants"
+            
             if indel_mode:
                 df_wt['window_end'] = df_wt['mutated_seq'].map(lambda x: len(x))
             df_wt['sliced_mutated_seq'] = [
-                target_seq[df_wt['window_start'][index]:df_wt['window_end'][index]] 
-                for index in range(num_mutants)
+                target_seq[start:end] 
+                for start, end in zip(df_wt['window_start'], df_wt['window_end'])
             ]
             df = pd.concat([df, df_wt], axis=0)
             df = df.drop_duplicates()
@@ -175,7 +178,7 @@ class ProteinGymScorer:
     use_autocast : bool
         Whether to use autocast for inference (default True)
     dtype : torch.dtype, optional
-        Data type for autocast. If None, uses MODEL_DTYPE default for model.
+        Data type for autocast. If None, defaults to float16.
     """
     
     # Model context lengths (minus 2 for special tokens)
@@ -204,31 +207,6 @@ class ProteinGymScorer:
         'E1-600': 2046,
     }
     
-    # Default dtype for autocast per model (None = no autocast for that model)
-    MODEL_DTYPE = {
-        'ESM2-8': torch.float16,
-        'ESM2-35': torch.float16,
-        'ESM2-150': torch.float16,
-        'ESM2-650': torch.float16,
-        'ESM2-3B': torch.float16,
-        'ESMC-300': torch.float16,
-        'ESMC-600': torch.float16,
-        'ProtBert': torch.float16,
-        'ProtBert-BFD': torch.float16,
-        'GLM2-150': torch.float16,
-        'GLM2-650': torch.float16,
-        'DSM-150': torch.float16,
-        'DSM-650': torch.float16,
-        'DPLM-150': torch.float16,
-        'DPLM-650': torch.float16,
-        'DPLM-3B': torch.float16,
-        'Random-Transformer': torch.float16,
-        'AMPLIFY-120': torch.float16,
-        'AMPLIFY-350': torch.float16,
-        'E1-150': None,  # E1 models don't use autocast
-        'E1-300': None,
-        'E1-600': None,
-    }
     
     # Models that don't append EOS token
     GLM2_MODELS = ["GLM2-150", "GLM2-650", "GLM2-GAIA"]
@@ -260,14 +238,7 @@ class ProteinGymScorer:
         
         # Autocast settings
         self.use_autocast = use_autocast
-        # Use provided dtype, or fall back to model default, or None (no autocast)
-        if dtype is not None:
-            self.dtype = dtype
-        else:
-            self.dtype = self.MODEL_DTYPE.get(model_name, torch.float16)
-        # If dtype is None (e.g., E1 models), disable autocast
-        if self.dtype is None:
-            self.use_autocast = False
+        self.dtype = dtype if dtype is not None else torch.float16
 
     def score_substitutions(
         self,
@@ -431,7 +402,6 @@ class ProteinGymScorer:
     def _create_dynamic_batches(
         self,
         sequences: List[str],
-        positions_list: List[List[int]],
         max_batch_tokens: Optional[int] = None,
     ) -> List[List[int]]:
         """Create dynamic batches that pack sequences greedily until max_batch_tokens is reached."""
@@ -823,7 +793,7 @@ class ProteinGymScorer:
         assert len(sequences) == len(positions_list), "Must have one position list per sequence"
         
         # Create dynamic batches
-        batch_indices = self._create_dynamic_batches(sequences, positions_list)
+        batch_indices = self._create_dynamic_batches(sequences)
         
         all_log_probs = [None] * len(sequences)
         all_selected_logits = [None] * len(sequences) if return_logits else None
@@ -846,7 +816,7 @@ class ProteinGymScorer:
                 batch_sequences,
                 return_tensors='pt',
                 add_special_tokens=True,
-                padding=False,
+                padding='longest',
             )
             input_ids = tokens['input_ids'].to(self.device)
             attention_mask = tokens['attention_mask'].to(self.device)
@@ -1063,6 +1033,7 @@ class ProteinGymRunner:
         scoring_method: str = "masked_marginal",
         scoring_window: str = "optimal",
         batch_size: int = 32,
+        max_batch_tokens: int = 65536,
         use_autocast: bool = True,
         dtype: Optional[torch.dtype] = None,
     ) -> Dict[str, float]:
@@ -1082,6 +1053,8 @@ class ProteinGymRunner:
             "optimal" or "sliding"
         batch_size : int
             Batch size for inference
+        max_batch_tokens : int
+            Maximum tokens per batch for dynamic batching (default 65536)
         use_autocast : bool
             Whether to use autocast for inference (default True)
         dtype : torch.dtype, optional
@@ -1109,6 +1082,7 @@ class ProteinGymRunner:
                 tokenizer=tokenizer,
                 device=self.device,
                 batch_size=batch_size,
+                max_batch_tokens=max_batch_tokens,
                 use_autocast=use_autocast,
                 dtype=dtype,
             )

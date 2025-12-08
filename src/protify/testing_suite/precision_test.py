@@ -36,7 +36,7 @@ from torch.utils.data import DataLoader
 TEST_DMS_IDS = [
     "A4_HUMAN_Seuma_2022",  # Stability
     "ACE2_HUMAN_Chan_2020",  # Binding
-    "CAPSD_AAV2S_Sinai_2021",  # Organismal fitness
+    "ENV_HV1BR_Haddox_2016",  # Organismal fitness
 ]
 
 
@@ -82,7 +82,7 @@ def score_with_precision(
         model=model,
         tokenizer=tokenizer,
         device=device,
-        batch_size=32,
+        batch_size=128,
         max_batch_tokens=max_batch_tokens,
         use_autocast=use_autocast,
         dtype=scorer_dtype,
