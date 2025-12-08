@@ -3,6 +3,7 @@ import os
 import sys
 import subprocess
 import time
+import gc
 import numpy as np
 import pandas as pd
 import torch
@@ -1112,6 +1113,19 @@ class ProteinGymRunner:
                 
                 self._save_results(dms_id, results_df, model_name, suffix, mode)
                 tqdm.write(f"[Assay {dms_id}] saved/updated")
+            
+            del scorer
+            del model
+            del tokenizer
+            
+            if self.device.type == 'cuda':
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            
+            # Run garbage collection
+            gc.collect()
+            
+            tqdm.write(f"Model {model_name} deleted and memory cleared")
             
             timing[model_name] = time.time() - start_time
         
