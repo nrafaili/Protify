@@ -52,13 +52,12 @@ class RandomTransformer(nn.Module):
         self.config = config
         self.transformer = TransformerForMaskedLM(config)
 
-    def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None, output_attentions: bool = False):
-        # Return the full output object which includes logits
-        out = self.transformer(input_ids, attention_mask, output_attentions=output_attentions)
+    def forward(self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None, output_attentions: bool = False) -> torch.Tensor:
         if output_attentions:
+            out = self.transformer(input_ids, attention_mask, output_attentions=output_attentions)
             return out.last_hidden_state, out.attentions
         else:
-            return out
+            return self.transformer(input_ids, attention_mask).last_hidden_state
 
 
 def build_random_model(preset: str, masked_lm: bool = False, **kwargs):
