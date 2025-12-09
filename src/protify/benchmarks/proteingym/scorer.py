@@ -1081,6 +1081,18 @@ class ProteinGymRunner:
         for model_name in model_names:
             start_time = time.time()
             
+            if self.device.type == 'cuda':
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            gc.collect()
+            
+            # Clear torch compilation cache for E1 models
+            if model_name.lower().startswith('e1'):
+                try:
+                    torch._dynamo.reset()
+                except Exception:
+                    pass
+            
             model, tokenizer = get_base_model(model_name, masked_lm=True)
             model = model.to(self.device)
             
@@ -1131,6 +1143,13 @@ class ProteinGymRunner:
             
             # Run garbage collection
             gc.collect()
+            
+            # Clear torch compilation cache for E1 models to prevent shape mismatches
+            if model_name.lower().startswith('e1'):
+                try:
+                    torch._dynamo.reset()
+                except Exception:
+                    pass
             
             tqdm.write(f"Model {model_name} deleted and memory cleared")
             
